@@ -170,7 +170,8 @@ tasks.named('processResources', ProcessResources) {
             'gold_fluid.png', 'sandstone_fluid.png', 'iron_fluid_clear.png', 'iron_fluid_filled.png',
             'clay_fluid.png', 'void_fluid.png', 'diamond_fluid.png', 'diamond_fluid_down.png',
             'diamond_fluid_up.png', 'diamond_fluid_north.png', 'diamond_fluid_south.png',
-            'diamond_fluid_west.png', 'diamond_fluid_east.png', 'diamond_fluid_itemstack.png'
+            'diamond_fluid_west.png', 'diamond_fluid_east.png', 'diamond_fluid_itemstack.png',
+            'diamond_wood_fluid_clear.png', 'diamond_wood_fluid_filled.png'
             into 'assets/buildcrafttransport/textures/block/pipe'
         }
         from('buildcraft_resources/assets/buildcrafttransport/textures/gui') {

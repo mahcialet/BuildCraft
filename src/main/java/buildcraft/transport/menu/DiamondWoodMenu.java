@@ -51,7 +51,8 @@ public final class DiamondWoodMenu extends AbstractContainerMenu {
 
     private PipeHolderBlockEntity holder() {
         return inventory.player.level().getBlockEntity(pos) instanceof PipeHolderBlockEntity holder
-            && holder.pipeType() == PipeType.DIAMOND_WOOD_ITEM ? holder : null;
+            && (holder.pipeType() == PipeType.DIAMOND_WOOD_ITEM
+                || holder.pipeType() == PipeType.DIAMOND_WOOD_FLUID) ? holder : null;
     }
 
     private void refresh() {

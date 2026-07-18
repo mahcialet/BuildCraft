@@ -34,6 +34,7 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_CLAY_FLUID = pipe(PipeType.CLAY_FLUID);
     public static final DeferredItem<PipeItem> PIPE_VOID_FLUID = pipe(PipeType.VOID_FLUID);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_FLUID = pipe(PipeType.DIAMOND_FLUID);
+    public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_FLUID = pipe(PipeType.DIAMOND_WOOD_FLUID);
 
     private BCTransportItems() {
     }

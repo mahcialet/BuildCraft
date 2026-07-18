@@ -131,6 +131,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
         registerTest(event, environment, "transport_clay_void_fluid_pipes", BCCoreGameTests::transportClayVoidFluidPipes);
         registerTest(event, environment, "transport_diamond_fluid_pipe", BCCoreGameTests::transportDiamondFluidPipe);
+        registerTest(event, environment, "transport_diamond_wood_fluid_pipe", BCCoreGameTests::transportDiamondWoodFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1138,11 +1139,11 @@ public final class BCCoreGameTests {
                     helper.getLevel().getBlockEntity(woodPos);
             helper.assertValueEqual(wood.extractionDirection(), net.minecraft.core.Direction.WEST,
                     "wood fluid pipe selected wrong extraction direction");
-            helper.assertValueEqual(wood.mjReceiver().receivePower(100_000, false), 0L,
+            helper.assertValueEqual(wood.mjReceiver().receivePower(100_000, false), 90_000L,
                     "wood fluid pipe returned paid extraction power");
-            helper.assertValueEqual(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.RESIDUE_TANK), 900,
+            helper.assertValueEqual(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.RESIDUE_TANK), 990,
                     "wood fluid pipe extracted wrong amount");
-            helper.assertValueEqual(wood.fluidBuffer().getAmountAsInt(0), 100,
+            helper.assertValueEqual(wood.fluidBuffer().getAmountAsInt(0), 10,
                     "wood fluid pipe buffered wrong amount");
             var drops = net.minecraft.world.level.block.Block.getDrops(
                     helper.getLevel().getBlockState(woodPos), helper.getLevel(), woodPos, wood);
@@ -1425,6 +1426,82 @@ public final class BCCoreGameTests {
         helper.assertTrue(drops.size() == 1
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_FLUID.get()),
                 "diamond fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportDiamondWoodFluidPipe(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos pipePos = helper.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos tankPos = pipePos.west();
+        BlockPos outputPos = pipePos.east();
+        helper.getLevel().setBlock(pipePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.DIAMOND_WOOD_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(outputPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(tankPos, BCCoreBlocks.ENGINE.get().defaultBlockState().setValue(
+                BlockEngine.ENGINE_TYPE, EnumEngineType.IRON), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var pipe = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        var tank = (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(tankPos);
+        ItemStack waterFilter = ItemFragileFluidContainer.create(BCCoreItems.FRAGILE_FLUID_SHARD.get(),
+                new net.neoforged.neoforge.fluids.FluidStack(
+                        net.minecraft.world.level.material.Fluids.WATER, 100));
+        pipe.setDiamondFilter(0, waterFilter);
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        var fuel = net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get());
+        tank.tanks().set(CombustionEngineBlockEntity.RESIDUE_TANK, water, 500);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), pipe);
+        helper.assertValueEqual(pipe.extractionDirection(), net.minecraft.core.Direction.WEST,
+                "diamond wooden fluid pipe selected wrong source");
+        helper.assertValueEqual(pipe.mjReceiver().receivePower(MjAPI.MJ, false), 920_000L,
+                "diamond wooden whitelist charged wrong power");
+        helper.assertValueEqual(tank.tanks().getAmountAsInt(CombustionEngineBlockEntity.RESIDUE_TANK), 420,
+                "diamond wooden whitelist extracted wrong amount");
+        helper.assertValueEqual(pipe.fluidBuffer().getAmountAsInt(0), 80,
+                "diamond wooden whitelist buffered wrong amount");
+
+        pipe.fluidBuffer().set(0, net.neoforged.neoforge.transfer.fluid.FluidResource.EMPTY, 0);
+        tank.tanks().set(CombustionEngineBlockEntity.RESIDUE_TANK, fuel, 500);
+        helper.assertValueEqual(pipe.mjReceiver().receivePower(MjAPI.MJ, false), MjAPI.MJ,
+                "diamond wooden whitelist extracted nonmatching fluid");
+        pipe.setDiamondFilterMode(buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.BLACK_LIST);
+        helper.assertValueEqual(pipe.mjReceiver().receivePower(MjAPI.MJ, false), 920_000L,
+                "diamond wooden blacklist rejected nonmatching fluid");
+        helper.assertValueEqual(pipe.fluidBuffer().getAmountAsInt(0), 80,
+                "diamond wooden blacklist buffered wrong amount");
+
+        pipe.fluidBuffer().set(0, net.neoforged.neoforge.transfer.fluid.FluidResource.EMPTY, 0);
+        tank.tanks().set(CombustionEngineBlockEntity.RESIDUE_TANK, water, 500);
+        pipe.setDiamondFilterMode(buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.ROUND_ROBIN);
+        helper.assertValueEqual(pipe.mjReceiver().receivePower(MjAPI.MJ, false), MjAPI.MJ,
+                "diamond wooden legacy round-robin unexpectedly extracted fluid");
+
+        net.minecraft.nbt.CompoundTag saved = pipe.saveWithFullMetadata(helper.getLevel().registryAccess());
+        var loaded = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                        pipePos, helper.getLevel().getBlockState(pipePos), saved, helper.getLevel().registryAccess());
+        helper.assertTrue(loaded != null && !loaded.diamondFilters().getFirst().isEmpty()
+                && loaded.diamondFilterMode()
+                    == buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.ROUND_ROBIN,
+                "diamond wooden fluid settings failed codec reload");
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        menuPlayer.setPos(pipePos.getX() + 0.5, pipePos.getY() + 0.5, pipePos.getZ() + 0.5);
+        var menu = new buildcraft.transport.menu.DiamondWoodMenu(0, menuPlayer.getInventory(), pipePos);
+        helper.assertTrue(menu.stillValid(menuPlayer) && menu.slots.size() == 45,
+                "diamond wooden fluid menu did not expose filters plus inventory");
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_FLUID.get());
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(pipePos), helper.getLevel(), pipePos, pipe);
+        helper.assertTrue(drops.size() == 1
+                && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_FLUID.get()),
+                "diamond wooden fluid pipe returned wrong drop");
         helper.succeed();
     }
 

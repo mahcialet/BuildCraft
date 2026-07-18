@@ -398,7 +398,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureWoodDirection(ServerLevel level) {
-        if (pipeType() == PipeType.WOOD_FLUID) {
+        if (pipeType() == PipeType.WOOD_FLUID || pipeType() == PipeType.DIAMOND_WOOD_FLUID) {
             if (extractionDirection != null && isFluidHandler(level, extractionDirection)) return;
             extractionDirection = null;
             for (Direction direction : Direction.values()) {
@@ -530,7 +530,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public @Nullable IMjRedstoneReceiver mjReceiver() {
         return switch (pipeType()) {
-            case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM, WOOD_FLUID -> woodReceiver;
+            case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM, WOOD_FLUID, DIAMOND_WOOD_FLUID -> woodReceiver;
             case OBSIDIAN_ITEM -> obsidianReceiver;
             case STRIPES_ITEM -> stripesReceiver;
             default -> null;
@@ -598,7 +598,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private long extractItems(long power, boolean simulate) {
-        if (pipeType() == PipeType.WOOD_FLUID) return extractFluid(power, simulate);
+        if (pipeType() == PipeType.WOOD_FLUID || pipeType() == PipeType.DIAMOND_WOOD_FLUID) {
+            return extractFluid(power, simulate);
+        }
         if (!(level instanceof ServerLevel serverLevel)
             || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
                 && pipeType() != PipeType.EMZULI_ITEM)
@@ -647,12 +649,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         var source = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
                 worldPosition.relative(extractionDirection), extractionDirection.getOpposite());
         if (source == null) return power;
-        int remaining = (int) Math.min(Integer.MAX_VALUE, power / 1_000);
+        int remaining = (int) Math.min(pipeType().fluidTransferRate(), power / 1_000);
         int extractedTotal = 0;
         try (Transaction transaction = Transaction.openRoot()) {
             for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
                 FluidResource resource = source.getResource(slot);
                 if (resource.isEmpty()) continue;
+                if (pipeType() == PipeType.DIAMOND_WOOD_FLUID && !matchesDiamondFluidFilter(resource)) continue;
                 int extracted = source.extract(slot, resource, remaining, transaction);
                 if (extracted <= 0) continue;
                 int inserted = fluidBuffer.insert(resource, extracted, transaction);
@@ -664,6 +667,29 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (!simulate && extractedTotal > 0) sync();
         return power - extractedTotal * 1_000L;
+    }
+
+    private boolean matchesDiamondFluidFilter(FluidResource resource) {
+        if (diamondFilterMode == DiamondFilterMode.ROUND_ROBIN) return false;
+        boolean configured = false;
+        boolean matched = false;
+        for (ItemStack filter : diamondFilters) {
+            if (filter.isEmpty()) continue;
+            var access = net.neoforged.neoforge.transfer.access.ItemAccess.forStack(filter.copy());
+            var handler = access.getCapability(Capabilities.Fluid.ITEM);
+            if (handler == null) continue;
+            for (int slot = 0; slot < handler.size(); slot++) {
+                FluidResource filtered = handler.getResource(slot);
+                if (filtered.isEmpty() || handler.getAmountAsLong(slot) <= 0) continue;
+                configured = true;
+                if (filtered.equals(resource)) matched = true;
+            }
+        }
+        return switch (diamondFilterMode) {
+            case WHITE_LIST -> !configured || matched;
+            case BLACK_LIST -> !matched;
+            case ROUND_ROBIN -> false;
+        };
     }
 
     private boolean matchesDiamondFilter(ItemStack stack) {
@@ -695,7 +721,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public void setDiamondFilter(int index, ItemStack stack) {
-        if (pipeType() != PipeType.DIAMOND_WOOD_ITEM || index < 0 || index >= diamondFilters.size()) return;
+        if ((pipeType() != PipeType.DIAMOND_WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_FLUID)
+                || index < 0 || index >= diamondFilters.size()) return;
         diamondFilters.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
         if (index == diamondFilterCursor && stack.isEmpty()) advanceDiamondFilter();
         sync();
@@ -706,7 +733,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public void setDiamondFilterMode(DiamondFilterMode mode) {
-        if (pipeType() != PipeType.DIAMOND_WOOD_ITEM || mode == null) return;
+        if ((pipeType() != PipeType.DIAMOND_WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_FLUID)
+                || mode == null) return;
         diamondFilterMode = mode;
         sync();
     }

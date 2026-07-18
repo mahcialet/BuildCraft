@@ -198,6 +198,13 @@
     { "when": { "type": "diamond_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_fluid_north_arm", "x": 90 } },
     { "when": { "type": "diamond_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_fluid_east_arm", "x": 90, "y": 90 } },
     { "when": { "type": "diamond_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_fluid_south_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "diamond_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_fluid_west_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "diamond_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_fluid_west_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "diamond_wood_fluid" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_center" } },
+    { "when": { "type": "diamond_wood_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm" } },
+    { "when": { "type": "diamond_wood_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 180 } },
+    { "when": { "type": "diamond_wood_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90 } },
+    { "when": { "type": "diamond_wood_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "diamond_wood_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "diamond_wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 270 } }
   ]
 }
