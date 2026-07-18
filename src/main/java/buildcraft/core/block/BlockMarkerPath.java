@@ -2,6 +2,7 @@ package buildcraft.core.block;
 
 import buildcraft.core.marker.PathSavedData;
 import com.mojang.serialization.MapCodec;
+import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -14,6 +15,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.SoundType;
@@ -28,7 +31,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
 /** Thin, face-mounted marker whose ordered connections live in {@link PathSavedData}. */
-public final class BlockMarkerPath extends Block {
+public final class BlockMarkerPath extends BaseEntityBlock {
     public static final MapCodec<BlockMarkerPath> CODEC = simpleCodec(BlockMarkerPath::new);
     public static final EnumProperty<Direction> FACING = BlockStateProperties.FACING;
     private static final VoxelShape UP = box(6, 0, 6, 10, 10, 10);
@@ -49,6 +52,11 @@ public final class BlockMarkerPath extends Block {
     }
 
     @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return new PathMarkerBlockEntity(pos, state);
+    }
+
+    @Override
     public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
         BlockState state = defaultBlockState().setValue(FACING, context.getClickedFace());
         return state.canSurvive(context.getLevel(), context.getClickedPos()) ? state : null;
@@ -59,6 +67,13 @@ public final class BlockMarkerPath extends Block {
         Direction facing = state.getValue(FACING);
         BlockPos supportPos = pos.relative(facing.getOpposite());
         return level.getBlockState(supportPos).isFaceSturdy(level, supportPos, facing);
+    }
+
+    @Override
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean movedByPiston) {
+        if (level instanceof ServerLevel serverLevel && !oldState.is(this)) {
+            PathSavedData.get(serverLevel).addMarker(pos);
+        }
     }
 
     @Override

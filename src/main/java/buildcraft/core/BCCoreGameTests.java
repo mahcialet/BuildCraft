@@ -5,9 +5,12 @@ import buildcraft.api.enums.EnumDecoratedBlock;
 import buildcraft.core.block.BlockDecoration;
 import buildcraft.core.gametest.BuildCraftGameTestInstance;
 import buildcraft.core.item.ItemBlockDecoration;
+import buildcraft.core.item.ItemMarkerConnector;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
+import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.JsonOps;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
@@ -54,6 +57,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
+        registerTest(event, environment, "path_marker_sync", BCCoreGameTests::pathMarkerSync);
     }
 
     private static void registerTest(
@@ -114,6 +118,7 @@ public final class BCCoreGameTests {
         BlockPos c = new BlockPos(4, 1, 0);
         BlockPos d = new BlockPos(6, 1, 0);
         BlockPos e = new BlockPos(8, 1, 0);
+        for (BlockPos marker : java.util.List.of(a, b, c, d, e)) paths.addMarker(marker);
 
         helper.assertTrue(paths.connect(a, b), "Could not create a path");
         helper.assertTrue(paths.connect(b, c), "Could not extend a path");
@@ -131,6 +136,67 @@ public final class BCCoreGameTests {
         PathConnection opened = paths.connectionAt(a).orElseThrow();
         helper.assertTrue(!opened.loop(), "Removing a loop marker did not open the loop");
         helper.assertValueEqual(opened.positions(), java.util.List.of(b, a, e, d), "opened loop order");
+
+        Object encoded = PathSavedData.CODEC.encodeStart(JsonOps.INSTANCE, paths).getOrThrow();
+        PathSavedData decoded = PathSavedData.CODEC.parse(JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
+        helper.assertValueEqual(decoded.markers(), paths.markers(), "persisted marker positions");
+        helper.assertValueEqual(decoded.connections().getFirst().positions(), opened.positions(), "persisted path order");
+
+        PathSavedData aimedPaths = new PathSavedData();
+        BlockPos left = new BlockPos(-1, 0, 2);
+        BlockPos right = new BlockPos(1, 0, 2);
+        aimedPaths.addMarker(left);
+        aimedPaths.addMarker(right);
+        ItemMarkerConnector.Candidate aimed = ItemMarkerConnector.findCandidate(
+            aimedPaths, new Vec3(0.5, 0.5, 0.0), new Vec3(0.0, 0.0, 1.0)
+        );
+        helper.assertTrue(aimed != null, "Connector did not select the aimed marker line");
+        helper.assertTrue(
+            (aimed.from().equals(left) && aimed.to().equals(right))
+                || (aimed.from().equals(right) && aimed.to().equals(left)),
+            "Connector selected the wrong marker line"
+        );
+
+        PathSavedData directional = new PathSavedData();
+        BlockPos p0 = new BlockPos(0, 0, 0);
+        BlockPos p1 = new BlockPos(1, 0, 0);
+        BlockPos q0 = new BlockPos(0, 0, 2);
+        BlockPos q1 = new BlockPos(1, 0, 2);
+        for (BlockPos marker : java.util.List.of(p0, p1, q0, q1)) directional.addMarker(marker);
+        helper.assertTrue(directional.connect(p0, p1), "Could not create directional path A");
+        helper.assertTrue(directional.connect(q0, q1), "Could not create directional path B");
+        helper.assertTrue(
+            !directional.canConnect(p0, q0) && !directional.canConnect(q0, p0),
+            "Connector allowed a direction-reversing first-to-first merge"
+        );
+        helper.succeed();
+    }
+
+    private static void pathMarkerSync(GameTestHelper helper) {
+        BlockPos first = new BlockPos(0, 1, 0);
+        BlockPos middle = new BlockPos(2, 1, 0);
+        BlockPos last = new BlockPos(4, 1, 0);
+        for (BlockPos marker : java.util.List.of(first, middle, last)) {
+            helper.setBlock(marker.below(), Blocks.STONE);
+            helper.setBlock(marker, BCCoreBlocks.MARKER_PATH.get().defaultBlockState());
+        }
+
+        PathSavedData paths = PathSavedData.get(helper.getLevel());
+        BlockPos absoluteFirst = helper.absolutePos(first);
+        BlockPos absoluteMiddle = helper.absolutePos(middle);
+        BlockPos absoluteLast = helper.absolutePos(last);
+        helper.assertTrue(paths.connect(absoluteFirst, absoluteMiddle), "Could not connect placed markers");
+        helper.assertTrue(paths.connect(absoluteMiddle, absoluteLast), "Could not extend placed markers");
+
+        PathMarkerBlockEntity firstEntity = (PathMarkerBlockEntity) helper.getLevel().getBlockEntity(absoluteFirst);
+        helper.assertValueEqual(
+            firstEntity.path(), java.util.List.of(absoluteFirst, absoluteMiddle, absoluteLast), "synced block entity path"
+        );
+        helper.assertTrue(!firstEntity.loop(), "Open path synced as a loop");
+
+        helper.destroyBlock(middle);
+        helper.assertTrue(paths.connectionAt(absoluteFirst).isEmpty(), "Destroyed middle marker did not split short path");
+        helper.assertValueEqual(firstEntity.path(), java.util.List.of(), "surviving marker snapshot was not cleared");
         helper.succeed();
     }
 
