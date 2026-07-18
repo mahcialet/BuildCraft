@@ -65,8 +65,12 @@ tasks.named('processResources', ProcessResources) {
     // Reuse the original artwork without duplicating binary assets while the
     // historical resource tree remains available as the migration source.
     from('buildcraft_resources/assets/buildcraftcore/textures/items') {
-        include 'gear_wood.png', 'gear_stone.png', 'gear_iron.png', 'gear_gold.png', 'gear_diamond.png', 'wrench.png'
+        include 'gear_wood.png', 'gear_stone.png', 'gear_iron.png', 'gear_gold.png', 'gear_diamond.png', 'wrench.png', 'marker_path.png'
         into 'assets/buildcraftcore/textures/item'
+    }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks') {
+        include 'marker_path.png'
+        into 'assets/buildcraftcore/textures/block'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/blueprint') {
         include 'black.png', 'blue.png'

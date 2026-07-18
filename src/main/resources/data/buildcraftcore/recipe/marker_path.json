@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": { "G": "minecraft:green_dye", "T": "minecraft:redstone_torch" },
+  "pattern": ["G", "T"],
+  "result": { "id": "buildcraftcore:marker_path" }
+}

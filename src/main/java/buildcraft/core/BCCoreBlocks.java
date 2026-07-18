@@ -2,6 +2,7 @@ package buildcraft.core;
 
 import buildcraft.BuildCraft;
 import buildcraft.core.block.BlockDecoration;
+import buildcraft.core.block.BlockMarkerPath;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -12,6 +13,8 @@ public final class BCCoreBlocks {
 
     public static final DeferredBlock<BlockDecoration> DECORATED =
         BLOCKS.registerBlock("decorated", BlockDecoration::new);
+    public static final DeferredBlock<BlockMarkerPath> MARKER_PATH =
+        BLOCKS.registerBlock("marker_path", BlockMarkerPath::new);
 
     private BCCoreBlocks() {
     }
