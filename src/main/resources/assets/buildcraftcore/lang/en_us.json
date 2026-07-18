@@ -5,5 +5,11 @@
   "item.buildcraftcore.gear_stone": "Stone Gear",
   "item.buildcraftcore.gear_iron": "Iron Gear",
   "item.buildcraftcore.gear_gold": "Gold Gear",
-  "item.buildcraftcore.gear_diamond": "Diamond Gear"
+  "item.buildcraftcore.gear_diamond": "Diamond Gear",
+  "block.buildcraftcore.decorated.destroy": "Destroy Decoration",
+  "block.buildcraftcore.decorated.blueprint": "Blueprint Decoration",
+  "block.buildcraftcore.decorated.template": "Template Decoration",
+  "block.buildcraftcore.decorated.paper": "Paper Decoration",
+  "block.buildcraftcore.decorated.leather": "Leather Decoration",
+  "block.buildcraftcore.decorated.laser_back": "Laser Decoration"
 }

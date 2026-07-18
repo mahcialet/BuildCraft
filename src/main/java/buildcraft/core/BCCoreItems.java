@@ -2,6 +2,7 @@ package buildcraft.core;
 
 import buildcraft.BuildCraft;
 import buildcraft.core.item.ItemWrench;
+import buildcraft.core.item.ItemBlockDecoration;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -13,6 +14,10 @@ public final class BCCoreItems {
 
     public static final DeferredItem<ItemWrench> WRENCH = ITEMS.registerItem(
         "wrench", ItemWrench::new, properties -> properties.stacksTo(1)
+    );
+    public static final DeferredItem<ItemBlockDecoration> DECORATED = ITEMS.registerItem(
+        "decorated",
+        properties -> new ItemBlockDecoration(BCCoreBlocks.DECORATED.get(), properties.useBlockDescriptionPrefix())
     );
     public static final DeferredItem<Item> GEAR_WOOD = ITEMS.registerSimpleItem("gear_wood");
     public static final DeferredItem<Item> GEAR_STONE = ITEMS.registerSimpleItem("gear_stone");

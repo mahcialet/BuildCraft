@@ -1,0 +1,16 @@
+{
+  "model": {
+    "type": "minecraft:select",
+    "property": "minecraft:block_state",
+    "block_state_property": "decoration_type",
+    "cases": [
+      { "when": "destroy", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/destroy" } },
+      { "when": "blueprint", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/blueprint" } },
+      { "when": "template", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/template" } },
+      { "when": "paper", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/paper" } },
+      { "when": "leather", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/leather" } },
+      { "when": "laser_back", "model": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/laser_back" } }
+    ],
+    "fallback": { "type": "minecraft:model", "model": "buildcraftcore:block/decorated/destroy" }
+  }
+}

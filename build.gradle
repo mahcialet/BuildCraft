@@ -60,6 +60,18 @@ tasks.named('processResources', ProcessResources) {
         include 'gear_wood.png', 'gear_stone.png', 'gear_iron.png', 'gear_gold.png', 'gear_diamond.png', 'wrench.png'
         into 'assets/buildcraftcore/textures/item'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks/blueprint') {
+        include 'black.png', 'blue.png'
+        into 'assets/buildcraftcore/textures/block/blueprint'
+    }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
+        include 'leather.png', 'paper.png', 'texture_red_dark.png'
+        into 'assets/buildcraftcore/textures/block/misc'
+    }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/laser') {
+        include 'bottom.png'
+        into 'assets/buildcraftcore/textures/block/laser'
+    }
 }
 
 tasks.named('jar', Jar) {

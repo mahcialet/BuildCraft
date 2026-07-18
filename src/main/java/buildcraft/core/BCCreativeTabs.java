@@ -1,6 +1,8 @@
 package buildcraft.core;
 
 import buildcraft.BuildCraft;
+import buildcraft.api.enums.EnumDecoratedBlock;
+import buildcraft.core.item.ItemBlockDecoration;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.CreativeModeTab;
@@ -26,6 +28,9 @@ public final class BCCreativeTabs {
                 output.accept(BCCoreItems.GEAR_IRON.get());
                 output.accept(BCCoreItems.GEAR_GOLD.get());
                 output.accept(BCCoreItems.GEAR_DIAMOND.get());
+                for (EnumDecoratedBlock type : EnumDecoratedBlock.values()) {
+                    output.accept(ItemBlockDecoration.createStack(type));
+                }
             })
             .build()
     );
