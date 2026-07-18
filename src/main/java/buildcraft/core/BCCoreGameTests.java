@@ -29,6 +29,12 @@ import buildcraft.api.mj.MjCapabilityHelper;
 import buildcraft.api.mj.MjEnergyAdapter;
 import buildcraft.api.mj.MjRfConversion;
 import buildcraft.api.mj.IMjToRfStatus;
+import buildcraft.api.mj.IMjConnector;
+import buildcraft.api.mj.IMjReceiver;
+import buildcraft.api.mj.IMjRedstoneReceiver;
+import buildcraft.api.enums.EnumEngineType;
+import buildcraft.core.block.BlockEngine;
+import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -99,6 +105,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
+        registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
     }
 
     private static void registerTest(
@@ -727,6 +734,62 @@ public final class BCCoreGameTests {
             MjAPI.setRfStatus(previous);
         }
         helper.succeed();
+    }
+
+    private static void redstoneEngine(GameTestHelper helper) {
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.WOOD)
+            .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
+        BlockPos enginePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        RedstoneEngineBlockEntity engine = (RedstoneEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        helper.assertTrue(engine != null, "redstone engine block entity missing");
+        helper.assertTrue(helper.getLevel().getCapability(
+            MjAPI.CAP_CONNECTOR, enginePos, net.minecraft.core.Direction.UP
+        ) != null, "registered engine connector capability missing");
+        helper.assertTrue(helper.getLevel().getCapability(
+            MjAPI.CAP_CONNECTOR, enginePos, net.minecraft.core.Direction.DOWN
+        ) == null, "registered engine connector leaked to another side");
+        helper.assertTrue(engine.connector(net.minecraft.core.Direction.UP) != null,
+            "engine output connector missing");
+        helper.assertTrue(engine.connector(net.minecraft.core.Direction.DOWN) == null,
+            "engine exposed connector on input side");
+        IMjReceiver normalReceiver = new IMjReceiver() {
+            @Override public boolean canConnect(IMjConnector other) { return true; }
+            @Override public long getPowerRequested() { return MjAPI.MJ; }
+            @Override public long receivePower(long amount, boolean simulate) { return 0; }
+        };
+        helper.assertTrue(!engine.connector(net.minecraft.core.Direction.UP).canConnect(normalReceiver),
+            "redstone engine connected to a normal MJ receiver");
+
+        TestMjReceiver receiver = new TestMjReceiver();
+        for (int tick = 0; tick < 60; tick++) engine.tickCycle(true, receiver, tick);
+        helper.assertValueEqual(receiver.received, MjAPI.MJ, "redstone engine pulse output");
+        helper.assertTrue(engine.pumping(), "powered redstone engine was not pumping");
+        helper.assertValueEqual(engine.currentOutput(), MjAPI.MJ / 20, "redstone engine nominal output");
+        engine.tickCycle(false, receiver, 61);
+        helper.assertValueEqual(engine.storedPower(), 0L, "unpowered redstone engine retained power");
+        helper.succeed();
+    }
+
+    private static final class TestMjReceiver implements IMjRedstoneReceiver {
+        private long received;
+
+        @Override
+        public boolean canConnect(IMjConnector other) {
+            return true;
+        }
+
+        @Override
+        public long getPowerRequested() {
+            return 10 * MjAPI.MJ;
+        }
+
+        @Override
+        public long receivePower(long microJoules, boolean simulate) {
+            if (!simulate) received += microJoules;
+            return 0;
+        }
     }
 
     private static UseOnContext useContext(GameTestHelper helper, net.minecraft.world.entity.player.Player player,

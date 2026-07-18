@@ -3,6 +3,9 @@ package buildcraft.core;
 import buildcraft.BuildCraft;
 import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
+import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
+import buildcraft.api.mj.MjAPI;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -22,11 +25,21 @@ public final class BCCoreBlockEntities {
         BLOCK_ENTITIES.register("marker_volume", () -> new BlockEntityType<>(
             VolumeMarkerBlockEntity::new, BCCoreBlocks.MARKER_VOLUME.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RedstoneEngineBlockEntity>> ENGINE_REDSTONE =
+        BLOCK_ENTITIES.register("engine_redstone", () -> new BlockEntityType<>(
+            RedstoneEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
+        ));
 
     private BCCoreBlockEntities() {
     }
 
     public static void register(IEventBus modBus) {
         BLOCK_ENTITIES.register(modBus);
+        modBus.addListener(BCCoreBlockEntities::registerCapabilities);
+    }
+
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_REDSTONE.get(),
+            (engine, side) -> engine.connector(side));
     }
 }

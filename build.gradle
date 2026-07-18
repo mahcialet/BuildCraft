@@ -93,6 +93,13 @@ tasks.named('processResources', ProcessResources) {
         include 'marker_path.png', 'marker_volume.png'
         into 'assets/buildcraftcore/textures/block'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks/engine/wood') {
+        into 'assets/buildcraftcore/textures/block/engine/wood'
+    }
+    from('buildcraft_resources/assets/buildcraftlib/textures/blocks/engine') {
+        include 'chamber_base.png', 'trunk_blue.png'
+        into 'assets/buildcraftcore/textures/block/engine'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/blueprint') {
         include 'black.png', 'blue.png'
         into 'assets/buildcraftcore/textures/block/blueprint'
