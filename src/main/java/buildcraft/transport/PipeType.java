@@ -23,7 +23,9 @@ public enum PipeType implements StringRepresentable {
     COBBLESTONE_FLUID("cobblestone_fluid", "pipe_cobble_fluid", "Cobblestone Fluid Pipe"),
     STONE_FLUID("stone_fluid", "pipe_stone_fluid", "Stone Fluid Pipe"),
     QUARTZ_FLUID("quartz_fluid", "pipe_quartz_fluid", "Quartz Fluid Pipe"),
-    WOOD_FLUID("wood_fluid", "pipe_wood_fluid", "Wooden Fluid Pipe");
+    WOOD_FLUID("wood_fluid", "pipe_wood_fluid", "Wooden Fluid Pipe"),
+    GOLD_FLUID("gold_fluid", "pipe_gold_fluid", "Golden Fluid Pipe"),
+    SANDSTONE_FLUID("sandstone_fluid", "pipe_sandstone_fluid", "Sandstone Fluid Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -44,7 +46,8 @@ public enum PipeType implements StringRepresentable {
         if (carriesFluids() != other.carriesFluids()) return false;
         if (carriesFluids()) {
             if (isWoodenFluidExtraction() && other.isWoodenFluidExtraction()) return false;
-            return this == other || isWoodenFluidExtraction() || other.isWoodenFluidExtraction();
+            return this == other || isWoodenFluidExtraction() || other.isWoodenFluidExtraction()
+                || isGeneralFluidConnector() || other.isGeneralFluidConnector();
         }
         if (this == STRUCTURE || other == STRUCTURE) return this == other;
         if (isWoodenExtraction() && other.isWoodenExtraction()) return false;
@@ -67,15 +70,20 @@ public enum PipeType implements StringRepresentable {
 
     public boolean carriesItems() { return this != STRUCTURE && !carriesFluids(); }
     public boolean carriesFluids() {
-        return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID || this == WOOD_FLUID;
+        return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID
+            || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID;
     }
     public boolean isWoodenFluidExtraction() { return this == WOOD_FLUID; }
+    private boolean isGeneralFluidConnector() { return this == GOLD_FLUID || this == SANDSTONE_FLUID; }
+    public boolean connectsFluidHandlers() { return carriesFluids() && this != SANDSTONE_FLUID; }
     public int fluidTransferRate() {
         return switch (this) {
             case COBBLESTONE_FLUID -> 10;
             case STONE_FLUID -> 20;
             case QUARTZ_FLUID -> 40;
             case WOOD_FLUID -> 10;
+            case GOLD_FLUID -> 80;
+            case SANDSTONE_FLUID -> 20;
             default -> 0;
         };
     }

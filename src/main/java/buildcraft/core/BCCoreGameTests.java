@@ -127,6 +127,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
+        registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1147,6 +1148,76 @@ public final class BCCoreGameTests {
                     "wood fluid pipe returned wrong drop item");
             helper.succeed();
         });
+    }
+
+    private static void transportFastIsolatedFluidPipes(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos goldPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos stonePos = goldPos.east();
+        helper.getLevel().setBlock(goldPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.GOLD_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stonePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.STONE_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(goldPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "gold fluid pipe did not connect separated material");
+        helper.assertValueEqual(buildcraft.transport.PipeType.GOLD_FLUID.fluidTransferRate(), 80,
+                "gold fluid transfer rate");
+        helper.assertValueEqual(buildcraft.transport.PipeType.SANDSTONE_FLUID.fluidTransferRate(), 20,
+                "sandstone fluid transfer rate");
+        var gold = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(goldPos);
+        var stone = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(stonePos);
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        gold.fluidBuffer().set(0, water, 500);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), goldPos, helper.getLevel().getBlockState(goldPos), gold);
+        helper.assertValueEqual(gold.fluidBuffer().getAmountAsInt(0), 420, "gold pipe retained wrong amount");
+        helper.assertValueEqual(stone.fluidBuffer().getAmountAsInt(0), 80, "gold pipe transferred wrong amount");
+
+        BlockPos sandstonePos = helper.absolutePos(new BlockPos(4, 2, 1));
+        BlockPos cobblePos = sandstonePos.east();
+        BlockPos tankPos = sandstonePos.south();
+        helper.getLevel().setBlock(sandstonePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.SANDSTONE_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(tankPos, BCCoreBlocks.ENGINE.get().defaultBlockState().setValue(
+                BlockEngine.ENGINE_TYPE, EnumEngineType.IRON), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(sandstonePos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "sandstone fluid pipe did not connect to pipe");
+        helper.assertTrue(!helper.getLevel().getBlockState(sandstonePos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.SOUTH), "sandstone fluid pipe connected to tank");
+        helper.assertTrue(helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                sandstonePos, net.minecraft.core.Direction.SOUTH) == null,
+                "sandstone fluid pipe exposed capability to tank");
+
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_GOLD_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_GOLD_FLUID.get());
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_SANDSTONE_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_SANDSTONE_FLUID.get());
+        var goldDrops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(goldPos), helper.getLevel(), goldPos, gold);
+        helper.assertTrue(goldDrops.size() == 1
+                && goldDrops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_GOLD_FLUID.get()),
+                "gold fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void assertFluidUpgradeRecipe(GameTestHelper helper, net.minecraft.world.item.Item inputPipe,
+            net.minecraft.world.item.Item outputPipe) {
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(inputPipe), new ItemStack(Items.SLIME_BALL)));
+        ItemStack output = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel())
+                .orElseThrow().value().assemble(input);
+        helper.assertTrue(output.is(outputPipe), "fluid upgrade recipe returned wrong item");
     }
 
     private static void transportPipeFoundation(GameTestHelper helper) {

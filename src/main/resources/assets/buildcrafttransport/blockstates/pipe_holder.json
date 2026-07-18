@@ -156,6 +156,20 @@
     { "when": { "type": "wood_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90 } },
     { "when": { "type": "wood_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 90 } },
     { "when": { "type": "wood_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "gold_fluid" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_center" } },
+    { "when": { "type": "gold_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm" } },
+    { "when": { "type": "gold_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm", "x": 180 } },
+    { "when": { "type": "gold_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm", "x": 90 } },
+    { "when": { "type": "gold_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "gold_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "gold_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/gold_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "sandstone_fluid" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_center" } },
+    { "when": { "type": "sandstone_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm" } },
+    { "when": { "type": "sandstone_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 180 } },
+    { "when": { "type": "sandstone_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90 } },
+    { "when": { "type": "sandstone_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "sandstone_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "sandstone_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 270 } }
   ]
 }

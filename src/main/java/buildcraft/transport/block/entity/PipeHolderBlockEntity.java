@@ -147,8 +147,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
             if (direction == blocked || direction == extractionDirection) continue;
             if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
-            var target = level.getCapability(Capabilities.Fluid.BLOCK,
-                    worldPosition.relative(direction), direction.getOpposite());
+            BlockPos targetPos = worldPosition.relative(direction);
+            var targetEntity = level.getBlockEntity(targetPos);
+            var target = targetEntity instanceof PipeHolderBlockEntity pipe
+                    && pipeType().connectsTo(pipe.pipeType()) && pipe.pipeType().carriesFluids()
+                ? pipe.fluidBuffer()
+                : level.getCapability(Capabilities.Fluid.BLOCK, targetPos, direction.getOpposite());
             if (target == null || target == fluidBuffer) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 int extracted = fluidBuffer.extract(0, resource, rate, transaction);
@@ -156,7 +160,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 if (inserted <= 0) continue;
                 if (inserted < extracted) fluidBuffer.insert(0, resource, extracted - inserted, transaction);
                 transaction.commit();
-                if (level.getBlockEntity(worldPosition.relative(direction)) instanceof PipeHolderBlockEntity pipe) {
+                if (targetEntity instanceof PipeHolderBlockEntity pipe) {
                     pipe.fluidReceivedFrom = direction.getOpposite();
                     pipe.fluidInputCooldown = 60;
                 }
@@ -880,6 +884,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public FluidStacksResourceHandler fluidBuffer() {
         return fluidBuffer;
+    }
+
+    public @Nullable FluidStacksResourceHandler fluidBuffer(Direction side) {
+        if (!pipeType().carriesFluids()) return null;
+        if (pipeType().connectsFluidHandlers()) return fluidBuffer;
+        return level != null && level.getBlockEntity(worldPosition.relative(side)) instanceof PipeHolderBlockEntity
+            ? fluidBuffer : null;
     }
 
     public int travellingCount() {

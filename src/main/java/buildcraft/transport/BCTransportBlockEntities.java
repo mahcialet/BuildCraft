@@ -28,7 +28,7 @@ public final class BCTransportBlockEntities {
         event.registerBlockEntity(Capabilities.Item.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side != null && holder.pipeType().carriesItems() ? holder.input(side) : null);
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PIPE_HOLDER.get(),
-            (holder, side) -> side != null && holder.pipeType().carriesFluids() ? holder.fluidBuffer() : null);
+            (holder, side) -> side == null ? null : holder.fluidBuffer(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) -> holder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, PIPE_HOLDER.get(), (holder, side) -> holder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_REDSTONE_RECEIVER, PIPE_HOLDER.get(),
