@@ -683,6 +683,15 @@ public final class BCCoreGameTests {
         helper.assertTrue(fuel != null, "light fuel definition missing");
         helper.assertValueEqual(fuel.getPowerPerCycle(), 6 * MjAPI.MJ, "light fuel power");
         helper.assertValueEqual(fuel.getTotalBurningTime(), 15_000, "light fuel burn time");
+        net.neoforged.neoforge.fluids.FluidStack water = new net.neoforged.neoforge.fluids.FluidStack(
+            net.minecraft.world.level.material.Fluids.WATER, 1
+        );
+        helper.assertTrue(BuildcraftFuelRegistry.coolant.getCoolant(water) != null,
+            "water coolant definition missing");
+        helper.assertValueEqual(
+            BuildcraftFuelRegistry.coolant.getDegreesPerMb(water, 500), 0.0023F,
+            "water cooling coefficient"
+        );
         helper.succeed();
     }
 

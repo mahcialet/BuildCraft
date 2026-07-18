@@ -6,6 +6,7 @@ import buildcraft.core.BCCreativeTabs;
 import buildcraft.core.item.ItemBlockEngine;
 import buildcraft.energy.client.BCEnergyClient;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
@@ -23,6 +24,7 @@ public final class BCEnergy {
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());
         FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.OIL, 3_000_000L, 10_000);
         FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.FUEL_LIGHT, 6_000_000L, 15_000);
+        buildcraft.lib.fluid.CoolantRegistry.INSTANCE.addCoolant(() -> Fluids.WATER, 0.0023F);
         if (FMLEnvironment.getDist().isClient()) BCEnergyClient.register(modBus);
     }
 
