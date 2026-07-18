@@ -1,0 +1,1 @@
+{ "type": "minecraft:crafting_shapeless", "category": "equipment", "ingredients": ["buildcraftcore:paintbrush", "minecraft:black_dye"], "result": { "id": "buildcraftcore:paintbrush", "components": { "buildcraftcore:paintbrush_color": "black", "buildcraftcore:paintbrush": { "color": "black", "uses_left": 64 } } } }

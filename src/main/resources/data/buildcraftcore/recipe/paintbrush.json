@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "i": "minecraft:string",
+    "w": "#minecraft:wool",
+    "g": "buildcraftcore:gear_wood",
+    "s": "minecraft:stick"
+  },
+  "pattern": [" iw", " gi", "s  "],
+  "result": { "id": "buildcraftcore:paintbrush" }
+}

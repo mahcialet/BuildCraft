@@ -9,6 +9,8 @@ import buildcraft.core.item.ItemMarkerConnector;
 import buildcraft.core.item.ItemMapLocation;
 import buildcraft.api.items.MapLocationData;
 import buildcraft.api.items.MapLocationType;
+import buildcraft.api.items.PaintbrushData;
+import buildcraft.core.item.ItemPaintbrush;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -29,6 +31,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Blocks;
@@ -67,6 +70,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "volume_graph", BCCoreGameTests::volumeGraph);
         registerTest(event, environment, "volume_marker_sync", BCCoreGameTests::volumeMarkerSync);
         registerTest(event, environment, "map_location", BCCoreGameTests::mapLocation);
+        registerTest(event, environment, "paintbrush", BCCoreGameTests::paintbrush);
     }
 
     private static void registerTest(
@@ -358,6 +362,56 @@ public final class BCCoreGameTests {
         ItemMapLocation.clear(spotStack);
         helper.assertValueEqual(item.getType(spotStack), MapLocationType.CLEAN, "cleared map type");
         helper.assertValueEqual(spotStack.getMaxStackSize(), 16, "cleared map stack limit");
+        helper.succeed();
+    }
+
+    private static void paintbrush(GameTestHelper helper) {
+        ItemPaintbrush item = BCCoreItems.PAINTBRUSH.get();
+        net.minecraft.world.entity.player.Player survival = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        net.minecraft.world.entity.player.Player creative = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        // GameTest's mock player does not apply the requested game mode's abilities.
+        creative.getAbilities().instabuild = true;
+
+        BlockPos glass = new BlockPos(0, 1, 0);
+        helper.setBlock(glass, Blocks.GLASS);
+        ItemStack red = ItemPaintbrush.colored(item, DyeColor.RED);
+        helper.assertTrue(item.useOn(useContext(helper, survival, red, glass)).consumesAction(), "Brush did not paint glass");
+        helper.assertBlockPresent(Blocks.RED_STAINED_GLASS, glass);
+        helper.assertValueEqual(ItemPaintbrush.data(red).usesLeft(), 63, "paint use count");
+
+        InteractionResult unchanged = item.useOn(useContext(helper, survival, red, glass));
+        helper.assertTrue(!unchanged.consumesAction(), "Same-color paint consumed an action");
+        helper.assertValueEqual(ItemPaintbrush.data(red).usesLeft(), 63, "same-color use count");
+
+        BlockPos pane = new BlockPos(1, 1, 0);
+        helper.setBlock(pane, Blocks.GLASS_PANE);
+        ItemStack blue = ItemPaintbrush.colored(item, DyeColor.BLUE);
+        helper.assertTrue(item.useOn(useContext(helper, creative, blue, pane)).consumesAction(), "Brush did not paint pane");
+        helper.assertBlockPresent(Blocks.BLUE_STAINED_GLASS_PANE, pane);
+        helper.assertValueEqual(ItemPaintbrush.data(blue).usesLeft(), 64, "creative paint use count");
+
+        BlockPos terracotta = new BlockPos(2, 1, 0);
+        helper.setBlock(terracotta, Blocks.TERRACOTTA);
+        ItemStack lastUse = ItemPaintbrush.colored(item, DyeColor.LIME);
+        ItemPaintbrush.load(lastUse, DyeColor.LIME, 1);
+        helper.assertTrue(item.useOn(useContext(helper, survival, lastUse, terracotta)).consumesAction(),
+            "Brush did not paint terracotta");
+        helper.assertBlockPresent(Blocks.LIME_TERRACOTTA, terracotta);
+        helper.assertTrue(ItemPaintbrush.data(lastUse) == null, "Exhausted brush retained use data");
+        helper.assertTrue(lastUse.get(BCCoreDataComponents.PAINTBRUSH_COLOR.get()) == null,
+            "Exhausted brush retained model color");
+
+        ItemStack clean = new ItemStack(item);
+        helper.assertTrue(item.useOn(useContext(helper, survival, clean, glass)).consumesAction(),
+            "Clean brush did not remove glass color");
+        helper.assertBlockPresent(Blocks.GLASS, glass);
+
+        PaintbrushData expected = new PaintbrushData(DyeColor.MAGENTA, 37);
+        Object encoded = PaintbrushData.CODEC.encodeStart(JsonOps.INSTANCE, expected).getOrThrow();
+        PaintbrushData decoded = PaintbrushData.CODEC.parse(
+            JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded
+        ).getOrThrow();
+        helper.assertValueEqual(decoded, expected, "persisted paintbrush data");
         helper.succeed();
     }
 

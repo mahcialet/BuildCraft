@@ -3,6 +3,8 @@ package buildcraft.core;
 import buildcraft.BuildCraft;
 import buildcraft.api.items.MapLocationData;
 import buildcraft.api.items.MapLocationType;
+import buildcraft.api.items.PaintbrushData;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
@@ -20,6 +22,12 @@ public final class BCCoreDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<MapLocationData>> MAP_LOCATION =
         COMPONENTS.register("map_location", () -> DataComponentType.<MapLocationData>builder()
             .persistent(MapLocationData.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<DyeColor>> PAINTBRUSH_COLOR =
+        COMPONENTS.register("paintbrush_color", () -> DataComponentType.<DyeColor>builder()
+            .persistent(DyeColor.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<PaintbrushData>> PAINTBRUSH =
+        COMPONENTS.register("paintbrush", () -> DataComponentType.<PaintbrushData>builder()
+            .persistent(PaintbrushData.CODEC).build());
 
     private BCCoreDataComponents() {
     }
