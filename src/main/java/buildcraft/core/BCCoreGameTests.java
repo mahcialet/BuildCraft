@@ -23,6 +23,10 @@ import buildcraft.core.item.ItemFragileFluidContainer;
 import buildcraft.api.enums.EnumSpring;
 import buildcraft.core.block.BlockSpring;
 import buildcraft.core.item.ItemBlockSpring;
+import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjBattery;
+import buildcraft.api.mj.MjCapabilityHelper;
+import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -90,6 +94,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
+        registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
     }
 
     private static void registerTest(
@@ -616,6 +621,43 @@ public final class BCCoreGameTests {
         }
         helper.assertValueEqual(waterSpring.getDestroySpeed(helper.getLevel(), waterPos), -1.0F,
             "spring destroy speed");
+        helper.succeed();
+    }
+
+    private static void mjFoundation(GameTestHelper helper) {
+        MjBattery battery = new MjBattery(10);
+        MjRedstoneBatteryReceiver receiver = new MjRedstoneBatteryReceiver(battery);
+        MjCapabilityHelper capabilities = new MjCapabilityHelper(receiver);
+        helper.assertTrue(capabilities.connector() == receiver, "MJ connector role");
+        helper.assertTrue(capabilities.receiver() == receiver, "MJ receiver role");
+        helper.assertTrue(capabilities.redstoneReceiver() == receiver, "MJ redstone receiver role");
+        helper.assertTrue(capabilities.readable() == receiver, "MJ readable role");
+        helper.assertTrue(capabilities.passiveProvider() == null, "MJ passive-provider role leak");
+
+        helper.assertValueEqual(receiver.receivePower(6, true), 0L, "simulated MJ excess");
+        helper.assertValueEqual(battery.getStored(), 0L, "simulated MJ changed storage");
+        helper.assertValueEqual(receiver.receivePower(6, false), 0L, "committed MJ excess");
+        helper.assertValueEqual(battery.getStored(), 6L, "committed MJ storage");
+        helper.assertValueEqual(receiver.getPowerRequested(), 4L, "requested MJ");
+
+        receiver.receivePower(6, false);
+        helper.assertValueEqual(battery.getStored(), 12L, "historical MJ overfill");
+        helper.assertValueEqual(receiver.receivePower(3, false), 3L, "full battery rejected MJ");
+        helper.assertValueEqual(battery.extractPower(5, 7, true), 7L, "simulated MJ extraction");
+        helper.assertValueEqual(battery.getStored(), 12L, "simulated extraction changed MJ");
+        helper.assertValueEqual(battery.extractPower(5, 7), 7L, "committed MJ extraction");
+        helper.assertValueEqual(battery.extractPower(6, 7), 0L, "minimum MJ extraction");
+
+        MjBattery decoded = new MjBattery(10);
+        decoded.deserializeNBT(battery.serializeNBT());
+        helper.assertValueEqual(decoded.getStored(), 5L, "MJ NBT round trip");
+        decoded.addPower(20, false);
+        decoded.tick(helper.getLevel(), helper.absolutePos(BlockPos.ZERO));
+        helper.assertValueEqual(decoded.getStored(), 24L, "MJ overload decay");
+        helper.assertValueEqual(MjAPI.formatMj(1_500_000), "1.5", "MJ display formatting");
+        helper.assertTrue(MjAPI.CAP_CONNECTOR != null && MjAPI.CAP_RECEIVER != null
+            && MjAPI.CAP_REDSTONE_RECEIVER != null && MjAPI.CAP_READABLE != null
+            && MjAPI.CAP_PASSIVE_PROVIDER != null, "MJ capabilities were not created");
         helper.succeed();
     }
 
