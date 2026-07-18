@@ -17,5 +17,7 @@
   "gui.buildcrafttransport.diamond_wood.mode": "Mode: %s",
   "gui.buildcrafttransport.diamond_wood.mode.white_list": "Whitelist",
   "gui.buildcrafttransport.diamond_wood.mode.black_list": "Blacklist",
-  "gui.buildcrafttransport.diamond_wood.mode.round_robin": "Round Robin"
+  "gui.buildcrafttransport.diamond_wood.mode.round_robin": "Round Robin",
+  "item.buildcrafttransport.pipe_emzuli_item": "Emzuli Transport Pipe",
+  "gui.buildcrafttransport.emzuli": "Extraction Presets"
 }

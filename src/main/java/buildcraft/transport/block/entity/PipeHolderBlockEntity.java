@@ -53,11 +53,19 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final List<ItemStack> diamondFilters = new ArrayList<>();
     private DiamondFilterMode diamondFilterMode = DiamondFilterMode.WHITE_LIST;
     private int diamondFilterCursor;
+    private final List<ItemStack> emzuliFilters = new ArrayList<>();
+    private final List<Optional<DyeColor>> emzuliColors = new ArrayList<>();
+    private final int[] emzuliTtl = new int[4];
+    private int emzuliCurrent = -1;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
         for (Direction direction : Direction.values()) inputs[direction.ordinal()] = new InputHandler();
         for (int index = 0; index < 9; index++) diamondFilters.add(ItemStack.EMPTY);
+        for (int index = 0; index < 4; index++) {
+            emzuliFilters.add(ItemStack.EMPTY);
+            emzuliColors.add(Optional.empty());
+        }
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
@@ -66,6 +74,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private void serverTick(ServerLevel level) {
         if (!pipeType().carriesItems()) return;
+        tickEmzuliActivations();
         if (obsidianWaitTicks > 0) obsidianWaitTicks--;
         ensureWoodDirection(level);
         ensureIronDirection(level);
@@ -216,7 +225,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureWoodDirection(ServerLevel level) {
-        if (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM) {
+        if (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
+            && pipeType() != PipeType.EMZULI_ITEM) {
             extractionDirection = null;
             return;
         }
@@ -262,7 +272,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public boolean rotateExtractionDirection() {
         if (!(level instanceof ServerLevel serverLevel)
-            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM)) return false;
+            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
+                && pipeType() != PipeType.EMZULI_ITEM)) return false;
         Direction current = extractionDirection == null ? Direction.DOWN : extractionDirection;
         Direction[] directions = Direction.values();
         for (int offset = 1; offset <= directions.length; offset++) {
@@ -278,7 +289,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public boolean rotatePipeDirection() {
         if (!(level instanceof ServerLevel serverLevel)) return false;
-        if (pipeType() == PipeType.WOOD_ITEM || pipeType() == PipeType.DIAMOND_WOOD_ITEM) {
+        if (pipeType() == PipeType.WOOD_ITEM || pipeType() == PipeType.DIAMOND_WOOD_ITEM
+            || pipeType() == PipeType.EMZULI_ITEM) {
             return rotateExtractionDirection();
         }
         if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return false;
@@ -309,7 +321,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public @Nullable IMjRedstoneReceiver mjReceiver() {
         return switch (pipeType()) {
-            case WOOD_ITEM, DIAMOND_WOOD_ITEM -> woodReceiver;
+            case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM -> woodReceiver;
             case OBSIDIAN_ITEM -> obsidianReceiver;
             default -> null;
         };
@@ -377,12 +389,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private long extractItems(long power, boolean simulate) {
         if (!(level instanceof ServerLevel serverLevel)
-            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM)
+            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
+                && pipeType() != PipeType.EMZULI_ITEM)
             || extractionDirection == null || power < MjAPI.MJ) return power;
         var source = serverLevel.getCapability(
             Capabilities.Item.BLOCK, worldPosition.relative(extractionDirection), extractionDirection.getOpposite()
         );
         if (source == null) return power;
+        int emzuliPreset = pipeType() == PipeType.EMZULI_ITEM ? selectedEmzuliPreset() : -1;
+        if (pipeType() == PipeType.EMZULI_ITEM && emzuliPreset < 0) return power;
         int remaining = pipeType() == PipeType.DIAMOND_WOOD_ITEM ? 1 : (int) Math.min(512, power / MjAPI.MJ);
         List<ItemStack> extractedStacks = new ArrayList<>();
         int extractedCount = 0;
@@ -391,6 +406,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 ItemResource resource = source.getResource(slot);
                 if (resource.isEmpty()) continue;
                 if (pipeType() == PipeType.DIAMOND_WOOD_ITEM && !matchesDiamondFilter(resource.toStack(1))) continue;
+                if (pipeType() == PipeType.EMZULI_ITEM
+                    && !sameFilter(emzuliFilters.get(emzuliPreset), resource.toStack(1))) continue;
                 int extracted = source.extract(slot, resource, remaining, transaction);
                 if (extracted > 0) {
                     extractedStacks.add(resource.toStack(extracted));
@@ -401,9 +418,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (!simulate && extractedCount > 0) transaction.commit();
         }
         if (!simulate) {
-            for (ItemStack stack : extractedStacks) enqueue(stack, extractionDirection, INITIAL_SPEED);
+            Optional<DyeColor> extractedColor = pipeType() == PipeType.EMZULI_ITEM
+                ? emzuliColors.get(emzuliPreset) : Optional.empty();
+            for (ItemStack stack : extractedStacks) enqueue(stack, extractionDirection, INITIAL_SPEED, extractedColor);
             if (pipeType() == PipeType.DIAMOND_WOOD_ITEM && extractedCount > 0
                 && diamondFilterMode == DiamondFilterMode.ROUND_ROBIN) advanceDiamondFilter();
+            if (pipeType() == PipeType.EMZULI_ITEM && extractedCount > 0) {
+                emzuliCurrent = nextEmzuliPreset(emzuliPreset);
+                sync();
+            }
         }
         return power - extractedCount * MjAPI.MJ;
     }
@@ -457,6 +480,82 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return diamondFilterCursor;
     }
 
+    private void tickEmzuliActivations() {
+        if (pipeType() != PipeType.EMZULI_ITEM) return;
+        boolean changed = false;
+        for (int index = 0; index < emzuliTtl.length; index++) {
+            if (emzuliTtl[index] > 0) {
+                emzuliTtl[index]--;
+                changed = true;
+            }
+        }
+        if (emzuliCurrent >= 0 && (emzuliTtl[emzuliCurrent] == 0
+            || emzuliFilters.get(emzuliCurrent).isEmpty())) {
+            emzuliCurrent = selectedEmzuliPreset();
+            changed = true;
+        }
+        if (changed) sync();
+    }
+
+    public boolean activateEmzuliPreset(int index) {
+        if (pipeType() != PipeType.EMZULI_ITEM || index < 0 || index >= emzuliTtl.length) return false;
+        emzuliTtl[index] = 2;
+        if (emzuliCurrent < 0 && !emzuliFilters.get(index).isEmpty()) emzuliCurrent = index;
+        sync();
+        return true;
+    }
+
+    private int selectedEmzuliPreset() {
+        if (emzuliCurrent >= 0 && emzuliTtl[emzuliCurrent] > 0
+            && !emzuliFilters.get(emzuliCurrent).isEmpty()) return emzuliCurrent;
+        return nextEmzuliPreset(emzuliCurrent < 0 ? 3 : emzuliCurrent);
+    }
+
+    private int nextEmzuliPreset(int after) {
+        for (int offset = 1; offset <= emzuliFilters.size(); offset++) {
+            int candidate = Math.floorMod(after + offset, emzuliFilters.size());
+            if (emzuliTtl[candidate] > 0 && !emzuliFilters.get(candidate).isEmpty()) return candidate;
+        }
+        return -1;
+    }
+
+    public List<ItemStack> emzuliFilters() {
+        return emzuliFilters.stream().map(ItemStack::copy).toList();
+    }
+
+    public void setEmzuliFilter(int index, ItemStack stack) {
+        if (pipeType() != PipeType.EMZULI_ITEM || index < 0 || index >= emzuliFilters.size()) return;
+        emzuliFilters.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+        if (index == emzuliCurrent && stack.isEmpty()) emzuliCurrent = selectedEmzuliPreset();
+        sync();
+    }
+
+    public Optional<DyeColor> emzuliColor(int index) {
+        return index >= 0 && index < emzuliColors.size() ? emzuliColors.get(index) : Optional.empty();
+    }
+
+    public void cycleEmzuliColor(int index, boolean reverse) {
+        if (pipeType() != PipeType.EMZULI_ITEM || index < 0 || index >= emzuliColors.size()) return;
+        DyeColor[] colors = DyeColor.values();
+        Optional<DyeColor> old = emzuliColors.get(index);
+        if (old.isEmpty()) {
+            emzuliColors.set(index, Optional.of(reverse ? colors[colors.length - 1] : colors[0]));
+        } else {
+            int ordinal = old.get().ordinal() + (reverse ? -1 : 1);
+            emzuliColors.set(index, ordinal < 0 || ordinal >= colors.length
+                ? Optional.empty() : Optional.of(colors[ordinal]));
+        }
+        sync();
+    }
+
+    public int emzuliCurrent() {
+        return emzuliCurrent;
+    }
+
+    public boolean emzuliActive(int index) {
+        return index >= 0 && index < emzuliTtl.length && emzuliTtl[index] > 0;
+    }
+
     private void drop(ServerLevel level, ItemStack stack, @Nullable Direction direction) {
         double x = worldPosition.getX() + 0.5 + (direction == null ? 0 : direction.getStepX() * 0.6);
         double y = worldPosition.getY() + 0.5 + (direction == null ? 0 : direction.getStepY() * 0.6);
@@ -502,6 +601,16 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         diamondFilterMode = input.read("diamond_filter_mode", DiamondFilterMode.CODEC)
             .orElse(DiamondFilterMode.WHITE_LIST);
         diamondFilterCursor = Math.floorMod(input.getIntOr("diamond_filter_cursor", 0), diamondFilters.size());
+        List<ItemStack> savedEmzuli = input.read("emzuli_filters", ItemStack.OPTIONAL_CODEC.listOf()).orElse(List.of());
+        List<Optional<DyeColor>> savedColors = input.read(
+            "emzuli_colors", DyeColor.CODEC.optionalFieldOf("value").codec().listOf()
+        ).orElse(List.of());
+        for (int index = 0; index < emzuliFilters.size(); index++) {
+            emzuliFilters.set(index, index < savedEmzuli.size() ? savedEmzuli.get(index) : ItemStack.EMPTY);
+            emzuliColors.set(index, index < savedColors.size() ? savedColors.get(index) : Optional.empty());
+            emzuliTtl[index] = input.getIntOr("emzuli_ttl_" + index, 0);
+        }
+        emzuliCurrent = input.getIntOr("emzuli_current", -1);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -520,6 +629,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         output.store("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondFilters);
         output.store("diamond_filter_mode", DiamondFilterMode.CODEC, diamondFilterMode);
         output.putInt("diamond_filter_cursor", diamondFilterCursor);
+        output.store("emzuli_filters", ItemStack.OPTIONAL_CODEC.listOf(), emzuliFilters);
+        output.store("emzuli_colors", DyeColor.CODEC.optionalFieldOf("value").codec().listOf(), emzuliColors);
+        for (int index = 0; index < emzuliTtl.length; index++) output.putInt("emzuli_ttl_" + index, emzuliTtl[index]);
+        output.putInt("emzuli_current", emzuliCurrent);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }

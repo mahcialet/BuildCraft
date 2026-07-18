@@ -107,6 +107,13 @@
     { "when": { "type": "diamond_wood_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_item_arm", "x": 90 } },
     { "when": { "type": "diamond_wood_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "diamond_wood_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "diamond_wood_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "diamond_wood_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_item_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "emzuli_item" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_center" } },
+    { "when": { "type": "emzuli_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm" } },
+    { "when": { "type": "emzuli_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm", "x": 180 } },
+    { "when": { "type": "emzuli_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm", "x": 90 } },
+    { "when": { "type": "emzuli_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "emzuli_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "emzuli_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/emzuli_item_arm", "x": 90, "y": 270 } }
   ]
 }

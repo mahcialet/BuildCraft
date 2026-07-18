@@ -132,6 +132,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
+        registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
     }
 
     private static void registerTest(
@@ -1758,6 +1759,98 @@ public final class BCCoreGameTests {
         helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get()),
             "diamond wooden recipe returned wrong item");
         helper.assertValueEqual(recipeOutput.getCount(), 8, "diamond wooden recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void transportEmzuliItemPipe(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState emzuli = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.EMZULI_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos emzuliPos = sourcePos.east();
+        BlockPos cobblePos = emzuliPos.east();
+        BlockPos targetPos = cobblePos.east();
+        helper.getLevel().setBlock(sourcePos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(emzuliPos, emzuli, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(targetPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        net.minecraft.world.Container source = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(sourcePos);
+        net.minecraft.world.Container target = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(targetPos);
+        source.setItem(0, new ItemStack(Items.GOLD_INGOT, 4));
+        source.setItem(1, new ItemStack(Items.IRON_INGOT, 4));
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(emzuliPos);
+        helper.assertTrue(holder != null, "Emzuli holder missing");
+        tickPipes(helper, 1, emzuliPos);
+        holder.setEmzuliFilter(0, new ItemStack(Items.GOLD_INGOT));
+        holder.setEmzuliFilter(1, new ItemStack(Items.IRON_INGOT));
+        holder.cycleEmzuliColor(0, false);
+        helper.assertTrue(holder.emzuliColor(0).orElse(null) == net.minecraft.world.item.DyeColor.WHITE,
+            "Emzuli preset did not select white paint");
+        helper.assertTrue(holder.activateEmzuliPreset(0) && holder.activateEmzuliPreset(1),
+            "Emzuli gate activation contract rejected preset");
+        helper.assertValueEqual(holder.emzuliCurrent(), 0, "Emzuli did not select first active preset");
+        buildcraft.api.mj.IMjRedstoneReceiver receiver = holder.mjReceiver();
+        helper.assertTrue(receiver != null, "Emzuli MJ receiver missing");
+        helper.assertValueEqual(receiver.receivePower(2 * MjAPI.MJ, false), 0L,
+            "Emzuli first preset consumed wrong MJ");
+        helper.assertValueEqual(holder.travellingItems().getFirst().stack().getCount(), 2,
+            "Emzuli first preset extracted wrong count");
+        helper.assertTrue(holder.travellingItems().getFirst().color().orElse(null)
+            == net.minecraft.world.item.DyeColor.WHITE, "Emzuli preset did not paint extracted stack");
+        helper.assertValueEqual(holder.emzuliCurrent(), 1, "Emzuli did not advance to next active preset");
+        holder.activateEmzuliPreset(0);
+        holder.activateEmzuliPreset(1);
+        helper.assertValueEqual(receiver.receivePower(3 * MjAPI.MJ, false), 0L,
+            "Emzuli second preset consumed wrong MJ");
+        helper.assertValueEqual(holder.travellingItems().get(1).stack().getCount(), 3,
+            "Emzuli second preset extracted wrong count");
+        helper.assertTrue(holder.travellingItems().get(1).color().isEmpty(),
+            "Emzuli unpainted preset unexpectedly painted stack");
+        helper.assertValueEqual(holder.emzuliCurrent(), 0, "Emzuli preset round-robin did not wrap");
+        tickPipes(helper, 65, emzuliPos, cobblePos);
+        helper.assertValueEqual(containerCount(target, Items.GOLD_INGOT), 2, "Emzuli missed gold extraction");
+        helper.assertValueEqual(containerCount(target, Items.IRON_INGOT), 3, "Emzuli missed iron extraction");
+        helper.assertTrue(!holder.emzuliActive(0) && !holder.emzuliActive(1),
+            "Emzuli preset activation did not expire after TTL");
+        helper.assertTrue(!buildcraft.transport.PipeType.EMZULI_ITEM.connectsTo(
+            buildcraft.transport.PipeType.DIAMOND_WOOD_ITEM), "Emzuli connected to wooden extraction pipe");
+
+        net.minecraft.world.entity.player.Player menuPlayer =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        buildcraft.transport.menu.EmzuliMenu menu = new buildcraft.transport.menu.EmzuliMenu(
+            0, menuPlayer.getInventory(), emzuliPos
+        );
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 1), "Emzuli menu rejected paint button");
+        helper.assertTrue(holder.emzuliColor(1).orElse(null) == net.minecraft.world.item.DyeColor.WHITE,
+            "Emzuli menu did not cycle preset paint");
+        holder.activateEmzuliPreset(1);
+        net.minecraft.nbt.CompoundTag saved = holder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity loaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    emzuliPos, helper.getLevel().getBlockState(emzuliPos), saved, helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(loaded != null && loaded.emzuliFilters().get(0).is(Items.GOLD_INGOT)
+            && loaded.emzuliFilters().get(1).is(Items.IRON_INGOT), "Emzuli filters failed codec reload");
+        helper.assertTrue(loaded.emzuliColor(0).orElse(null) == net.minecraft.world.item.DyeColor.WHITE
+            && loaded.emzuliActive(1), "Emzuli paint or activation failed codec reload");
+        assertPipeLoot(helper, emzuliPos, buildcraft.transport.BCTransportItems.PIPE_EMZULI_ITEM.get());
+        net.minecraft.world.item.crafting.CraftingInput recipeInput =
+            net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get()),
+                new ItemStack(Items.LAPIS_BLOCK)
+            ));
+        ItemStack recipeOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_EMZULI_ITEM.get()),
+            "Emzuli upgrade recipe returned wrong item");
+        helper.assertValueEqual(recipeOutput.getCount(), 1, "Emzuli upgrade recipe returned wrong count");
         helper.succeed();
     }
 
