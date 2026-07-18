@@ -58,9 +58,6 @@ public final class PathMarkerBlockEntity extends BlockEntity implements IPathPro
 
     @Override
     public void setRemoved() {
-        if (level instanceof ServerLevel serverLevel && !level.getBlockState(worldPosition).is(BCCoreBlocks.MARKER_PATH.get())) {
-            PathSavedData.get(serverLevel).removeMarker(worldPosition);
-        }
         super.setRemoved();
     }
 

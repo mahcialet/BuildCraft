@@ -99,9 +99,6 @@ public final class VolumeMarkerBlockEntity extends BlockEntity implements ITileA
 
     @Override
     public void setRemoved() {
-        if (level instanceof ServerLevel serverLevel && !level.getBlockState(worldPosition).is(BCCoreBlocks.MARKER_VOLUME.get())) {
-            VolumeSavedData.get(serverLevel).removeMarker(worldPosition);
-        }
         super.setRemoved();
     }
 

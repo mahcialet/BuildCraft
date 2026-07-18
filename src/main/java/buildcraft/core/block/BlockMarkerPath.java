@@ -77,6 +77,12 @@ public final class BlockMarkerPath extends BaseEntityBlock {
     }
 
     @Override
+    protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
+        PathSavedData.get(level).removeMarker(pos);
+        super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
+    }
+
+    @Override
     protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos,
         Direction direction, BlockPos neighbourPos, BlockState neighbourState, RandomSource random) {
         if (direction == state.getValue(FACING).getOpposite() && !state.canSurvive(level, pos)) {
