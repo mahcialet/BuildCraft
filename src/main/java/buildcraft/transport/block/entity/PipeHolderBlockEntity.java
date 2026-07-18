@@ -156,12 +156,17 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             return;
         }
         int directionCount = Direction.values().length;
-        int attempts = pipeType() == PipeType.CLAY_FLUID ? directionCount * 2 : directionCount;
+        int attempts = pipeType() == PipeType.CLAY_FLUID || pipeType() == PipeType.DIAMOND_FLUID
+                ? directionCount * 2 : directionCount;
         for (int offset = 0; offset < attempts; offset++) {
             Direction direction = Direction.values()[Math.floorMod(routeCursor + offset % directionCount, directionCount)];
             if (direction == blocked || direction == extractionDirection
                     || pipeType() == PipeType.IRON_FLUID && direction != routingDirection) continue;
             if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            if (pipeType() == PipeType.DIAMOND_FLUID) {
+                int required = offset < directionCount ? 2 : 1;
+                if (diamondFluidPriority(direction, resource) != required) continue;
+            }
             BlockPos targetPos = worldPosition.relative(direction);
             var targetEntity = level.getBlockEntity(targetPos);
             if (pipeType() == PipeType.CLAY_FLUID) {
@@ -189,6 +194,25 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 return;
             }
         }
+    }
+
+    private int diamondFluidPriority(Direction direction, FluidResource resource) {
+        boolean configured = false;
+        int base = direction.ordinal() * 9;
+        for (int index = 0; index < 9; index++) {
+            ItemStack filter = diamondRouteFilters.get(base + index);
+            if (filter.isEmpty()) continue;
+            var access = net.neoforged.neoforge.transfer.access.ItemAccess.forStack(filter.copy());
+            var handler = access.getCapability(Capabilities.Fluid.ITEM);
+            if (handler == null) continue;
+            for (int slot = 0; slot < handler.size(); slot++) {
+                FluidResource filtered = handler.getResource(slot);
+                if (filtered.isEmpty() || handler.getAmountAsLong(slot) <= 0) continue;
+                configured = true;
+                if (filtered.equals(resource)) return 2;
+            }
+        }
+        return configured ? 0 : 1;
     }
 
     private void drainInputs() {
@@ -772,7 +796,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public void setDiamondRouteFilter(int index, ItemStack stack) {
-        if (pipeType() != PipeType.DIAMOND_ITEM || index < 0 || index >= diamondRouteFilters.size()) return;
+        if ((pipeType() != PipeType.DIAMOND_ITEM && pipeType() != PipeType.DIAMOND_FLUID)
+                || index < 0 || index >= diamondRouteFilters.size()) return;
         diamondRouteFilters.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(
             Math.min(stack.getCount(), stack.getMaxStackSize())
         ));

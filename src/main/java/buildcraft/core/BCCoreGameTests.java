@@ -130,6 +130,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
         registerTest(event, environment, "transport_clay_void_fluid_pipes", BCCoreGameTests::transportClayVoidFluidPipes);
+        registerTest(event, environment, "transport_diamond_fluid_pipe", BCCoreGameTests::transportDiamondFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1347,6 +1348,83 @@ public final class BCCoreGameTests {
         helper.assertTrue(drops.size() == 1
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_VOID_FLUID.get()),
                 "void fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportDiamondFluidPipe(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos pipePos = helper.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos eastPos = pipePos.east();
+        BlockPos southPos = pipePos.south();
+        BlockPos northPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.DIAMOND_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        BlockState cobble = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_FLUID);
+        helper.getLevel().setBlock(eastPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(southPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(northPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var diamond = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        var east = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(eastPos);
+        var south = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(southPos);
+        var north = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(northPos);
+        ItemStack waterFilter = ItemFragileFluidContainer.create(BCCoreItems.FRAGILE_FLUID_SHARD.get(),
+                new net.neoforged.neoforge.fluids.FluidStack(
+                        net.minecraft.world.level.material.Fluids.WATER, 100));
+        ItemStack lavaFilter = ItemFragileFluidContainer.create(BCCoreItems.FRAGILE_FLUID_SHARD.get(),
+                new net.neoforged.neoforge.fluids.FluidStack(
+                        net.minecraft.world.level.material.Fluids.LAVA, 100));
+        diamond.setDiamondRouteFilter(net.minecraft.core.Direction.EAST.ordinal() * 9, waterFilter);
+        diamond.setDiamondRouteFilter(net.minecraft.core.Direction.SOUTH.ordinal() * 9, lavaFilter);
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        diamond.fluidBuffer().set(0, water, 160);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), diamond);
+        helper.assertValueEqual(east.fluidBuffer().getAmountAsInt(0), 80,
+                "diamond fluid pipe ignored matching filter");
+        helper.assertValueEqual(south.fluidBuffer().getAmountAsInt(0), 0,
+                "diamond fluid pipe used nonmatching filter");
+        helper.assertValueEqual(north.fluidBuffer().getAmountAsInt(0), 0,
+                "diamond fluid pipe used fallback before match");
+
+        diamond.fluidBuffer().set(0, net.neoforged.neoforge.transfer.fluid.FluidResource.EMPTY, 0);
+        var fuel = net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get());
+        diamond.fluidBuffer().set(0, fuel, 160);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), diamond);
+        helper.assertValueEqual(north.fluidBuffer().getAmountAsInt(0), 80,
+                "diamond fluid pipe did not use empty-filter fallback");
+        diamond.setDiamondRouteFilter(net.minecraft.core.Direction.NORTH.ordinal() * 9, lavaFilter);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), diamond);
+        helper.assertValueEqual(diamond.fluidBuffer().getAmountAsInt(0), 80,
+                "diamond fluid pipe used configured nonmatching output");
+
+        net.minecraft.nbt.CompoundTag saved = diamond.saveWithFullMetadata(helper.getLevel().registryAccess());
+        var loaded = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                        pipePos, helper.getLevel().getBlockState(pipePos), saved, helper.getLevel().registryAccess());
+        helper.assertTrue(loaded != null && !loaded.diamondRouteFilters()
+                .get(net.minecraft.core.Direction.EAST.ordinal() * 9).isEmpty(),
+                "diamond fluid filters failed codec reload");
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        menuPlayer.setPos(pipePos.getX() + 0.5, pipePos.getY() + 0.5, pipePos.getZ() + 0.5);
+        var menu = new buildcraft.transport.menu.DiamondRouteMenu(0, menuPlayer.getInventory(), pipePos);
+        helper.assertTrue(menu.stillValid(menuPlayer) && menu.slots.size() == 90,
+                "diamond fluid menu did not expose 54 filters plus inventory");
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_DIAMOND_FLUID.get());
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(pipePos), helper.getLevel(), pipePos, diamond);
+        helper.assertTrue(drops.size() == 1
+                && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_FLUID.get()),
+                "diamond fluid pipe returned wrong drop");
         helper.succeed();
     }
 

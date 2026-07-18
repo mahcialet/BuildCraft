@@ -31,5 +31,6 @@
   "item.buildcrafttransport.pipe_sandstone_fluid": "Sandstone Fluid Pipe",
   "item.buildcrafttransport.pipe_iron_fluid": "Iron Fluid Pipe",
   "item.buildcrafttransport.pipe_clay_fluid": "Clay Fluid Pipe",
-  "item.buildcrafttransport.pipe_void_fluid": "Void Fluid Pipe"
+  "item.buildcrafttransport.pipe_void_fluid": "Void Fluid Pipe",
+  "item.buildcrafttransport.pipe_diamond_fluid": "Diamond Fluid Pipe"
 }
