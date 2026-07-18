@@ -59,6 +59,20 @@
             },
             {
               "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_sandstone_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "sandstone_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_void_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "void_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
               "name": "buildcrafttransport:pipe_quartz_item"
             }
           ]

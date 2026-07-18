@@ -66,6 +66,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (transit.ticks() > 1) {
                 next.add(transit.withTicks(transit.ticks() - 1));
             } else if (transit.toCenter()) {
+                if (pipeType() == PipeType.VOID_ITEM) continue;
                 Direction destination = chooseDestination(level, transit.from(), transit.blocked());
                 if (destination == null) drop(level, transit.stack(), null);
                 else {
@@ -121,7 +122,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (level.getBlockEntity(targetPos) instanceof PipeHolderBlockEntity other) {
             return pipeType().connectsTo(other.pipeType()) && other.pipeType().carriesItems();
         }
-        return level.getCapability(Capabilities.Item.BLOCK, targetPos, direction.getOpposite()) != null;
+        return pipeType().connectsInventories()
+            && level.getCapability(Capabilities.Item.BLOCK, targetPos, direction.getOpposite()) != null;
     }
 
     private void deliver(ServerLevel level, Transit transit, List<Transit> next) {
@@ -167,6 +169,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 delta = 0.02;
             }
             case STONE_ITEM -> {
+                target = 0.01;
+                delta = 0.008;
+            }
+            case SANDSTONE_ITEM -> {
                 target = 0.01;
                 delta = 0.008;
             }

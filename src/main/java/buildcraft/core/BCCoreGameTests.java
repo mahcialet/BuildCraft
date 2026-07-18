@@ -128,6 +128,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
+        registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
     }
 
     private static void registerTest(
@@ -1437,6 +1438,83 @@ public final class BCCoreGameTests {
             Items.IRON_INGOT, Items.GLASS);
         assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_CLAY_ITEM.get(),
             Items.CLAY, Items.GLASS);
+        helper.succeed();
+    }
+
+    private static void transportTerminalItemPipes(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState sandstone = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.SANDSTONE_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos chestPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos sandstonePos = chestPos.east();
+        BlockPos cobblePos = sandstonePos.east();
+        helper.getLevel().setBlock(chestPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(sandstonePos, sandstone, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        BlockState sandstoneState = helper.getLevel().getBlockState(sandstonePos);
+        helper.assertTrue(!sandstoneState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "sandstone pipe incorrectly connected to inventory");
+        helper.assertTrue(sandstoneState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST),
+            "sandstone pipe did not connect to item pipe");
+        var sandstoneInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            sandstonePos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(sandstoneInput, Items.SAND, 1);
+        tickPipes(helper, 10, sandstonePos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity sandstoneHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(sandstonePos);
+        helper.assertValueEqual(sandstoneHolder.travellingCount(), 1,
+            "sandstone pipe lost travelling item");
+        helper.assertTrue(Math.abs(sandstoneHolder.travellingItems().getFirst().speed() - 0.042) < 0.0001,
+            "sandstone pipe did not use stone speed delta");
+
+        BlockState voidPipe = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.VOID_ITEM
+        );
+        BlockPos voidPos = helper.absolutePos(new BlockPos(5, 1, 1));
+        BlockPos voidTargetPos = voidPos.east();
+        helper.getLevel().setBlock(voidPos, voidPipe, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(voidTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var voidInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            voidPos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(voidInput, Items.ROTTEN_FLESH, 7);
+        tickPipes(helper, 10, voidPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity voidHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(voidPos);
+        net.minecraft.world.Container voidTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(voidTargetPos);
+        helper.assertValueEqual(voidHolder.travellingCount(), 0, "void pipe retained discarded stack");
+        helper.assertValueEqual(containerCount(voidTarget, Items.ROTTEN_FLESH), 0,
+            "void pipe routed discarded stack into inventory");
+        net.minecraft.world.phys.AABB search = new net.minecraft.world.phys.AABB(voidPos).inflate(2);
+        helper.assertTrue(helper.getLevel().getEntitiesOfClass(
+            net.minecraft.world.entity.item.ItemEntity.class, search
+        ).stream().noneMatch(entity -> entity.getItem().is(Items.ROTTEN_FLESH)),
+            "void pipe dropped rather than discarded stack");
+
+        assertPipeLoot(helper, sandstonePos, buildcraft.transport.BCTransportItems.PIPE_SANDSTONE_ITEM.get());
+        assertPipeLoot(helper, voidPos, buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_SANDSTONE_ITEM.get(),
+            Items.SANDSTONE, Items.GLASS);
+        net.minecraft.world.item.crafting.CraftingInput voidRecipeInput =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(Items.BLACK_DYE), new ItemStack(Items.GLASS), new ItemStack(Items.REDSTONE)
+            ));
+        ItemStack voidOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, voidRecipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(voidRecipeInput);
+        helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
+            "void pipe recipe returned wrong item");
+        helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
     }
 

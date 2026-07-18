@@ -8,6 +8,8 @@
     { "when": { "type": "gold_item" }, "apply": { "model": "buildcrafttransport:block/gold_item_center" } },
     { "when": { "type": "iron_item" }, "apply": { "model": "buildcrafttransport:block/iron_item_center" } },
     { "when": { "type": "clay_item" }, "apply": { "model": "buildcrafttransport:block/clay_item_center" } },
+    { "when": { "type": "sandstone_item" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_center" } },
+    { "when": { "type": "void_item" }, "apply": { "model": "buildcrafttransport:block/void_item_center" } },
 
     { "when": { "type": "structure", "up": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm" } },
     { "when": { "type": "structure", "down": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 180 } },
@@ -63,6 +65,20 @@
     { "when": { "type": "clay_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90 } },
     { "when": { "type": "clay_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "clay_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "clay_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "clay_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "sandstone_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm" } },
+    { "when": { "type": "sandstone_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm", "x": 180 } },
+    { "when": { "type": "sandstone_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm", "x": 90 } },
+    { "when": { "type": "sandstone_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "sandstone_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "sandstone_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "void_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm" } },
+    { "when": { "type": "void_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 180 } },
+    { "when": { "type": "void_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90 } },
+    { "when": { "type": "void_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "void_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "void_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 270 } }
   ]
 }

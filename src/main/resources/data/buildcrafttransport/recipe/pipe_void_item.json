@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["DGR"],"key":{"D":"minecraft:black_dye","G":"minecraft:glass","R":"minecraft:redstone"},"result":{"id":"buildcrafttransport:pipe_void_item","count":8}}

@@ -10,7 +10,9 @@ public enum PipeType implements StringRepresentable {
     WOOD_ITEM("wood_item", "pipe_wood_item", "Wooden Transport Pipe"),
     GOLD_ITEM("gold_item", "pipe_gold_item", "Golden Transport Pipe"),
     IRON_ITEM("iron_item", "pipe_iron_item", "Iron Transport Pipe"),
-    CLAY_ITEM("clay_item", "pipe_clay_item", "Clay Transport Pipe");
+    CLAY_ITEM("clay_item", "pipe_clay_item", "Clay Transport Pipe"),
+    SANDSTONE_ITEM("sandstone_item", "pipe_sandstone_item", "Sandstone Transport Pipe"),
+    VOID_ITEM("void_item", "pipe_void_item", "Void Transport Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -44,10 +46,15 @@ public enum PipeType implements StringRepresentable {
     }
 
     private boolean isGeneralConnector() {
-        return this == WOOD_ITEM || this == GOLD_ITEM || this == IRON_ITEM || this == CLAY_ITEM;
+        return this == WOOD_ITEM || this == GOLD_ITEM || this == IRON_ITEM || this == CLAY_ITEM
+            || this == SANDSTONE_ITEM || this == VOID_ITEM;
     }
 
     public boolean carriesItems() {
         return this != STRUCTURE;
+    }
+
+    public boolean connectsInventories() {
+        return carriesItems() && this != SANDSTONE_ITEM;
     }
 }
