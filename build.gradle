@@ -86,10 +86,14 @@ tasks.named('processResources', ProcessResources) {
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/lasers') {
         include 'marker_volume_connected.png'
-        into 'assets/buildcraftcore/textures/lasers'
+        into 'assets/buildcraftcore/textures/block/lasers'
     }
     from('buildcraft_resources/assets/buildcraftcore/models/item') {
         include 'volume_box.json'
+        filter { line -> line.replace(
+            '"main": "buildcraftcore:lasers/marker_volume_connected"',
+            '"main": "buildcraftcore:block/lasers/marker_volume_connected", "particle": "buildcraftcore:block/lasers/marker_volume_connected"'
+        ) }
         into 'assets/buildcraftcore/models/item'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks') {

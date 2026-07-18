@@ -1,0 +1,5 @@
+{
+  "multipart": [
+    { "apply": { "model": "buildcraftenergy:block/fluid_light_fuel" } }
+  ]
+}
