@@ -39,6 +39,7 @@ import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.energy.BCEnergyFluids;
+import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -112,6 +113,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
         registerTest(event, environment, "creative_engine", BCCoreGameTests::creativeEngine);
         registerTest(event, environment, "energy_fluids", BCCoreGameTests::energyFluids);
+        registerTest(event, environment, "stirling_engine", BCCoreGameTests::stirlingEngine);
     }
 
     private static void registerTest(
@@ -681,6 +683,45 @@ public final class BCCoreGameTests {
         helper.assertTrue(fuel != null, "light fuel definition missing");
         helper.assertValueEqual(fuel.getPowerPerCycle(), 6 * MjAPI.MJ, "light fuel power");
         helper.assertValueEqual(fuel.getTotalBurningTime(), 15_000, "light fuel burn time");
+        helper.succeed();
+    }
+
+    private static void stirlingEngine(GameTestHelper helper) {
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.STONE)
+            .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
+        BlockPos enginePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        StirlingEngineBlockEntity engine =
+            (StirlingEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        helper.assertTrue(engine != null, "stirling engine block entity missing");
+        helper.assertTrue(helper.getLevel().getCapability(
+            MjAPI.CAP_CONNECTOR, enginePos, net.minecraft.core.Direction.UP
+        ) != null, "stirling engine connector capability missing");
+        net.neoforged.neoforge.transfer.ResourceHandler<
+            net.neoforged.neoforge.transfer.item.ItemResource
+        > fuelHandler = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            enginePos, net.minecraft.core.Direction.NORTH
+        );
+        helper.assertTrue(fuelHandler != null, "stirling engine fuel capability missing");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(fuelHandler.insert(
+                0, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.COBBLESTONE), 1, transaction
+            ), 0, "stirling engine accepted a non-fuel item");
+            helper.assertValueEqual(fuelHandler.insert(
+                0, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.COAL), 1, transaction
+            ), 1, "stirling engine rejected coal");
+            transaction.commit();
+        }
+        TestMjReceiver receiver = new TestMjReceiver();
+        for (int tick = 0; tick < 16; tick++) engine.tickCycle(true, receiver);
+        helper.assertTrue(engine.burnTime() > 0, "stirling engine did not consume solid fuel");
+        helper.assertValueEqual(engine.fuelInventory().getAmountAsInt(0), 0,
+            "stirling engine retained consumed fuel");
+        helper.assertTrue(receiver.received > 0, "stirling engine did not emit MJ");
+        helper.assertTrue(engine.storedPower() > 0, "stirling engine did not buffer MJ");
         helper.succeed();
     }
 

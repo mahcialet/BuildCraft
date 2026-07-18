@@ -3,6 +3,7 @@ package buildcraft.energy;
 import buildcraft.api.enums.EnumSpring;
 import buildcraft.lib.fluid.FuelRegistry;
 import buildcraft.core.BCCreativeTabs;
+import buildcraft.core.item.ItemBlockEngine;
 import buildcraft.energy.client.BCEnergyClient;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
@@ -17,6 +18,7 @@ public final class BCEnergy {
 
     public BCEnergy(IEventBus modBus) {
         BCEnergyFluids.register(modBus);
+        BCEnergyBlockEntities.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());
         FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.OIL, 3_000_000L, 10_000);
@@ -26,6 +28,7 @@ public final class BCEnergy {
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
+            event.accept(ItemBlockEngine.stirlingEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
         }

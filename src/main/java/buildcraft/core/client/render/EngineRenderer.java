@@ -26,8 +26,6 @@ import org.jspecify.annotations.Nullable;
 public final class EngineRenderer<T extends BlockEntity & EngineBlockEntity>
     implements BlockEntityRenderer<T, EngineRenderState> {
     private static final String MOD_ID = "buildcraftcore";
-    private static final SpriteId BACK = sprite("engine/wood/back");
-    private static final SpriteId SIDE = sprite("engine/wood/side");
     private static final SpriteId CHAMBER = sprite("engine/chamber_base");
 
     private final SpriteGetter sprites;
@@ -48,6 +46,7 @@ public final class EngineRenderer<T extends BlockEntity & EngineBlockEntity>
         BlockEntityRenderer.super.extractRenderState(engine, state, partialTicks, cameraPosition, breakProgress);
         state.progress = engine.renderProgress(partialTicks);
         state.facing = engine.getBlockState().getValue(BlockEngine.FACING);
+        state.baseTexture = engine.baseTexture();
         state.trunkTexture = engine.trunkTexture();
     }
 
@@ -57,8 +56,8 @@ public final class EngineRenderer<T extends BlockEntity & EngineBlockEntity>
         poseStack.pushPose();
         orientFromUp(poseStack, state.facing);
 
-        TextureAtlasSprite back = sprites.get(BACK);
-        TextureAtlasSprite side = sprites.get(SIDE);
+        TextureAtlasSprite back = sprites.get(spriteId(state.baseTexture + "/back"));
+        TextureAtlasSprite side = sprites.get(spriteId(state.baseTexture + "/side"));
         TextureAtlasSprite chamber = sprites.get(CHAMBER);
         TextureAtlasSprite trunk = sprites.get(sprite("engine/trunk_" + state.trunkTexture));
         float displacement = triangularDisplacement(state.progress);
@@ -163,6 +162,10 @@ public final class EngineRenderer<T extends BlockEntity & EngineBlockEntity>
 
     private static SpriteId sprite(String path) {
         return Sheets.BLOCKS_MAPPER.apply(Identifier.fromNamespaceAndPath(MOD_ID, path));
+    }
+
+    private static SpriteId spriteId(String location) {
+        return Sheets.BLOCKS_MAPPER.apply(Identifier.parse(location));
     }
 
 }

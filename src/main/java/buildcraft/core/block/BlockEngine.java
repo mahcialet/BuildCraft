@@ -6,6 +6,8 @@ import buildcraft.core.BCCoreBlockEntities;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.core.block.entity.EngineBlockEntity;
+import buildcraft.energy.BCEnergyBlockEntities;
+import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -71,6 +73,7 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return switch (state.getValue(ENGINE_TYPE)) {
             case WOOD -> new RedstoneEngineBlockEntity(pos, state);
+            case STONE -> new StirlingEngineBlockEntity(pos, state);
             case CREATIVE -> new CreativeEngineBlockEntity(pos, state);
             default -> null;
         };
@@ -82,6 +85,9 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     ) {
         if (type == BCCoreBlockEntities.ENGINE_REDSTONE.get()) {
             return createTickerHelper(type, BCCoreBlockEntities.ENGINE_REDSTONE.get(), RedstoneEngineBlockEntity::tick);
+        }
+        if (type == BCEnergyBlockEntities.ENGINE_STIRLING.get()) {
+            return createTickerHelper(type, BCEnergyBlockEntities.ENGINE_STIRLING.get(), StirlingEngineBlockEntity::tick);
         }
         return createTickerHelper(type, BCCoreBlockEntities.ENGINE_CREATIVE.get(), CreativeEngineBlockEntity::tick);
     }

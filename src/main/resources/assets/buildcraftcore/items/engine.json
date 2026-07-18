@@ -5,6 +5,7 @@
     "block_state_property": "type",
     "cases": [
       { "when": "wood", "model": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_redstone" } },
+      { "when": "stone", "model": { "type": "minecraft:model", "model": "buildcraftenergy:item/engine_stirling" } },
       { "when": "creative", "model": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_creative" } }
     ],
     "fallback": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_redstone" }

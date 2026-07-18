@@ -122,6 +122,10 @@ tasks.named('processResources', ProcessResources) {
         rename 'bucketFuel.png', 'fuel_light_bucket.png'
         into 'assets/buildcraftenergy/textures/item'
     }
+    from('buildcraft_resources/assets/buildcraftenergy/textures/blocks/engine/stone') {
+        include 'back.png', 'side.png'
+        into 'assets/buildcraftenergy/textures/block/engine/stone'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'

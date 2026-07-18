@@ -14,5 +14,9 @@ public interface EngineBlockEntity {
 
     float renderProgress(float partialTicks);
 
+    default String baseTexture() {
+        return "buildcraftcore:block/engine/wood";
+    }
+
     String trunkTexture();
 }
