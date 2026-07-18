@@ -147,13 +147,28 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         int available = fluidBuffer.getAmountAsInt(0);
         if (resource.isEmpty() || available <= 0) return;
         int rate = Math.min(available, pipeType().fluidTransferRate());
-        for (int offset = 0; offset < Direction.values().length; offset++) {
-            Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
+        if (pipeType() == PipeType.VOID_FLUID) {
+            try (Transaction transaction = Transaction.openRoot()) {
+                fluidBuffer.extract(0, resource, rate, transaction);
+                transaction.commit();
+            }
+            sync();
+            return;
+        }
+        int directionCount = Direction.values().length;
+        int attempts = pipeType() == PipeType.CLAY_FLUID ? directionCount * 2 : directionCount;
+        for (int offset = 0; offset < attempts; offset++) {
+            Direction direction = Direction.values()[Math.floorMod(routeCursor + offset % directionCount, directionCount)];
             if (direction == blocked || direction == extractionDirection
                     || pipeType() == PipeType.IRON_FLUID && direction != routingDirection) continue;
             if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
             BlockPos targetPos = worldPosition.relative(direction);
             var targetEntity = level.getBlockEntity(targetPos);
+            if (pipeType() == PipeType.CLAY_FLUID) {
+                boolean pipeTarget = targetEntity instanceof PipeHolderBlockEntity;
+                boolean externalPass = offset < directionCount;
+                if (pipeTarget == externalPass) continue;
+            }
             var target = targetEntity instanceof PipeHolderBlockEntity pipe
                     && pipeType().connectsTo(pipe.pipeType()) && pipe.acceptsFluidFrom(direction.getOpposite())
                 ? pipe.fluidBuffer()

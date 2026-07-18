@@ -129,6 +129,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
+        registerTest(event, environment, "transport_clay_void_fluid_pipes", BCCoreGameTests::transportClayVoidFluidPipes);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1281,6 +1282,71 @@ public final class BCCoreGameTests {
         helper.assertTrue(drops.size() == 1
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_IRON_FLUID.get()),
                 "iron fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportClayVoidFluidPipes(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos clayPos = helper.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos westPos = clayPos.west();
+        BlockPos eastPos = clayPos.east();
+        BlockPos tankPos = clayPos.south();
+        BlockState cobble = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_FLUID);
+        helper.getLevel().setBlock(clayPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.CLAY_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(westPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(eastPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(tankPos, BCCoreBlocks.ENGINE.get().defaultBlockState().setValue(
+                BlockEngine.ENGINE_TYPE, EnumEngineType.IRON), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var clay = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(clayPos);
+        var west = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(westPos);
+        var east = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(eastPos);
+        var tank = (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(tankPos);
+        var fuel = net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get());
+        clay.fluidBuffer().set(0, fuel, 200);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), clayPos, helper.getLevel().getBlockState(clayPos), clay);
+        helper.assertValueEqual(tank.tanks().getAmountAsInt(CombustionEngineBlockEntity.FUEL_TANK), 40,
+                "clay fluid pipe did not prioritize tank");
+        helper.assertValueEqual(west.fluidBuffer().getAmountAsInt(0) + east.fluidBuffer().getAmountAsInt(0), 0,
+                "clay fluid pipe sent fluid to pipe before tank");
+        tank.tanks().set(CombustionEngineBlockEntity.FUEL_TANK, fuel, CombustionEngineBlockEntity.TANK_CAPACITY);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), clayPos, helper.getLevel().getBlockState(clayPos), clay);
+        helper.assertValueEqual(west.fluidBuffer().getAmountAsInt(0) + east.fluidBuffer().getAmountAsInt(0), 40,
+                "clay fluid pipe did not fall back to pipe");
+
+        BlockPos voidPos = helper.absolutePos(new BlockPos(2, 2, 5));
+        BlockPos voidTargetPos = voidPos.east();
+        helper.getLevel().setBlock(voidPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.VOID_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(voidTargetPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var voidPipe = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(voidPos);
+        var voidTarget = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(voidTargetPos);
+        voidPipe.fluidBuffer().set(0, fuel, 200);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), voidPos, helper.getLevel().getBlockState(voidPos), voidPipe);
+        helper.assertValueEqual(voidPipe.fluidBuffer().getAmountAsInt(0), 120,
+                "void fluid pipe discarded wrong amount");
+        helper.assertValueEqual(voidTarget.fluidBuffer().getAmountAsInt(0), 0,
+                "void fluid pipe forwarded discarded fluid");
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_CLAY_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_CLAY_FLUID.get());
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_VOID_FLUID.get());
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(voidPos), helper.getLevel(), voidPos, voidPipe);
+        helper.assertTrue(drops.size() == 1
+                && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_VOID_FLUID.get()),
+                "void fluid pipe returned wrong drop");
         helper.succeed();
     }
 

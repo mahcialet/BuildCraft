@@ -177,6 +177,20 @@
     { "when": { "type": "iron_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90 } },
     { "when": { "type": "iron_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 90 } },
     { "when": { "type": "iron_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "iron_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "iron_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "clay_fluid" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_center" } },
+    { "when": { "type": "clay_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm" } },
+    { "when": { "type": "clay_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm", "x": 180 } },
+    { "when": { "type": "clay_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm", "x": 90 } },
+    { "when": { "type": "clay_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "clay_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "clay_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/clay_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "void_fluid" }, "apply": { "model": "buildcrafttransport:block/void_fluid_center" } },
+    { "when": { "type": "void_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm" } },
+    { "when": { "type": "void_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm", "x": 180 } },
+    { "when": { "type": "void_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm", "x": 90 } },
+    { "when": { "type": "void_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "void_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "void_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/void_fluid_arm", "x": 90, "y": 270 } }
   ]
 }
