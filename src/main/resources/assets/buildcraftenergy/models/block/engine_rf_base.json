@@ -1,0 +1,21 @@
+{
+  "textures": {
+    "back": "buildcraftenergy:block/engine/rf/back",
+    "side": "buildcraftenergy:block/engine/rf/side",
+    "particle": "buildcraftenergy:block/engine/rf/side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 4, 16],
+      "faces": {
+        "down": { "texture": "#back" },
+        "up": { "texture": "#back" },
+        "north": { "texture": "#side" },
+        "south": { "texture": "#side" },
+        "west": { "texture": "#side" },
+        "east": { "texture": "#side" }
+      }
+    }
+  ]
+}

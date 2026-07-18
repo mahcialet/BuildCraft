@@ -7,6 +7,7 @@
       { "when": "wood", "model": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_redstone" } },
       { "when": "stone", "model": { "type": "minecraft:model", "model": "buildcraftenergy:item/engine_stirling" } },
       { "when": "iron", "model": { "type": "minecraft:model", "model": "buildcraftenergy:item/engine_combustion" } },
+      { "when": "rf", "model": { "type": "minecraft:model", "model": "buildcraftenergy:item/engine_rf" } },
       { "when": "creative", "model": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_creative" } }
     ],
     "fallback": { "type": "minecraft:model", "model": "buildcraftcore:item/engine_redstone" }

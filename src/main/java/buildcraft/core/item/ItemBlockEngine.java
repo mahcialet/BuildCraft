@@ -28,6 +28,9 @@ public final class ItemBlockEngine extends BlockItem {
     public static ItemStack combustionEngine() {
         return createStack(EnumEngineType.IRON);
     }
+    public static ItemStack rfEngine() {
+        return createStack(EnumEngineType.RF);
+    }
 
     public static ItemStack createStack(EnumEngineType type) {
         ItemStack stack = new ItemStack(BCCoreItems.ENGINE.get());

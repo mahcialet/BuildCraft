@@ -9,6 +9,7 @@ import buildcraft.core.block.entity.EngineBlockEntity;
 import buildcraft.energy.BCEnergyBlockEntities;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
+import buildcraft.energy.block.entity.RfEngineBlockEntity;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -76,6 +77,7 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
             case WOOD -> new RedstoneEngineBlockEntity(pos, state);
             case STONE -> new StirlingEngineBlockEntity(pos, state);
             case IRON -> new CombustionEngineBlockEntity(pos, state);
+            case RF -> new RfEngineBlockEntity(pos, state);
             case CREATIVE -> new CreativeEngineBlockEntity(pos, state);
             default -> null;
         };
@@ -93,6 +95,9 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
         }
         if (type == BCEnergyBlockEntities.ENGINE_COMBUSTION.get()) {
             return createTickerHelper(type, BCEnergyBlockEntities.ENGINE_COMBUSTION.get(), CombustionEngineBlockEntity::tick);
+        }
+        if (type == BCEnergyBlockEntities.ENGINE_RF.get()) {
+            return createTickerHelper(type, BCEnergyBlockEntities.ENGINE_RF.get(), RfEngineBlockEntity::tick);
         }
         return createTickerHelper(type, BCCoreBlockEntities.ENGINE_CREATIVE.get(), CreativeEngineBlockEntity::tick);
     }

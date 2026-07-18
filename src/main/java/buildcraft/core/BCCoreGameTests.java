@@ -41,6 +41,7 @@ import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.energy.BCEnergyFluids;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
+import buildcraft.energy.block.entity.RfEngineBlockEntity;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -116,6 +117,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_fluids", BCCoreGameTests::energyFluids);
         registerTest(event, environment, "stirling_engine", BCCoreGameTests::stirlingEngine);
         registerTest(event, environment, "combustion_engine", BCCoreGameTests::combustionEngine);
+        registerTest(event, environment, "rf_engine", BCCoreGameTests::rfEngine);
     }
 
     private static void registerTest(
@@ -780,6 +782,41 @@ public final class BCCoreGameTests {
             "combustion engine did not consume coolant above ideal heat");
         helper.assertTrue(engine.heat() < CombustionEngineBlockEntity.MAX_HEAT,
             "cooled combustion engine overheated");
+        helper.succeed();
+    }
+
+    private static void rfEngine(GameTestHelper helper) {
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.RF)
+            .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
+        BlockPos enginePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        RfEngineBlockEntity engine = (RfEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        helper.assertTrue(engine != null, "RF engine block entity missing");
+        net.neoforged.neoforge.transfer.energy.EnergyHandler energy = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+            enginePos, net.minecraft.core.Direction.NORTH
+        );
+        helper.assertTrue(energy != null, "RF engine energy capability missing");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(energy.insert(1_000, transaction), 1_000,
+                "RF engine rejected external energy");
+            helper.assertValueEqual(energy.extract(1, transaction), 0,
+                "RF engine allowed external energy extraction");
+            transaction.commit();
+        }
+        engine.upgrades().set(0,
+            net.neoforged.neoforge.transfer.item.ItemResource.of(BCCoreItems.GEAR_IRON.get()), 1);
+        engine.upgrades().set(1,
+            net.neoforged.neoforge.transfer.item.ItemResource.of(BCCoreItems.GEAR_GOLD.get()), 1);
+        helper.assertValueEqual(engine.mjPerTick(), 9 * MjAPI.MJ, "RF engine upgraded output");
+        helper.assertValueEqual(engine.energyConsumptionRate(), 90, "RF engine upgraded consumption");
+        TestMjReceiver receiver = new TestMjReceiver();
+        for (int tick = 0; tick < 16; tick++) engine.tickCycle(true, receiver);
+        helper.assertTrue(energy.getAmountAsInt() < 1_000, "RF engine did not consume external energy");
+        helper.assertTrue(receiver.received > 0, "RF engine did not emit MJ");
+        helper.assertTrue(engine.heat() > 20, "RF engine did not heat while converting energy");
         helper.succeed();
     }
 

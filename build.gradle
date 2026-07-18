@@ -130,6 +130,10 @@ tasks.named('processResources', ProcessResources) {
         include 'back.png', 'side.png'
         into 'assets/buildcraftenergy/textures/block/engine/iron'
     }
+    from('buildcraft_resources/assets/buildcraftenergy/textures/blocks/engine/rf') {
+        include 'back.png', 'side.png'
+        into 'assets/buildcraftenergy/textures/block/engine/rf'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'

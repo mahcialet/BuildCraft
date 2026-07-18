@@ -4,6 +4,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.core.BCCoreBlocks;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
+import buildcraft.energy.block.entity.RfEngineBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -25,6 +26,10 @@ public final class BCEnergyBlockEntities {
         BLOCK_ENTITIES.register("engine_combustion", () -> new BlockEntityType<>(
             CombustionEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RfEngineBlockEntity>> ENGINE_RF =
+        BLOCK_ENTITIES.register("engine_rf", () -> new BlockEntityType<>(
+            RfEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
+        ));
 
     private BCEnergyBlockEntities() {
     }
@@ -43,5 +48,9 @@ public final class BCEnergyBlockEntities {
             (engine, side) -> engine.connector(side));
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, ENGINE_COMBUSTION.get(),
             (engine, side) -> engine.tanks());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_RF.get(),
+            (engine, side) -> engine.connector(side));
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, ENGINE_RF.get(),
+            (engine, side) -> engine.energy());
     }
 }

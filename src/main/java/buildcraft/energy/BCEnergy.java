@@ -32,6 +32,7 @@ public final class BCEnergy {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
             event.accept(ItemBlockEngine.stirlingEngine());
             event.accept(ItemBlockEngine.combustionEngine());
+            event.accept(ItemBlockEngine.rfEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
         }

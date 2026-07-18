@@ -24,6 +24,7 @@ public final class BCEnergyClient {
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BCEnergyBlockEntities.ENGINE_STIRLING.get(), EngineRenderer::new);
         event.registerBlockEntityRenderer(BCEnergyBlockEntities.ENGINE_COMBUSTION.get(), EngineRenderer::new);
+        event.registerBlockEntityRenderer(BCEnergyBlockEntities.ENGINE_RF.get(), EngineRenderer::new);
     }
 
     private static void registerFluidModels(RegisterFluidModelsEvent event) {

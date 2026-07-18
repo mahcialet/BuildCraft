@@ -4,5 +4,6 @@
   "item.buildcraftenergy.oil_bucket": "Oil Bucket",
   "item.buildcraftenergy.fuel_light_bucket": "Light Fuel Bucket",
   "block.buildcraftcore.engine.stone": "Stirling Engine",
-  "block.buildcraftcore.engine.iron": "Combustion Engine"
+  "block.buildcraftcore.engine.iron": "Combustion Engine",
+  "block.buildcraftcore.engine.rf": "RF Engine"
 }
