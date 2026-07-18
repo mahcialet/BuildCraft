@@ -23,6 +23,8 @@
   "item.buildcraftcore.fragile_fluid_shard": "Fragile Fluid Shard",
   "item.buildcraftcore.fragile_fluid_shard.filled": "Fragile %s Shard",
   "item.buildcraftcore.fragile_fluid_shard.amount": "%s / %s mB",
+  "block.buildcraftcore.spring.water": "Water Spring",
+  "block.buildcraftcore.spring.oil": "Oil Spring",
   "gui.buildcraftcore.list.label": "List label",
   "gui.buildcraftcore.list.precise": "Match data components precisely",
   "gui.buildcraftcore.list.type": "Match item type",

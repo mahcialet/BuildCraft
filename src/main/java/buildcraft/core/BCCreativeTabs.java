@@ -2,6 +2,8 @@ package buildcraft.core;
 
 import buildcraft.BuildCraft;
 import buildcraft.api.enums.EnumDecoratedBlock;
+import buildcraft.api.enums.EnumSpring;
+import buildcraft.core.item.ItemBlockSpring;
 import buildcraft.core.item.ItemBlockDecoration;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
@@ -33,6 +35,7 @@ public final class BCCreativeTabs {
                 }
                 output.accept(BCCoreItems.LIST.get());
                 output.accept(BCCoreItems.VOLUME_BOX.get());
+                for (EnumSpring type : EnumSpring.VALUES) output.accept(ItemBlockSpring.createStack(type));
                 output.accept(BCCoreItems.GEAR_WOOD.get());
                 output.accept(BCCoreItems.GEAR_STONE.get());
                 output.accept(BCCoreItems.GEAR_IRON.get());

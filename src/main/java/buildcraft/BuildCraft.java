@@ -9,6 +9,7 @@ import buildcraft.core.BCCoreDataComponents;
 import buildcraft.core.BCCoreMenus;
 import buildcraft.core.BCCoreNetwork;
 import buildcraft.core.BCCoreVolumeBoxes;
+import buildcraft.core.BCCoreFeatures;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.api.distmarker.Dist;
@@ -23,6 +24,7 @@ public final class BuildCraft {
 
     public BuildCraft(IEventBus modBus) {
         BCCoreBlocks.register(modBus);
+        BCCoreFeatures.register(modBus);
         BCCoreDataComponents.register(modBus);
         BCCoreBlockEntities.register(modBus);
         BCCoreMenus.register(modBus);

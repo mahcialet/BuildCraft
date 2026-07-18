@@ -20,6 +20,9 @@ import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
 import buildcraft.api.items.FluidItemDrops;
 import buildcraft.core.item.ItemFragileFluidContainer;
+import buildcraft.api.enums.EnumSpring;
+import buildcraft.core.block.BlockSpring;
+import buildcraft.core.item.ItemBlockSpring;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -86,6 +89,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "list", BCCoreGameTests::list);
         registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
+        registerTest(event, environment, "spring", BCCoreGameTests::spring);
     }
 
     private static void registerTest(
@@ -577,6 +581,41 @@ public final class BCCoreGameTests {
             transaction.commit();
         }
         helper.assertTrue(shard.isEmpty(), "Drained fragile shard was not consumed");
+        helper.succeed();
+    }
+
+    private static void spring(GameTestHelper helper) {
+        BlockPos waterPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockState waterSpring = BCCoreBlocks.SPRING.get().defaultBlockState()
+            .setValue(BlockSpring.SPRING_TYPE, EnumSpring.WATER);
+        helper.getLevel().setBlock(waterPos, waterSpring, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().removeBlock(waterPos.above(), false);
+        helper.assertTrue(BCCoreBlocks.SPRING.get().tryGenerate(
+            helper.getLevel(), waterPos, waterSpring, net.minecraft.util.RandomSource.create(1L)
+        ), "Water spring did not generate fluid");
+        helper.assertTrue(helper.getLevel().getBlockState(waterPos.above()).is(Blocks.WATER),
+            "Water spring generated the wrong block");
+
+        BlockPos oilPos = helper.absolutePos(new BlockPos(2, 1, 0));
+        BlockState oilSpring = waterSpring.setValue(BlockSpring.SPRING_TYPE, EnumSpring.OIL);
+        helper.getLevel().setBlock(oilPos, oilSpring, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(!BCCoreBlocks.SPRING.get().tryGenerate(
+            helper.getLevel(), oilPos, oilSpring, net.minecraft.util.RandomSource.create(1L)
+        ), "Unconfigured oil spring generated a block");
+        helper.assertTrue(helper.getLevel().isEmptyBlock(oilPos.above()),
+            "Unconfigured oil spring changed the world");
+
+        for (EnumSpring type : EnumSpring.VALUES) {
+            ItemStack stack = ItemBlockSpring.createStack(type);
+            EnumSpring stored = stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+                .get(BlockSpring.SPRING_TYPE);
+            helper.assertValueEqual(stored, type, "stored spring type");
+            helper.assertValueEqual(stack.getHoverName(),
+                Component.translatable("block.buildcraftcore.spring." + type.getSerializedName()),
+                "spring variant name");
+        }
+        helper.assertValueEqual(waterSpring.getDestroySpeed(helper.getLevel(), waterPos), -1.0F,
+            "spring destroy speed");
         helper.succeed();
     }
 

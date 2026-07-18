@@ -9,6 +9,7 @@ import buildcraft.core.item.ItemPaintbrush;
 import buildcraft.core.item.ItemList;
 import buildcraft.core.item.ItemVolumeBox;
 import buildcraft.core.item.ItemFragileFluidContainer;
+import buildcraft.core.item.ItemBlockSpring;
 import buildcraft.api.items.FluidItemDrops;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
@@ -46,6 +47,9 @@ public final class BCCoreItems {
     public static final DeferredItem<ItemBlockDecoration> DECORATED = ITEMS.registerItem(
         "decorated",
         properties -> new ItemBlockDecoration(BCCoreBlocks.DECORATED.get(), properties.useBlockDescriptionPrefix())
+    );
+    public static final DeferredItem<ItemBlockSpring> SPRING = ITEMS.registerItem(
+        "spring", properties -> new ItemBlockSpring(BCCoreBlocks.SPRING.get(), properties.useBlockDescriptionPrefix())
     );
     public static final DeferredItem<BlockItem> MARKER_PATH = ITEMS.registerSimpleBlockItem(BCCoreBlocks.MARKER_PATH);
     public static final DeferredItem<BlockItem> MARKER_VOLUME = ITEMS.registerSimpleBlockItem(BCCoreBlocks.MARKER_VOLUME);

@@ -4,6 +4,7 @@ import buildcraft.BuildCraft;
 import buildcraft.core.block.BlockDecoration;
 import buildcraft.core.block.BlockMarkerPath;
 import buildcraft.core.block.BlockMarkerVolume;
+import buildcraft.core.block.BlockSpring;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -18,6 +19,8 @@ public final class BCCoreBlocks {
         BLOCKS.registerBlock("marker_path", BlockMarkerPath::new);
     public static final DeferredBlock<BlockMarkerVolume> MARKER_VOLUME =
         BLOCKS.registerBlock("marker_volume", BlockMarkerVolume::new);
+    public static final DeferredBlock<BlockSpring> SPRING =
+        BLOCKS.registerBlock("spring", BlockSpring::new);
 
     private BCCoreBlocks() {
     }
