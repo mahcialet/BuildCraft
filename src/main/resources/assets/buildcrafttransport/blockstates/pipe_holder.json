@@ -205,6 +205,27 @@
     { "when": { "type": "diamond_wood_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90 } },
     { "when": { "type": "diamond_wood_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 90 } },
     { "when": { "type": "diamond_wood_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "diamond_wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 270 } }
+{ "when": { "type": "diamond_wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_wood_fluid_arm", "x": 90, "y": 270 } },
+{ "when":{"type":"cobblestone_power"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_center"}},
+{ "when":{"type":"cobblestone_power","up":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm"}},
+{ "when":{"type":"cobblestone_power","down":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm","x":180}},
+{ "when":{"type":"cobblestone_power","north":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm","x":90}},
+{ "when":{"type":"cobblestone_power","east":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm","x":90,"y":90}},
+{ "when":{"type":"cobblestone_power","south":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm","x":90,"y":180}},
+{ "when":{"type":"cobblestone_power","west":"true"},"apply":{"model":"buildcrafttransport:block/cobblestone_power_arm","x":90,"y":270}},
+{ "when":{"type":"stone_power"},"apply":{"model":"buildcrafttransport:block/stone_power_center"}},
+{ "when":{"type":"stone_power","up":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm"}},
+{ "when":{"type":"stone_power","down":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm","x":180}},
+{ "when":{"type":"stone_power","north":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm","x":90}},
+{ "when":{"type":"stone_power","east":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm","x":90,"y":90}},
+{ "when":{"type":"stone_power","south":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm","x":90,"y":180}},
+{ "when":{"type":"stone_power","west":"true"},"apply":{"model":"buildcrafttransport:block/stone_power_arm","x":90,"y":270}},
+{ "when":{"type":"quartz_power"},"apply":{"model":"buildcrafttransport:block/quartz_power_center"}},
+{ "when":{"type":"quartz_power","up":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm"}},
+{ "when":{"type":"quartz_power","down":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":180}},
+{ "when":{"type":"quartz_power","north":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90}},
+{ "when":{"type":"quartz_power","east":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":90}},
+{ "when":{"type":"quartz_power","south":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":180}},
+{ "when":{"type":"quartz_power","west":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":270}}
   ]
 }

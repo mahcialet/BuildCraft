@@ -32,7 +32,10 @@
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_clay_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"clay_fluid"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_void_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"void_fluid"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_fluid"}}]},
-            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_fluid"}}]}
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_fluid"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_cobble_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"cobblestone_power"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_stone_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"stone_power"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_quartz_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"quartz_power"}}]}
       ]
     }]
   }],

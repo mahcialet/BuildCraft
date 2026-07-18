@@ -72,6 +72,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private int emzuliCurrent = -1;
     private final List<ItemStack> diamondRouteFilters = new ArrayList<>();
     private final StripesReceiver stripesReceiver = new StripesReceiver();
+    private final PowerConnector powerConnector = new PowerConnector();
     private @Nullable Direction stripesDirection;
     private long stripesPower;
     private long stripesProgress;
@@ -535,6 +536,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             case STRIPES_ITEM -> stripesReceiver;
             default -> null;
         };
+    }
+
+    public @Nullable IMjConnector mjConnector() {
+        return pipeType().carriesPower() ? powerConnector : mjReceiver();
     }
 
     public DyeColor pipeColor() {
@@ -1198,6 +1203,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 sync();
             }
             return microJoules - accepted;
+        }
+    }
+
+    private final class PowerConnector implements IMjConnector {
+        @Override
+        public boolean canConnect(IMjConnector other) {
+            return other != null;
         }
     }
 

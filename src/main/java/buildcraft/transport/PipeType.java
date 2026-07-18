@@ -30,7 +30,10 @@ public enum PipeType implements StringRepresentable {
     CLAY_FLUID("clay_fluid", "pipe_clay_fluid", "Clay Fluid Pipe"),
     VOID_FLUID("void_fluid", "pipe_void_fluid", "Void Fluid Pipe"),
     DIAMOND_FLUID("diamond_fluid", "pipe_diamond_fluid", "Diamond Fluid Pipe"),
-    DIAMOND_WOOD_FLUID("diamond_wood_fluid", "pipe_diamond_wood_fluid", "Diamond Wooden Fluid Pipe");
+    DIAMOND_WOOD_FLUID("diamond_wood_fluid", "pipe_diamond_wood_fluid", "Diamond Wooden Fluid Pipe"),
+    COBBLESTONE_POWER("cobblestone_power", "pipe_cobble_power", "Cobblestone Power Pipe"),
+    STONE_POWER("stone_power", "pipe_stone_power", "Stone Power Pipe"),
+    QUARTZ_POWER("quartz_power", "pipe_quartz_power", "Quartz Power Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -48,6 +51,10 @@ public enum PipeType implements StringRepresentable {
     public String englishName() { return englishName; }
 
     public boolean connectsTo(PipeType other) {
+        if (carriesPower() != other.carriesPower()) return false;
+        if (carriesPower()) {
+            return this == other || isGeneralPowerConnector() || other.isGeneralPowerConnector();
+        }
         if (carriesFluids() != other.carriesFluids()) return false;
         if (carriesFluids()) {
             if (isWoodenFluidExtraction() && other.isWoodenFluidExtraction()) return false;
@@ -73,7 +80,28 @@ public enum PipeType implements StringRepresentable {
         return this == WOOD_ITEM || this == DIAMOND_WOOD_ITEM || this == EMZULI_ITEM;
     }
 
-    public boolean carriesItems() { return this != STRUCTURE && !carriesFluids(); }
+    public boolean carriesItems() { return this != STRUCTURE && !carriesFluids() && !carriesPower(); }
+    public boolean carriesPower() {
+        return this == COBBLESTONE_POWER || this == STONE_POWER || this == QUARTZ_POWER;
+    }
+    private boolean isGeneralPowerConnector() {
+        return false;
+    }
+    public long powerTransferPerTick() {
+        return switch (this) {
+            case COBBLESTONE_POWER -> 4_000_000L;
+            case STONE_POWER -> 8_000_000L;
+            case QUARTZ_POWER -> 32_000_000L;
+            default -> 0;
+        };
+    }
+    public long powerResistancePerTick() {
+        return switch (this) {
+            case COBBLESTONE_POWER -> 62_500L;
+            case STONE_POWER, QUARTZ_POWER -> 31_250L;
+            default -> 0;
+        };
+    }
     public boolean carriesFluids() {
         return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID
             || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID

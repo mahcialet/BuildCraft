@@ -71,6 +71,7 @@ import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
@@ -125,7 +126,8 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
-        registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
+registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
+registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1092,6 +1094,49 @@ public final class BCCoreGameTests {
                     "fluid pipe returned wrong drop item");
             helper.succeed();
         });
+    }
+
+    private static void transportPowerPipeFoundation(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos firstPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos secondPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos stonePos = helper.absolutePos(new BlockPos(2, 1, 0));
+        helper.getLevel().setBlock(firstPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(secondPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stonePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.STONE_POWER), Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "matching power pipes did not connect");
+        helper.assertTrue(!helper.getLevel().getBlockState(secondPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "separate power materials connected");
+        helper.assertTrue(helper.getLevel().getCapability(
+                MjAPI.CAP_CONNECTOR, firstPos, net.minecraft.core.Direction.WEST) != null,
+                "power pipe did not expose its MJ connector");
+        helper.assertTrue(helper.getLevel().getCapability(
+                MjAPI.CAP_RECEIVER, firstPos, net.minecraft.core.Direction.WEST) == null,
+                "non-wooden power pipe incorrectly accepted direct MJ input");
+        helper.assertValueEqual(buildcraft.transport.PipeType.COBBLESTONE_POWER.powerTransferPerTick(),
+                4 * MjAPI.MJ, "cobblestone power transfer limit");
+        helper.assertValueEqual(buildcraft.transport.PipeType.STONE_POWER.powerTransferPerTick(),
+                8 * MjAPI.MJ, "stone power transfer limit");
+        helper.assertValueEqual(buildcraft.transport.PipeType.QUARTZ_POWER.powerTransferPerTick(),
+                32 * MjAPI.MJ, "quartz power transfer limit");
+        helper.assertValueEqual(buildcraft.transport.PipeType.COBBLESTONE_POWER.powerResistancePerTick(),
+                MjAPI.MJ / 16, "cobblestone power resistance");
+        helper.assertValueEqual(buildcraft.transport.PipeType.STONE_POWER.powerResistancePerTick(),
+                MjAPI.MJ / 32, "stone power resistance");
+        var pipe = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(firstPos);
+        var drops = Block.getDrops(helper.getLevel().getBlockState(firstPos), helper.getLevel(), firstPos, pipe);
+        helper.assertValueEqual(drops.size(), 1, "power pipe returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_POWER.get()),
+                "power pipe returned wrong drop item");
+        helper.succeed();
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {

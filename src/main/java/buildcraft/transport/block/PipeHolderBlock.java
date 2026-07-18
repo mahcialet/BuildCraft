@@ -105,6 +105,11 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
                     pos.relative(direction), direction.getOpposite()
             ) != null;
         }
+        if (type.carriesPower()) {
+            var connector = actualLevel.getCapability(buildcraft.api.mj.MjAPI.CAP_CONNECTOR,
+                pos.relative(direction), direction.getOpposite());
+            return connector != null;
+        }
         return type.connectsInventories() && actualLevel.getCapability(
                 net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
                 pos.relative(direction), direction.getOpposite()
