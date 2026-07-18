@@ -26,6 +26,7 @@ public final class BCCreativeTabs {
                 output.accept(BCCoreItems.MARKER_PATH.get());
                 output.accept(BCCoreItems.MARKER_VOLUME.get());
                 output.accept(BCCoreItems.MARKER_CONNECTOR.get());
+                output.accept(BCCoreItems.MAP_LOCATION.get());
                 output.accept(BCCoreItems.GEAR_WOOD.get());
                 output.accept(BCCoreItems.GEAR_STONE.get());
                 output.accept(BCCoreItems.GEAR_IRON.get());

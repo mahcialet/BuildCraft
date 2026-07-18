@@ -14,5 +14,7 @@
   "block.buildcraftcore.decorated.laser_back": "Laser Decoration",
   "block.buildcraftcore.marker_path": "Path Marker",
   "item.buildcraftcore.marker_connector": "Marker Connector",
-  "block.buildcraftcore.marker_volume": "Volume Marker"
+  "block.buildcraftcore.marker_volume": "Volume Marker",
+  "item.buildcraftcore.map_location": "Map Location",
+  "buildcraft.item.nonclean.usage": "Shift-right-click in the air to clear"
 }

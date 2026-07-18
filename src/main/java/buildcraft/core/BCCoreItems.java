@@ -4,6 +4,7 @@ import buildcraft.BuildCraft;
 import buildcraft.core.item.ItemWrench;
 import buildcraft.core.item.ItemBlockDecoration;
 import buildcraft.core.item.ItemMarkerConnector;
+import buildcraft.core.item.ItemMapLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.BlockItem;
 import net.neoforged.bus.api.IEventBus;
@@ -19,6 +20,9 @@ public final class BCCoreItems {
     );
     public static final DeferredItem<ItemMarkerConnector> MARKER_CONNECTOR = ITEMS.registerItem(
         "marker_connector", ItemMarkerConnector::new, properties -> properties.stacksTo(1)
+    );
+    public static final DeferredItem<ItemMapLocation> MAP_LOCATION = ITEMS.registerItem(
+        "map_location", ItemMapLocation::new, properties -> properties.stacksTo(16)
     );
     public static final DeferredItem<ItemBlockDecoration> DECORATED = ITEMS.registerItem(
         "decorated",

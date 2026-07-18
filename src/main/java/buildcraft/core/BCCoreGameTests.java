@@ -6,6 +6,9 @@ import buildcraft.core.block.BlockDecoration;
 import buildcraft.core.gametest.BuildCraftGameTestInstance;
 import buildcraft.core.item.ItemBlockDecoration;
 import buildcraft.core.item.ItemMarkerConnector;
+import buildcraft.core.item.ItemMapLocation;
+import buildcraft.api.items.MapLocationData;
+import buildcraft.api.items.MapLocationType;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -63,6 +66,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "path_marker_sync", BCCoreGameTests::pathMarkerSync);
         registerTest(event, environment, "volume_graph", BCCoreGameTests::volumeGraph);
         registerTest(event, environment, "volume_marker_sync", BCCoreGameTests::volumeMarkerSync);
+        registerTest(event, environment, "map_location", BCCoreGameTests::mapLocation);
     }
 
     private static void registerTest(
@@ -290,6 +294,78 @@ public final class BCCoreGameTests {
         helper.assertValueEqual(firstEntity.min(), absoluteFirst, "surviving marker minimum was not cleared");
         helper.assertValueEqual(firstEntity.max(), absoluteFirst, "surviving marker maximum was not cleared");
         helper.succeed();
+    }
+
+    private static void mapLocation(GameTestHelper helper) {
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.CREATIVE);
+        ItemMapLocation item = BCCoreItems.MAP_LOCATION.get();
+
+        // Use a vertical edge so independently allocated tests cannot present a nearer
+        // collinear marker in the shared GameTest dimension.
+        BlockPos areaFirst = new BlockPos(1, 10, 1), areaSecond = new BlockPos(1, 13, 1);
+        for (BlockPos marker : java.util.List.of(areaFirst, areaSecond)) {
+            helper.setBlock(marker.below(), Blocks.STONE);
+            helper.setBlock(marker, BCCoreBlocks.MARKER_VOLUME.get().defaultBlockState());
+        }
+        VolumeSavedData.get(helper.getLevel()).connectValid(helper.absolutePos(areaFirst));
+        ItemStack areaStack = new ItemStack(item);
+        InteractionResult areaResult = item.useOn(useContext(helper, player, areaStack, areaFirst));
+        helper.assertTrue(areaResult.consumesAction(), "Map did not record area provider");
+        helper.assertValueEqual(item.getType(areaStack), MapLocationType.AREA, "map area type");
+        helper.assertValueEqual(areaStack.getMaxStackSize(), 1, "recorded map stack limit");
+        BlockPos absoluteAreaFirst = helper.absolutePos(areaFirst), absoluteAreaSecond = helper.absolutePos(areaSecond);
+        BlockPos expectedAreaMin = new BlockPos(
+            Math.min(absoluteAreaFirst.getX(), absoluteAreaSecond.getX()),
+            Math.min(absoluteAreaFirst.getY(), absoluteAreaSecond.getY()),
+            Math.min(absoluteAreaFirst.getZ(), absoluteAreaSecond.getZ())
+        );
+        BlockPos expectedAreaMax = new BlockPos(
+            Math.max(absoluteAreaFirst.getX(), absoluteAreaSecond.getX()),
+            Math.max(absoluteAreaFirst.getY(), absoluteAreaSecond.getY()),
+            Math.max(absoluteAreaFirst.getZ(), absoluteAreaSecond.getZ())
+        );
+        helper.assertValueEqual(item.getAreaMin(areaStack).orElseThrow(), expectedAreaMin, "map area minimum");
+        helper.assertValueEqual(item.getAreaMax(areaStack).orElseThrow(), expectedAreaMax, "map area maximum");
+
+        BlockPos pathFirst = new BlockPos(0, 1, 3), pathSecond = new BlockPos(2, 1, 3);
+        for (BlockPos marker : java.util.List.of(pathFirst, pathSecond)) {
+            helper.setBlock(marker.below(), Blocks.STONE);
+            helper.setBlock(marker, BCCoreBlocks.MARKER_PATH.get().defaultBlockState());
+        }
+        PathSavedData paths = PathSavedData.get(helper.getLevel());
+        paths.connect(helper.absolutePos(pathFirst), helper.absolutePos(pathSecond));
+        ItemStack pathStack = new ItemStack(item);
+        helper.assertTrue(item.useOn(useContext(helper, player, pathStack, pathFirst)).consumesAction(), "Map did not record path");
+        helper.assertValueEqual(item.getType(pathStack), MapLocationType.PATH, "map path type");
+        helper.assertValueEqual(
+            item.getPath(pathStack), java.util.List.of(helper.absolutePos(pathFirst), helper.absolutePos(pathSecond)), "map path"
+        );
+
+        BlockPos spot = new BlockPos(5, 1, 0);
+        helper.setBlock(spot, Blocks.STONE);
+        ItemStack spotStack = new ItemStack(item);
+        helper.assertTrue(item.useOn(useContext(helper, player, spotStack, spot)).consumesAction(), "Map did not record spot");
+        helper.assertValueEqual(item.getType(spotStack), MapLocationType.SPOT, "map spot type");
+        helper.assertValueEqual(item.getPoint(spotStack).orElseThrow(), helper.absolutePos(spot), "map spot position");
+        helper.assertValueEqual(item.getPointSide(spotStack).orElseThrow(), net.minecraft.core.Direction.UP, "map spot side");
+
+        item.setStoredName(spotStack, "Quarry Site");
+        Object encoded = MapLocationData.CODEC.encodeStart(JsonOps.INSTANCE, ItemMapLocation.getData(spotStack)).getOrThrow();
+        MapLocationData decoded = MapLocationData.CODEC.parse(
+            JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded
+        ).getOrThrow();
+        helper.assertValueEqual(decoded.name(), "Quarry Site", "persisted map name");
+        ItemMapLocation.clear(spotStack);
+        helper.assertValueEqual(item.getType(spotStack), MapLocationType.CLEAN, "cleared map type");
+        helper.assertValueEqual(spotStack.getMaxStackSize(), 16, "cleared map stack limit");
+        helper.succeed();
+    }
+
+    private static UseOnContext useContext(GameTestHelper helper, net.minecraft.world.entity.player.Player player,
+        ItemStack stack, BlockPos relativePos) {
+        BlockPos absolutePos = helper.absolutePos(relativePos);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), net.minecraft.core.Direction.UP, absolutePos, false);
+        return new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, stack, hit);
     }
 
     private static Identifier id(String path) {

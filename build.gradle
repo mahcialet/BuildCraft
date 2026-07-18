@@ -68,6 +68,9 @@ tasks.named('processResources', ProcessResources) {
         include 'gear_wood.png', 'gear_stone.png', 'gear_iron.png', 'gear_gold.png', 'gear_diamond.png', 'wrench.png', 'marker_path.png', 'marker_volume.png', 'marker_connector.png'
         into 'assets/buildcraftcore/textures/item'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/items/map') {
+        into 'assets/buildcraftcore/textures/item/map'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks') {
         include 'marker_path.png', 'marker_volume.png'
         into 'assets/buildcraftcore/textures/block'

@@ -1,6 +1,7 @@
 package buildcraft.core.block.entity;
 
 import buildcraft.core.BCCoreBlockEntities;
+import buildcraft.api.core.IPathProvider;
 import buildcraft.core.BCCoreBlocks;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -21,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.List;
 
 /** Client-visible snapshot of the path containing this marker. */
-public final class PathMarkerBlockEntity extends BlockEntity {
+public final class PathMarkerBlockEntity extends BlockEntity implements IPathProvider {
     private List<BlockPos> path = List.of();
     private boolean loop;
 
@@ -35,6 +36,14 @@ public final class PathMarkerBlockEntity extends BlockEntity {
 
     public boolean loop() {
         return loop;
+    }
+
+    @Override
+    public List<BlockPos> getPath() {
+        if (!loop || path.isEmpty()) return path;
+        java.util.ArrayList<BlockPos> repeating = new java.util.ArrayList<>(path);
+        repeating.add(path.getFirst());
+        return List.copyOf(repeating);
     }
 
     @Override
