@@ -124,6 +124,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
+        registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
     }
 
     private static void registerTest(
@@ -1029,6 +1030,101 @@ public final class BCCoreGameTests {
         helper.assertTrue(drops.getFirst().is(buildcraft.energy.BCEnergyItems.MJ_DYNAMO.get()),
             "MJ Dynamo returned wrong drop item");
         helper.succeed();
+    }
+
+    private static void transportPipeFoundation(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        net.minecraft.world.entity.player.Player placingPlayer =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        placingPlayer.setItemInHand(InteractionHand.MAIN_HAND,
+            new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STONE_ITEM.get()));
+        BlockPos clicked = helper.absolutePos(new BlockPos(6, 0, 0));
+        BlockHitResult placementHit = new BlockHitResult(Vec3.atCenterOf(clicked),
+            net.minecraft.core.Direction.UP, clicked, false);
+        BlockState placementState = block.getStateForPlacement(new net.minecraft.world.item.context.BlockPlaceContext(
+            new net.minecraft.world.item.context.UseOnContext(placingPlayer, InteractionHand.MAIN_HAND, placementHit)
+        ));
+        helper.assertTrue(placementState != null && placementState.getValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE) == buildcraft.transport.PipeType.STONE_ITEM,
+            "stone pipe item did not select its holder type");
+        BlockPos cobbleA = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos cobbleB = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos stone = helper.absolutePos(new BlockPos(2, 1, 0));
+        BlockPos structure = helper.absolutePos(new BlockPos(3, 1, 0));
+        BlockPos quartz = helper.absolutePos(new BlockPos(4, 1, 0));
+        helper.getLevel().setBlock(cobbleA, block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        ), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobbleB, block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        ), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stone, block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.STONE_ITEM
+        ), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(structure, block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.STRUCTURE
+        ), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(quartz, block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.QUARTZ_ITEM
+        ), net.minecraft.world.level.block.Block.UPDATE_ALL);
+
+        BlockState cobbleAState = helper.getLevel().getBlockState(cobbleA);
+        BlockState cobbleBState = helper.getLevel().getBlockState(cobbleB);
+        BlockState stoneState = helper.getLevel().getBlockState(stone);
+        BlockState structureState = helper.getLevel().getBlockState(structure);
+        BlockState quartzState = helper.getLevel().getBlockState(quartz);
+        helper.assertTrue(cobbleAState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST),
+            "matching cobblestone pipes did not connect");
+        helper.assertTrue(cobbleBState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "matching cobblestone pipe connection was not reciprocal");
+        helper.assertTrue(!cobbleBState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
+            && !stoneState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "stone and cobblestone pipes incorrectly connected");
+        helper.assertTrue(stoneState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
+            && structureState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "structure pipe did not connect to stone pipe");
+        helper.assertTrue(structureState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
+            && quartzState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "structure pipe did not connect to quartz pipe");
+        helper.assertTrue(helper.getLevel().getBlockEntity(structure)
+            instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity,
+            "pipe holder block entity missing");
+
+        assertPipeLoot(helper, cobbleA, buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get());
+        assertPipeLoot(helper, stone, buildcraft.transport.BCTransportItems.PIPE_STONE_ITEM.get());
+        assertPipeLoot(helper, structure, buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get());
+        assertPipeLoot(helper, quartz, buildcraft.transport.BCTransportItems.PIPE_QUARTZ_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get(),
+            Items.COBBLESTONE, Items.GRAVEL);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get(),
+            Items.COBBLESTONE, Items.GLASS);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_STONE_ITEM.get(),
+            Items.STONE, Items.GLASS);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_QUARTZ_ITEM.get(),
+            Items.QUARTZ_BLOCK, Items.GLASS);
+        helper.succeed();
+    }
+
+    private static void assertPipeLoot(GameTestHelper helper, BlockPos pos, net.minecraft.world.item.Item item) {
+        BlockState state = helper.getLevel().getBlockState(pos);
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+            state, helper.getLevel(), pos, helper.getLevel().getBlockEntity(pos)
+        );
+        helper.assertValueEqual(drops.size(), 1, "pipe returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(item), "pipe returned wrong historical item identity");
+    }
+
+    private static void assertPipeRecipe(GameTestHelper helper, net.minecraft.world.item.Item expected,
+        net.minecraft.world.item.Item shell, net.minecraft.world.item.Item middle) {
+        net.minecraft.world.item.crafting.CraftingInput input =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(shell), new ItemStack(middle), new ItemStack(shell)
+            ));
+        ItemStack output = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel()
+        ).orElseThrow().value().assemble(input);
+        helper.assertTrue(output.is(expected), "pipe recipe returned wrong item");
+        helper.assertValueEqual(output.getCount(), 8, "pipe recipe returned wrong count");
     }
 
     private static void mjFoundation(GameTestHelper helper) {

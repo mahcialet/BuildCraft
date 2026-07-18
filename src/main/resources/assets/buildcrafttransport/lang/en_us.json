@@ -1,0 +1,6 @@
+{
+  "item.buildcrafttransport.pipe_structure": "Structure Pipe",
+  "item.buildcrafttransport.pipe_cobble_item": "Cobblestone Transport Pipe",
+  "item.buildcrafttransport.pipe_stone_item": "Stone Transport Pipe",
+  "item.buildcrafttransport.pipe_quartz_item": "Quartz Transport Pipe"
+}

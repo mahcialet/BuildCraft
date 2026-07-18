@@ -1,0 +1,42 @@
+{
+  "type": "minecraft:block",
+  "pools": [
+    {
+      "rolls": 1.0,
+      "bonus_rolls": 0.0,
+      "entries": [
+        {
+          "type": "minecraft:alternatives",
+          "children": [
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_structure",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "structure" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_cobble_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "cobblestone_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_stone_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "stone_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_quartz_item"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "random_sequence": "buildcrafttransport:blocks/pipe_holder"
+}

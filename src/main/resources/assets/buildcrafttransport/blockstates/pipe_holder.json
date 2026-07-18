@@ -1,0 +1,36 @@
+{
+  "multipart": [
+    { "when": { "type": "structure" }, "apply": { "model": "buildcrafttransport:block/structure_center" } },
+    { "when": { "type": "cobblestone_item" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_center" } },
+    { "when": { "type": "stone_item" }, "apply": { "model": "buildcrafttransport:block/stone_item_center" } },
+    { "when": { "type": "quartz_item" }, "apply": { "model": "buildcrafttransport:block/quartz_item_center" } },
+
+    { "when": { "type": "structure", "up": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm" } },
+    { "when": { "type": "structure", "down": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 180 } },
+    { "when": { "type": "structure", "north": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 90 } },
+    { "when": { "type": "structure", "east": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "structure", "south": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "structure", "west": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "cobblestone_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm" } },
+    { "when": { "type": "cobblestone_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm", "x": 180 } },
+    { "when": { "type": "cobblestone_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm", "x": 90 } },
+    { "when": { "type": "cobblestone_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "cobblestone_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "cobblestone_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "stone_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm" } },
+    { "when": { "type": "stone_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm", "x": 180 } },
+    { "when": { "type": "stone_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm", "x": 90 } },
+    { "when": { "type": "stone_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "stone_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "stone_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/stone_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "quartz_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm" } },
+    { "when": { "type": "quartz_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm", "x": 180 } },
+    { "when": { "type": "quartz_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm", "x": 90 } },
+    { "when": { "type": "quartz_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "quartz_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "quartz_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_item_arm", "x": 90, "y": 270 } }
+  ]
+}

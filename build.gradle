@@ -56,6 +56,9 @@ neoForge {
         buildcraftenergy {
             sourceSet sourceSets.main
         }
+        buildcrafttransport {
+            sourceSet sourceSets.main
+        }
     }
 }
 
@@ -142,6 +145,11 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcraftenergy/textures/blocks/mj_dynamo') {
         include 'back.png', 'front.png', 'side.png'
         into 'assets/buildcraftenergy/textures/block/mj_dynamo'
+    }
+
+    from('buildcraft_resources/assets/buildcrafttransport/textures/pipes') {
+        include 'structure.png', 'cobblestone_item.png', 'stone_item.png', 'quartz_item.png'
+        into 'assets/buildcrafttransport/textures/block/pipe'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
