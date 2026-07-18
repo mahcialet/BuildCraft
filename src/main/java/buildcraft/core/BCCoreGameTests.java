@@ -128,6 +128,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
+        registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1218,6 +1219,69 @@ public final class BCCoreGameTests {
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel())
                 .orElseThrow().value().assemble(input);
         helper.assertTrue(output.is(outputPipe), "fluid upgrade recipe returned wrong item");
+    }
+
+    private static void transportIronFluidPipe(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos ironPos = helper.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos westPos = ironPos.west();
+        BlockPos eastPos = ironPos.east();
+        helper.getLevel().setBlock(ironPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.IRON_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        BlockState cobble = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_FLUID);
+        helper.getLevel().setBlock(westPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(eastPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var iron = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(ironPos);
+        var west = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(westPos);
+        var east = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(eastPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), ironPos, helper.getLevel().getBlockState(ironPos), iron);
+        helper.assertTrue(iron.routingDirection() != null, "iron fluid pipe did not select output");
+        while (iron.routingDirection() != net.minecraft.core.Direction.EAST) {
+            helper.assertTrue(iron.rotatePipeDirection(), "iron fluid pipe failed to rotate output");
+        }
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        var input = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                ironPos, net.minecraft.core.Direction.WEST);
+        var output = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                ironPos, net.minecraft.core.Direction.EAST);
+        helper.assertTrue(input != null && output != null, "iron fluid sided capability missing");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(input.insert(water, 200, transaction), 200,
+                    "iron fluid input rejected fluid");
+            helper.assertValueEqual(output.insert(water, 50, transaction), 0,
+                    "iron fluid output accepted input");
+            transaction.commit();
+        }
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), ironPos, helper.getLevel().getBlockState(ironPos), iron);
+        helper.assertValueEqual(west.fluidBuffer().getAmountAsInt(0), 0,
+                "iron fluid pipe sent fluid to input side");
+        helper.assertValueEqual(east.fluidBuffer().getAmountAsInt(0), 40,
+                "iron fluid pipe sent wrong amount to output side");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(output.extract(water, 10, transaction), 10,
+                    "iron fluid output did not permit extraction");
+            transaction.commit();
+        }
+        helper.assertValueEqual(iron.fluidBuffer().getAmountAsInt(0), 150,
+                "iron fluid output extraction changed wrong amount");
+        assertFluidUpgradeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_IRON_ITEM.get(),
+                buildcraft.transport.BCTransportItems.PIPE_IRON_FLUID.get());
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(ironPos), helper.getLevel(), ironPos, iron);
+        helper.assertTrue(drops.size() == 1
+                && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_IRON_FLUID.get()),
+                "iron fluid pipe returned wrong drop");
+        helper.succeed();
     }
 
     private static void transportPipeFoundation(GameTestHelper helper) {

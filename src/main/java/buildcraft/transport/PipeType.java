@@ -25,7 +25,8 @@ public enum PipeType implements StringRepresentable {
     QUARTZ_FLUID("quartz_fluid", "pipe_quartz_fluid", "Quartz Fluid Pipe"),
     WOOD_FLUID("wood_fluid", "pipe_wood_fluid", "Wooden Fluid Pipe"),
     GOLD_FLUID("gold_fluid", "pipe_gold_fluid", "Golden Fluid Pipe"),
-    SANDSTONE_FLUID("sandstone_fluid", "pipe_sandstone_fluid", "Sandstone Fluid Pipe");
+    SANDSTONE_FLUID("sandstone_fluid", "pipe_sandstone_fluid", "Sandstone Fluid Pipe"),
+    IRON_FLUID("iron_fluid", "pipe_iron_fluid", "Iron Fluid Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -71,10 +72,12 @@ public enum PipeType implements StringRepresentable {
     public boolean carriesItems() { return this != STRUCTURE && !carriesFluids(); }
     public boolean carriesFluids() {
         return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID
-            || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID;
+            || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID;
     }
     public boolean isWoodenFluidExtraction() { return this == WOOD_FLUID; }
-    private boolean isGeneralFluidConnector() { return this == GOLD_FLUID || this == SANDSTONE_FLUID; }
+    private boolean isGeneralFluidConnector() {
+        return this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID;
+    }
     public boolean connectsFluidHandlers() { return carriesFluids() && this != SANDSTONE_FLUID; }
     public int fluidTransferRate() {
         return switch (this) {
@@ -84,6 +87,7 @@ public enum PipeType implements StringRepresentable {
             case WOOD_FLUID -> 10;
             case GOLD_FLUID -> 80;
             case SANDSTONE_FLUID -> 20;
+            case IRON_FLUID -> 40;
             default -> 0;
         };
     }

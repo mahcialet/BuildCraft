@@ -170,6 +170,13 @@
     { "when": { "type": "sandstone_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90 } },
     { "when": { "type": "sandstone_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 90 } },
     { "when": { "type": "sandstone_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "sandstone_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "sandstone_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/sandstone_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "iron_fluid" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_center" } },
+    { "when": { "type": "iron_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm" } },
+    { "when": { "type": "iron_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 180 } },
+    { "when": { "type": "iron_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90 } },
+    { "when": { "type": "iron_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "iron_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "iron_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/iron_fluid_arm", "x": 90, "y": 270 } }
   ]
 }

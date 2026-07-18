@@ -35,6 +35,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
@@ -51,6 +52,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public static final double INITIAL_SPEED = 0.05;
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
     private final FluidBuffer fluidBuffer = new FluidBuffer();
+    private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
     private @Nullable Direction fluidReceivedFrom;
     private int fluidInputCooldown;
     private final List<Transit> travelling = new ArrayList<>();
@@ -77,6 +79,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
         for (Direction direction : Direction.values()) inputs[direction.ordinal()] = new InputHandler();
+        for (Direction direction : Direction.values()) fluidSides[direction.ordinal()] = new SideFluidHandler(direction);
         for (int index = 0; index < 9; index++) diamondFilters.add(ItemStack.EMPTY);
         for (int index = 0; index < 4; index++) {
             emzuliFilters.add(ItemStack.EMPTY);
@@ -92,6 +95,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private void serverTick(ServerLevel level) {
         if (pipeType().carriesFluids()) {
             ensureWoodDirection(level);
+            ensureIronDirection(level);
             transferFluid(level);
             return;
         }
@@ -145,12 +149,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         int rate = Math.min(available, pipeType().fluidTransferRate());
         for (int offset = 0; offset < Direction.values().length; offset++) {
             Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
-            if (direction == blocked || direction == extractionDirection) continue;
+            if (direction == blocked || direction == extractionDirection
+                    || pipeType() == PipeType.IRON_FLUID && direction != routingDirection) continue;
             if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
             BlockPos targetPos = worldPosition.relative(direction);
             var targetEntity = level.getBlockEntity(targetPos);
             var target = targetEntity instanceof PipeHolderBlockEntity pipe
-                    && pipeType().connectsTo(pipe.pipeType()) && pipe.pipeType().carriesFluids()
+                    && pipeType().connectsTo(pipe.pipeType()) && pipe.acceptsFluidFrom(direction.getOpposite())
                 ? pipe.fluidBuffer()
                 : level.getCapability(Capabilities.Fluid.BLOCK, targetPos, direction.getOpposite());
             if (target == null || target == fluidBuffer) continue;
@@ -389,6 +394,19 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureIronDirection(ServerLevel level) {
+        if (pipeType() == PipeType.IRON_FLUID) {
+            if (routingDirection != null
+                    && getBlockState().getValue(PipeHolderBlock.property(routingDirection))) return;
+            routingDirection = null;
+            for (Direction direction : Direction.values()) {
+                if (getBlockState().getValue(PipeHolderBlock.property(direction))) {
+                    routingDirection = direction;
+                    sync();
+                    return;
+                }
+            }
+            return;
+        }
         if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) {
             routingDirection = null;
             return;
@@ -441,12 +459,16 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             return rotateExtractionDirection();
         }
         if (pipeType() == PipeType.STRIPES_ITEM) return rotateStripesDirection();
-        if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return false;
+        if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM
+                && pipeType() != PipeType.IRON_FLUID) return false;
         Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
         Direction[] directions = Direction.values();
         for (int offset = 1; offset <= directions.length; offset++) {
             Direction candidate = directions[(current.ordinal() + offset) % directions.length];
-            if (canExit(serverLevel, candidate) && candidate != current) {
+            boolean valid = pipeType() == PipeType.IRON_FLUID
+                    ? getBlockState().getValue(PipeHolderBlock.property(candidate))
+                    : canExit(serverLevel, candidate);
+            if (valid && candidate != current) {
                 routingDirection = candidate;
                 sync();
                 return true;
@@ -886,11 +908,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return fluidBuffer;
     }
 
-    public @Nullable FluidStacksResourceHandler fluidBuffer(Direction side) {
+    public @Nullable ResourceHandler<FluidResource> fluidBuffer(Direction side) {
         if (!pipeType().carriesFluids()) return null;
-        if (pipeType().connectsFluidHandlers()) return fluidBuffer;
+        if (pipeType().connectsFluidHandlers()) return fluidSides[side.ordinal()];
         return level != null && level.getBlockEntity(worldPosition.relative(side)) instanceof PipeHolderBlockEntity
-            ? fluidBuffer : null;
+            ? fluidSides[side.ordinal()] : null;
+    }
+
+    private boolean acceptsFluidFrom(Direction side) {
+        return pipeType().carriesFluids() && (pipeType() != PipeType.IRON_FLUID || side != routingDirection);
     }
 
     public int travellingCount() {
@@ -1025,6 +1051,34 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             int extracted = super.extract(index, resource, amount, transaction);
             if (extracted > 0) PipeHolderBlockEntity.this.setChanged();
             return extracted;
+        }
+    }
+
+    private final class SideFluidHandler implements ResourceHandler<FluidResource> {
+        private final Direction side;
+
+        private SideFluidHandler(Direction side) {
+            this.side = side;
+        }
+
+        @Override public int size() { return fluidBuffer.size(); }
+        @Override public FluidResource getResource(int index) { return fluidBuffer.getResource(index); }
+        @Override public long getAmountAsLong(int index) { return fluidBuffer.getAmountAsLong(index); }
+        @Override public boolean isValid(int index, FluidResource resource) {
+            return fluidBuffer.isValid(index, resource);
+        }
+        @Override public long getCapacityAsLong(int index, FluidResource resource) {
+            return fluidBuffer.getCapacityAsLong(index, resource);
+        }
+
+        @Override
+        public int insert(int index, FluidResource resource, int amount, TransactionContext transaction) {
+            return acceptsFluidFrom(side) ? fluidBuffer.insert(index, resource, amount, transaction) : 0;
+        }
+
+        @Override
+        public int extract(int index, FluidResource resource, int amount, TransactionContext transaction) {
+            return fluidBuffer.extract(index, resource, amount, transaction);
         }
     }
 

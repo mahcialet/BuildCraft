@@ -27,7 +27,8 @@
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_quartz_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"quartz_fluid"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_wood_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"wood_fluid"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_fluid"}}]},
-            {"type":"minecraft:item","name":"buildcrafttransport:pipe_sandstone_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"sandstone_fluid"}}]}
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_sandstone_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"sandstone_fluid"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_iron_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"iron_fluid"}}]}
       ]
     }]
   }],
