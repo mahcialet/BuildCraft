@@ -6,6 +6,7 @@ import buildcraft.api.items.MapLocationType;
 import buildcraft.api.items.PaintbrushData;
 import buildcraft.api.items.ListData;
 import com.mojang.serialization.Codec;
+import net.neoforged.neoforge.fluids.SimpleFluidContent;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -36,6 +37,11 @@ public final class BCCoreDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> LIST_USED =
         COMPONENTS.register("list_used", () -> DataComponentType.<Boolean>builder()
             .persistent(Codec.BOOL).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<SimpleFluidContent>> FRAGILE_FLUID =
+        COMPONENTS.register("fragile_fluid", () -> DataComponentType.<SimpleFluidContent>builder()
+            .persistent(SimpleFluidContent.CODEC)
+            .networkSynchronized(SimpleFluidContent.STREAM_CODEC)
+            .build());
 
     private BCCoreDataComponents() {
     }

@@ -18,6 +18,8 @@ import buildcraft.core.item.ItemList;
 import buildcraft.core.menu.ListMenu;
 import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
+import buildcraft.api.items.FluidItemDrops;
+import buildcraft.core.item.ItemFragileFluidContainer;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -83,6 +85,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "paintbrush", BCCoreGameTests::paintbrush);
         registerTest(event, environment, "list", BCCoreGameTests::list);
         registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
+        registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
     }
 
     private static void registerTest(
@@ -524,6 +527,56 @@ public final class BCCoreGameTests {
         VolumeBox decoded = VolumeBox.CODEC.parse(JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
         helper.assertValueEqual(decoded.id(), codecBox.id(), "persisted volume-box id");
         helper.assertValueEqual(decoded.edit(), codecBox.edit(), "persisted volume-box edit state");
+        helper.succeed();
+    }
+
+    private static void fragileFluidShard(GameTestHelper helper) {
+        net.neoforged.neoforge.fluids.FluidStack water = new net.neoforged.neoforge.fluids.FluidStack(
+            net.minecraft.world.level.material.Fluids.WATER, 1_250
+        );
+        java.util.ArrayList<ItemStack> drops = new java.util.ArrayList<>();
+        FluidItemDrops.addFluidDrops(drops, water);
+        helper.assertValueEqual(drops.size(), 3, "fluid shard drop count");
+        helper.assertValueEqual(ItemFragileFluidContainer.getFluid(drops.get(0)).getAmount(), 500,
+            "first fluid shard amount");
+        helper.assertValueEqual(ItemFragileFluidContainer.getFluid(drops.get(1)).getAmount(), 500,
+            "second fluid shard amount");
+        helper.assertValueEqual(ItemFragileFluidContainer.getFluid(drops.get(2)).getAmount(), 250,
+            "remainder fluid shard amount");
+
+        ItemStack shard = drops.getFirst();
+        net.neoforged.neoforge.transfer.access.ItemAccess access =
+            net.neoforged.neoforge.transfer.access.ItemAccess.forStack(shard);
+        net.neoforged.neoforge.transfer.ResourceHandler<net.neoforged.neoforge.transfer.fluid.FluidResource> handler =
+            access.getCapability(net.neoforged.neoforge.capabilities.Capabilities.Fluid.ITEM);
+        helper.assertTrue(handler != null, "Fluid shard did not expose its item fluid capability");
+        net.neoforged.neoforge.transfer.fluid.FluidResource waterResource =
+            net.neoforged.neoforge.transfer.fluid.FluidResource.of(net.minecraft.world.level.material.Fluids.WATER);
+        helper.assertValueEqual(handler.getAmountAsInt(0), 500, "fluid handler initial amount");
+
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(handler.extract(0, waterResource, 200, transaction), 200,
+                "simulated fluid extraction");
+        }
+        helper.assertValueEqual(handler.getAmountAsInt(0), 500, "aborted extraction amount");
+
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(handler.extract(0, waterResource, 200, transaction), 200,
+                "committed fluid extraction");
+            transaction.commit();
+        }
+        helper.assertValueEqual(handler.getAmountAsInt(0), 300, "remaining fluid amount");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(handler.insert(0, waterResource, 100, transaction), 0,
+                "extraction-only shard accepted fluid");
+            helper.assertValueEqual(handler.extract(0, waterResource, 300, transaction), 300,
+                "final fluid extraction");
+            transaction.commit();
+        }
+        helper.assertTrue(shard.isEmpty(), "Drained fragile shard was not consumed");
         helper.succeed();
     }
 

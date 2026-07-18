@@ -8,6 +8,10 @@ import buildcraft.core.item.ItemMapLocation;
 import buildcraft.core.item.ItemPaintbrush;
 import buildcraft.core.item.ItemList;
 import buildcraft.core.item.ItemVolumeBox;
+import buildcraft.core.item.ItemFragileFluidContainer;
+import buildcraft.api.items.FluidItemDrops;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.BlockItem;
 import net.neoforged.bus.api.IEventBus;
@@ -34,6 +38,9 @@ public final class BCCoreItems {
         "list", ItemList::new, properties -> properties.stacksTo(1)
     );
     public static final DeferredItem<ItemVolumeBox> VOLUME_BOX = ITEMS.registerItem("volume_box", ItemVolumeBox::new);
+    public static final DeferredItem<ItemFragileFluidContainer> FRAGILE_FLUID_SHARD = ITEMS.registerItem(
+        "fragile_fluid_shard", ItemFragileFluidContainer::new, properties -> properties.stacksTo(1)
+    );
     public static final DeferredItem<ItemBlockDecoration> DECORATED = ITEMS.registerItem(
         "decorated",
         properties -> new ItemBlockDecoration(BCCoreBlocks.DECORATED.get(), properties.useBlockDescriptionPrefix())
@@ -51,5 +58,12 @@ public final class BCCoreItems {
 
     public static void register(IEventBus modBus) {
         ITEMS.register(modBus);
+        modBus.addListener(BCCoreItems::registerCapabilities);
+        FluidItemDrops.register(FRAGILE_FLUID_SHARD::get);
+    }
+
+    private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerItem(Capabilities.Fluid.ITEM,
+            (stack, access) -> new ItemFragileFluidContainer.Handler(access), FRAGILE_FLUID_SHARD.get());
     }
 }
