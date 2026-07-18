@@ -40,6 +40,13 @@ neoForge {
             server()
             programArgument '--nogui'
         }
+        gameTestServer {
+            type = 'gameTestServer'
+            programArgument '--tests'
+            programArgument 'buildcraftcore:*'
+            programArgument '--report'
+            programArgument file('build/test-results/gametest/results.xml').absolutePath
+        }
     }
 
     mods {
@@ -51,6 +58,7 @@ neoForge {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
+    options.compilerArgs.addAll('-Xlint:deprecation')
 }
 
 tasks.named('processResources', ProcessResources) {
@@ -81,4 +89,16 @@ tasks.named('jar', Jar) {
             'Implementation-Version': project.version
         )
     }
+}
+
+def gameTestResultsDirectory = layout.buildDirectory.dir('test-results/gametest')
+
+tasks.named('runGameTestServer').configure {
+    doFirst {
+        gameTestResultsDirectory.get().asFile.mkdirs()
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn tasks.named('runGameTestServer')
 }
