@@ -1,5 +1,8 @@
 package buildcraft.transport.block.entity;
 
+import buildcraft.api.mj.IMjConnector;
+import buildcraft.api.mj.IMjRedstoneReceiver;
+import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
@@ -35,9 +38,12 @@ import java.util.Optional;
 /** Server-authoritative travelling-item state for a shared pipe holder. */
 public final class PipeHolderBlockEntity extends BlockEntity {
     public static final int TRAVEL_TICKS = 10;
+    public static final double INITIAL_SPEED = 0.05;
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
     private final List<Transit> travelling = new ArrayList<>();
+    private final WoodReceiver woodReceiver = new WoodReceiver();
     private int routeCursor;
+    private @Nullable Direction extractionDirection;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
@@ -50,6 +56,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private void serverTick(ServerLevel level) {
         if (!pipeType().carriesItems()) return;
+        ensureWoodDirection(level);
         drainInputs();
         if (travelling.isEmpty()) return;
         List<Transit> next = new ArrayList<>();
@@ -59,8 +66,11 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             } else if (transit.toCenter()) {
                 Direction destination = chooseDestination(level, transit.from(), transit.blocked());
                 if (destination == null) drop(level, transit.stack(), null);
-                else next.add(new Transit(transit.stack(), transit.from(), destination, false,
-                    TRAVEL_TICKS, Optional.empty()));
+                else {
+                    double speed = modifySpeed(transit.speed());
+                    next.add(new Transit(transit.stack(), transit.from(), destination, false,
+                        segmentTicks(speed), speed, Optional.empty()));
+                }
             } else {
                 deliver(level, transit, next);
             }
@@ -78,7 +88,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (resource.isEmpty() || amount <= 0) continue;
             input.set(0, ItemResource.EMPTY, 0);
             travelling.add(new Transit(resource.toStack(amount), direction, direction, true,
-                TRAVEL_TICKS, Optional.empty()));
+                segmentTicks(INITIAL_SPEED), INITIAL_SPEED, Optional.empty()));
         }
     }
 
@@ -109,7 +119,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         BlockPos targetPos = worldPosition.relative(direction);
         if (level.getBlockEntity(targetPos) instanceof PipeHolderBlockEntity other
             && pipeType().connectsTo(other.pipeType()) && other.pipeType().carriesItems()) {
-            other.enqueue(transit.stack(), direction.getOpposite());
+            other.enqueue(transit.stack(), direction.getOpposite(), transit.speed());
             return;
         }
         var target = level.getCapability(Capabilities.Item.BLOCK, targetPos, direction.getOpposite());
@@ -123,13 +133,121 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (inserted >= transit.stack().getCount()) return;
         ItemStack excess = transit.stack().copyWithCount(transit.stack().getCount() - inserted);
-        next.add(new Transit(excess, direction, direction, true, TRAVEL_TICKS, Optional.of(direction)));
+        next.add(new Transit(excess, direction, direction, true,
+            segmentTicks(transit.speed()), transit.speed(), Optional.of(direction)));
     }
 
-    private void enqueue(ItemStack stack, Direction from) {
+    private void enqueue(ItemStack stack, Direction from, double speed) {
         if (stack.isEmpty()) return;
-        travelling.add(new Transit(stack.copy(), from, from, true, TRAVEL_TICKS, Optional.empty()));
+        travelling.add(new Transit(stack.copy(), from, from, true,
+            segmentTicks(speed), speed, Optional.empty()));
         sync();
+    }
+
+    private double modifySpeed(double speed) {
+        double target;
+        double delta;
+        switch (pipeType()) {
+            case GOLD_ITEM -> {
+                target = 0.25;
+                delta = 0.07;
+            }
+            case COBBLESTONE_ITEM -> {
+                target = 0.01;
+                delta = 0.02;
+            }
+            case STONE_ITEM -> {
+                target = 0.01;
+                delta = 0.008;
+            }
+            case QUARTZ_ITEM -> {
+                target = 0.01;
+                delta = 0.002;
+            }
+            default -> {
+                return Math.max(0.03, speed);
+            }
+        }
+        double changed = speed < target ? Math.min(target, speed + delta) : Math.max(target, speed - delta);
+        return Math.max(0.03, changed);
+    }
+
+    private static int segmentTicks(double speed) {
+        return Math.max(1, (int) Math.ceil(0.5 / Math.max(0.001, speed)));
+    }
+
+    private void ensureWoodDirection(ServerLevel level) {
+        if (pipeType() != PipeType.WOOD_ITEM) {
+            extractionDirection = null;
+            return;
+        }
+        if (extractionDirection != null && isInventory(level, extractionDirection)) return;
+        extractionDirection = null;
+        for (Direction direction : Direction.values()) {
+            if (isInventory(level, direction)) {
+                extractionDirection = direction;
+                sync();
+                return;
+            }
+        }
+    }
+
+    private boolean isInventory(ServerLevel level, Direction direction) {
+        BlockPos targetPos = worldPosition.relative(direction);
+        return !(level.getBlockEntity(targetPos) instanceof PipeHolderBlockEntity)
+            && level.getCapability(Capabilities.Item.BLOCK, targetPos, direction.getOpposite()) != null;
+    }
+
+    public boolean rotateExtractionDirection() {
+        if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.WOOD_ITEM) return false;
+        Direction current = extractionDirection == null ? Direction.DOWN : extractionDirection;
+        Direction[] directions = Direction.values();
+        for (int offset = 1; offset <= directions.length; offset++) {
+            Direction candidate = directions[(current.ordinal() + offset) % directions.length];
+            if (isInventory(serverLevel, candidate)) {
+                extractionDirection = candidate;
+                sync();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public @Nullable Direction extractionDirection() {
+        return extractionDirection;
+    }
+
+    public IMjRedstoneReceiver woodReceiver() {
+        return woodReceiver;
+    }
+
+    private long extractItems(long power, boolean simulate) {
+        if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.WOOD_ITEM
+            || extractionDirection == null || power < MjAPI.MJ) return power;
+        var source = serverLevel.getCapability(
+            Capabilities.Item.BLOCK, worldPosition.relative(extractionDirection), extractionDirection.getOpposite()
+        );
+        if (source == null) return power;
+        int remaining = (int) Math.min(512, power / MjAPI.MJ);
+        List<ItemStack> extractedStacks = new ArrayList<>();
+        int extractedCount = 0;
+        try (Transaction transaction = Transaction.openRoot()) {
+            for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
+                ItemResource resource = source.getResource(slot);
+                if (resource.isEmpty()) continue;
+                int extracted = source.extract(slot, resource, remaining, transaction);
+                if (extracted > 0) {
+                    extractedStacks.add(resource.toStack(extracted));
+                    extractedCount += extracted;
+                    remaining -= extracted;
+                }
+            }
+            if (!simulate && extractedCount > 0) transaction.commit();
+        }
+        if (!simulate) {
+            for (ItemStack stack : extractedStacks) enqueue(stack, extractionDirection, INITIAL_SPEED);
+        }
+        return power - extractedCount * MjAPI.MJ;
     }
 
     private void drop(ServerLevel level, ItemStack stack, @Nullable Direction direction) {
@@ -166,6 +284,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.clear();
         travelling.addAll(input.read("travelling", Transit.CODEC.listOf()).orElse(List.of()));
         routeCursor = Math.max(0, input.getIntOr("route_cursor", 0));
+        extractionDirection = input.read("extraction_direction", Direction.CODEC).orElse(null);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -176,6 +295,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         super.saveAdditional(output);
         output.store("travelling", Transit.CODEC.listOf(), travelling);
         output.putInt("route_cursor", routeCursor);
+        if (extractionDirection != null) {
+            output.store("extraction_direction", Direction.CODEC, extractionDirection);
+        }
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
@@ -209,19 +331,39 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
+    private final class WoodReceiver implements IMjRedstoneReceiver {
+        @Override
+        public boolean canConnect(IMjConnector other) {
+            return other != null;
+        }
+
+        @Override
+        public long getPowerRequested() {
+            long offered = 512 * MjAPI.MJ;
+            return offered - extractItems(offered, true);
+        }
+
+        @Override
+        public long receivePower(long microJoules, boolean simulate) {
+            if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
+            return extractItems(microJoules, simulate);
+        }
+    }
+
     public record Transit(ItemStack stack, Direction from, Direction to, boolean toCenter, int ticks,
-                          Optional<Direction> blocked) {
+                          double speed, Optional<Direction> blocked) {
         public static final Codec<Transit> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ItemStack.CODEC.fieldOf("stack").forGetter(Transit::stack),
             Direction.CODEC.fieldOf("from").forGetter(Transit::from),
             Direction.CODEC.fieldOf("to").forGetter(Transit::to),
             Codec.BOOL.fieldOf("to_center").forGetter(Transit::toCenter),
             ExtraCodecs.NON_NEGATIVE_INT.fieldOf("ticks").forGetter(Transit::ticks),
+            Codec.DOUBLE.optionalFieldOf("speed", INITIAL_SPEED).forGetter(Transit::speed),
             Direction.CODEC.optionalFieldOf("blocked").forGetter(Transit::blocked)
         ).apply(instance, Transit::new));
 
         private Transit withTicks(int newTicks) {
-            return new Transit(stack, from, to, toCenter, newTicks, blocked);
+            return new Transit(stack, from, to, toCenter, newTicks, speed, blocked);
         }
     }
 }

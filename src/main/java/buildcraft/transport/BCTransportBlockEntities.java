@@ -1,5 +1,6 @@
 package buildcraft.transport;
 
+import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -28,5 +29,11 @@ public final class BCTransportBlockEntities {
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Item.BLOCK, PIPE_HOLDER.get(), (holder, side) ->
             side != null && holder.pipeType().carriesItems() ? holder.input(side) : null);
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) ->
+            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, PIPE_HOLDER.get(), (holder, side) ->
+            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
+        event.registerBlockEntity(MjAPI.CAP_REDSTONE_RECEIVER, PIPE_HOLDER.get(), (holder, side) ->
+            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
     }
 }

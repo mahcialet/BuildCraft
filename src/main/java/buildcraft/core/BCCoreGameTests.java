@@ -126,6 +126,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
+        registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
     }
 
     private static void registerTest(
@@ -1166,7 +1167,7 @@ public final class BCCoreGameTests {
             net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
             firstPos, null
         ) == null, "item pipe exposed an unsided capability");
-        tickPipes(helper, 50, firstPos, secondPos);
+        tickPipes(helper, 65, firstPos, secondPos);
         net.minecraft.world.Container chest = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(chestPos);
         helper.assertValueEqual(containerCount(chest, Items.DIAMOND), 12,
             "straight item pipes did not deliver into inventory");
@@ -1184,9 +1185,9 @@ public final class BCCoreGameTests {
             branchPos, net.minecraft.core.Direction.WEST
         );
         insertPipeItem(branchInput, Items.GOLD_INGOT, 3);
-        tickPipes(helper, 25, branchPos);
+        tickPipes(helper, 35, branchPos);
         insertPipeItem(branchInput, Items.IRON_INGOT, 4);
-        tickPipes(helper, 25, branchPos);
+        tickPipes(helper, 35, branchPos);
         net.minecraft.world.Container northChest =
             (net.minecraft.world.Container) helper.getLevel().getBlockEntity(northChestPos);
         net.minecraft.world.Container southChest =
@@ -1257,6 +1258,93 @@ public final class BCCoreGameTests {
             if (container.getItem(slot).is(item)) count += container.getItem(slot).getCount();
         }
         return count;
+    }
+
+    private static void transportSpecialItemPipes(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState wood = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.WOOD_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos woodPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos cobblePos = helper.absolutePos(new BlockPos(2, 1, 0));
+        BlockPos targetPos = helper.absolutePos(new BlockPos(3, 1, 0));
+        helper.getLevel().setBlock(sourcePos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(woodPos, wood, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(targetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        net.minecraft.world.Container source = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(sourcePos);
+        source.setItem(0, new ItemStack(Items.COAL, 10));
+        tickPipes(helper, 1, woodPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity woodHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(woodPos);
+        helper.assertValueEqual(woodHolder.extractionDirection(), net.minecraft.core.Direction.WEST,
+            "wood pipe did not face its source inventory");
+        buildcraft.api.mj.IMjReceiver woodReceiver = helper.getLevel().getCapability(
+            MjAPI.CAP_RECEIVER, woodPos, net.minecraft.core.Direction.UP
+        );
+        helper.assertTrue(woodReceiver != null, "wood pipe MJ receiver capability missing");
+        helper.assertValueEqual(woodReceiver.getPowerRequested(), 10 * MjAPI.MJ,
+            "wood pipe requested wrong MJ for available items");
+        helper.assertValueEqual(woodReceiver.receivePower(6 * MjAPI.MJ, true), 0L,
+            "wood pipe simulated wrong MJ excess");
+        helper.assertValueEqual(containerCount(source, Items.COAL), 10,
+            "wood pipe mutated source during MJ simulation");
+        helper.assertValueEqual(woodReceiver.receivePower(6 * MjAPI.MJ, false), 0L,
+            "wood pipe committed wrong MJ excess");
+        helper.assertValueEqual(containerCount(source, Items.COAL), 4,
+            "wood pipe extracted wrong committed item count");
+        tickPipes(helper, 65, woodPos, cobblePos);
+        net.minecraft.world.Container target = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(targetPos);
+        helper.assertValueEqual(containerCount(target, Items.COAL), 6,
+            "wood pipe did not deliver extracted items away from source");
+
+        BlockPos woodOtherPos = helper.absolutePos(new BlockPos(1, 1, 3));
+        BlockPos woodPairPos = woodOtherPos.east();
+        helper.getLevel().setBlock(woodOtherPos, wood, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(woodPairPos, wood, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(!helper.getLevel().getBlockState(woodOtherPos).getValue(
+            buildcraft.transport.block.PipeHolderBlock.EAST), "wood pipes incorrectly connected to each other");
+
+        BlockState gold = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.GOLD_ITEM
+        );
+        BlockPos goldPos = helper.absolutePos(new BlockPos(5, 1, 1));
+        BlockPos goldTargetPos = goldPos.east();
+        helper.getLevel().setBlock(goldPos, gold, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(goldTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var goldInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            goldPos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(goldInput, Items.REDSTONE, 2);
+        tickPipes(helper, 10, goldPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity goldHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(goldPos);
+        helper.assertValueEqual(goldHolder.travellingCount(), 1, "gold pipe lost travelling stack");
+        helper.assertTrue(Math.abs(goldHolder.travellingItems().getFirst().speed() - 0.12) < 0.0001,
+            "gold pipe did not accelerate by historical delta");
+        helper.assertTrue(goldHolder.travellingItems().getFirst().ticks() <= 5,
+            "gold pipe acceleration did not shorten travel time");
+        tickPipes(helper, 5, goldPos);
+        net.minecraft.world.Container goldTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(goldTargetPos);
+        helper.assertValueEqual(containerCount(goldTarget, Items.REDSTONE), 2,
+            "gold pipe did not deliver accelerated stack");
+
+        assertPipeLoot(helper, woodPos, buildcraft.transport.BCTransportItems.PIPE_WOOD_ITEM.get());
+        assertPipeLoot(helper, goldPos, buildcraft.transport.BCTransportItems.PIPE_GOLD_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_WOOD_ITEM.get(),
+            Items.OAK_PLANKS, Items.GLASS);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_GOLD_ITEM.get(),
+            Items.GOLD_INGOT, Items.GLASS);
+        helper.succeed();
     }
 
     private static void mjFoundation(GameTestHelper helper) {

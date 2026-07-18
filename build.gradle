@@ -148,7 +148,8 @@ tasks.named('processResources', ProcessResources) {
     }
 
     from('buildcraft_resources/assets/buildcrafttransport/textures/pipes') {
-        include 'structure.png', 'cobblestone_item.png', 'stone_item.png', 'quartz_item.png'
+        include 'structure.png', 'cobblestone_item.png', 'stone_item.png', 'quartz_item.png',
+            'wood_item_clear.png', 'wood_item_filled.png', 'gold_item.png'
         into 'assets/buildcrafttransport/textures/block/pipe'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {

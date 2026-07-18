@@ -4,11 +4,14 @@ import buildcraft.transport.BCTransportBlockEntities;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeItem;
+import buildcraft.api.tools.IWrenchable;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.Level;
@@ -30,7 +33,7 @@ import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
 
-public final class PipeHolderBlock extends BaseEntityBlock {
+public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchable {
     public static final MapCodec<PipeHolderBlock> CODEC = simpleCodec(PipeHolderBlock::new);
     public static final EnumProperty<PipeType> TYPE = EnumProperty.create("type", PipeType.class);
     public static final BooleanProperty DOWN = BooleanProperty.create("down");
@@ -118,6 +121,13 @@ public final class PipeHolderBlock extends BaseEntityBlock {
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new PipeHolderBlockEntity(pos, state);
+    }
+
+    @Override
+    public InteractionResult onWrenched(UseOnContext context) {
+        if (context.getLevel().isClientSide()) return InteractionResult.SUCCESS;
+        return context.getLevel().getBlockEntity(context.getClickedPos()) instanceof PipeHolderBlockEntity holder
+            && holder.rotateExtractionDirection() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
     @Override
