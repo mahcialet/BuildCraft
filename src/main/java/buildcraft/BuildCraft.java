@@ -1,6 +1,7 @@
 package buildcraft;
 
 import buildcraft.core.BCCoreItems;
+import buildcraft.core.BCCreativeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 
@@ -12,5 +13,6 @@ public final class BuildCraft {
 
     public BuildCraft(IEventBus modBus) {
         BCCoreItems.register(modBus);
+        BCCreativeTabs.register(modBus);
     }
 }
