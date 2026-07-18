@@ -1,6 +1,7 @@
 package buildcraft.transport.block.entity;
 
 import buildcraft.api.mj.IMjConnector;
+import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
@@ -73,6 +74,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final List<ItemStack> diamondRouteFilters = new ArrayList<>();
     private final StripesReceiver stripesReceiver = new StripesReceiver();
     private final PowerConnector powerConnector = new PowerConnector();
+    private final PowerReceiver powerReceiver = new PowerReceiver();
+    private long powerStored;
+    private @Nullable Direction powerReceivedFrom;
     private @Nullable Direction stripesDirection;
     private long stripesPower;
     private long stripesProgress;
@@ -94,6 +98,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void serverTick(ServerLevel level) {
+        if (pipeType().carriesPower()) {
+            transferPower(level);
+            return;
+        }
         if (pipeType().carriesFluids()) {
             ensureWoodDirection(level);
             ensureIronDirection(level);
@@ -138,6 +146,48 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.clear();
         travelling.addAll(next);
         sync();
+    }
+
+    private void transferPower(ServerLevel level) {
+        if (powerStored <= 0) return;
+        if (powerReceivedFrom != null
+                && !getBlockState().getValue(PipeHolderBlock.property(powerReceivedFrom))) {
+            powerReceivedFrom = null;
+        }
+        long limit = Math.min(powerStored, pipeType().powerTransferPerTick());
+        for (int offset = 0; offset < Direction.values().length; offset++) {
+            Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
+            if (direction == powerReceivedFrom
+                    || !getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            BlockPos targetPos = worldPosition.relative(direction);
+            var targetEntity = level.getBlockEntity(targetPos);
+            long rejected = limit;
+            if (targetEntity instanceof PipeHolderBlockEntity pipe
+                    && pipeType().connectsTo(pipe.pipeType())) {
+                rejected = pipe.receivePowerFromPipe(limit, direction.getOpposite());
+            } else {
+                IMjReceiver receiver = level.getCapability(MjAPI.CAP_RECEIVER, targetPos, direction.getOpposite());
+                if (receiver != null && receiver.canReceive() && receiver.canConnect(powerConnector)) {
+                    rejected = receiver.receivePower(limit, false);
+                }
+            }
+            long accepted = limit - Math.clamp(rejected, 0, limit);
+            if (accepted <= 0) continue;
+            powerStored -= accepted;
+            routeCursor = Math.floorMod(direction.ordinal() + 1, Direction.values().length);
+            sync();
+            return;
+        }
+    }
+
+    private long receivePowerFromPipe(long offered, Direction from) {
+        long accepted = Math.min(offered, Math.max(0, pipeType().powerTransferPerTick() - powerStored));
+        if (accepted > 0) {
+            powerStored += accepted;
+            powerReceivedFrom = from;
+            sync();
+        }
+        return offered - accepted;
     }
 
     private void transferFluid(ServerLevel level) {
@@ -539,8 +589,11 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public @Nullable IMjConnector mjConnector() {
-        return pipeType().carriesPower() ? powerConnector : mjReceiver();
+        return pipeType().isWoodenPowerInput() ? powerReceiver
+            : pipeType().carriesPower() ? powerConnector : mjReceiver();
     }
+
+    public long powerStored() { return powerStored; }
 
     public DyeColor pipeColor() {
         return pipeColor;
@@ -1046,6 +1099,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         stripesDirection = input.read("stripes_direction", Direction.CODEC).orElse(null);
         stripesPower = Math.clamp(input.getLongOr("stripes_power", 0), 0, 256 * MjAPI.MJ);
         stripesProgress = Math.max(0, input.getLongOr("stripes_progress", 0));
+        powerStored = Math.clamp(input.getLongOr("power_stored", 0), 0, pipeType().powerTransferPerTick());
+        powerReceivedFrom = input.read("power_received_from", Direction.CODEC).orElse(null);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -1073,6 +1128,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (stripesDirection != null) output.store("stripes_direction", Direction.CODEC, stripesDirection);
         output.putLong("stripes_power", stripesPower);
         output.putLong("stripes_progress", stripesProgress);
+        if (powerStored > 0) output.putLong("power_stored", powerStored);
+        if (powerReceivedFrom != null) {
+            output.store("power_received_from", Direction.CODEC, powerReceivedFrom);
+        }
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
@@ -1210,6 +1269,22 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         @Override
         public boolean canConnect(IMjConnector other) {
             return other != null;
+        }
+    }
+
+    private final class PowerReceiver implements IMjReceiver {
+        @Override public boolean canConnect(IMjConnector other) { return other != null; }
+        @Override public long getPowerRequested() {
+            return Math.max(0, pipeType().powerTransferPerTick() - powerStored);
+        }
+        @Override public long receivePower(long microJoules, boolean simulate) {
+            if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
+            long accepted = Math.min(microJoules, getPowerRequested());
+            if (!simulate && accepted > 0) {
+                powerStored += accepted;
+                sync();
+            }
+            return microJoules - accepted;
         }
     }
 

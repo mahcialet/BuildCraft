@@ -30,7 +30,9 @@ public final class BCTransportBlockEntities {
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side == null ? null : holder.fluidBuffer(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) -> holder.mjConnector());
-        event.registerBlockEntity(MjAPI.CAP_RECEIVER, PIPE_HOLDER.get(), (holder, side) -> holder.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, PIPE_HOLDER.get(),
+            (holder, side) -> holder.pipeType().isWoodenPowerInput()
+                ? (buildcraft.api.mj.IMjReceiver) holder.mjConnector() : holder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_REDSTONE_RECEIVER, PIPE_HOLDER.get(),
             (holder, side) -> holder.mjReceiver());
     }

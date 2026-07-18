@@ -36,5 +36,6 @@
   "item.buildcrafttransport.pipe_diamond_wood_fluid": "Diamond Wooden Fluid Pipe",
   "item.buildcrafttransport.pipe_cobble_power": "Cobblestone Power Pipe",
   "item.buildcrafttransport.pipe_stone_power": "Stone Power Pipe",
-  "item.buildcrafttransport.pipe_quartz_power": "Quartz Power Pipe"
+  "item.buildcrafttransport.pipe_quartz_power": "Quartz Power Pipe",
+  "item.buildcrafttransport.pipe_wood_power": "Wooden Power Pipe"
 }

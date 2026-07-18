@@ -226,6 +226,13 @@
 { "when":{"type":"quartz_power","north":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90}},
 { "when":{"type":"quartz_power","east":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":90}},
 { "when":{"type":"quartz_power","south":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":180}},
-{ "when":{"type":"quartz_power","west":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":270}}
+{ "when":{"type":"quartz_power","west":"true"},"apply":{"model":"buildcrafttransport:block/quartz_power_arm","x":90,"y":270}},
+{ "when":{"type":"wood_power"},"apply":{"model":"buildcrafttransport:block/wood_power_center"}},
+{ "when":{"type":"wood_power","up":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm"}},
+{ "when":{"type":"wood_power","down":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":180}},
+{ "when":{"type":"wood_power","north":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90}},
+{ "when":{"type":"wood_power","east":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":90}},
+{ "when":{"type":"wood_power","south":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":180}},
+{ "when":{"type":"wood_power","west":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":270}}
   ]
 }

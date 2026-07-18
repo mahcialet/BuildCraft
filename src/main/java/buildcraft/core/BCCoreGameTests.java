@@ -128,6 +128,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
+registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1137,6 +1138,49 @@ registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTe
         helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_POWER.get()),
                 "power pipe returned wrong drop item");
         helper.succeed();
+    }
+
+    private static void transportWoodPowerPipe(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos woodPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos cobblePos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos otherWoodPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        helper.getLevel().setBlock(woodPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(otherWoodPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_POWER), Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(woodPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "wooden power pipe rejected a normal power pipe");
+        helper.assertTrue(!helper.getLevel().getBlockState(woodPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.SOUTH), "wooden power pipes connected to each other");
+        IMjReceiver receiver = helper.getLevel().getCapability(
+                MjAPI.CAP_RECEIVER, woodPos, net.minecraft.core.Direction.WEST);
+        helper.assertTrue(receiver != null, "wooden power pipe receiver capability missing");
+        helper.assertValueEqual(receiver.getPowerRequested(), 16 * MjAPI.MJ,
+                "wooden power request did not use its transfer ceiling");
+        helper.assertValueEqual(receiver.receivePower(20 * MjAPI.MJ, true), 4 * MjAPI.MJ,
+                "wooden power simulation returned wrong excess");
+        var wood = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(woodPos);
+        helper.assertValueEqual(wood.powerStored(), 0L, "simulated power mutated the wooden buffer");
+        helper.assertValueEqual(receiver.receivePower(20 * MjAPI.MJ, false), 4 * MjAPI.MJ,
+                "wooden power overload was not returned");
+        helper.assertValueEqual(buildcraft.transport.PipeType.WOOD_POWER.powerResistancePerTick(),
+                MjAPI.MJ / 128, "wooden power resistance");
+        helper.runAfterDelay(2, () -> {
+            var cobble = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                    helper.getLevel().getBlockEntity(cobblePos);
+            helper.assertValueEqual(4 * MjAPI.MJ, cobble.powerStored(),
+                    "cobblestone pipe did not enforce its 4 MJ/t input ceiling");
+            helper.assertValueEqual(12 * MjAPI.MJ, wood.powerStored(),
+                    "wooden pipe lost rejected power");
+            helper.succeed();
+        });
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {
