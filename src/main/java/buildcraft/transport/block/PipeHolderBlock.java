@@ -14,6 +14,8 @@ import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.InsideBlockEffectApplier;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.Level;
@@ -33,6 +35,7 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
 
 public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchable {
@@ -118,6 +121,16 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
+        BlockHitResult hitResult) {
+        if (state.getValue(TYPE) != PipeType.DIAMOND_WOOD_ITEM) return InteractionResult.PASS;
+        if (player instanceof ServerPlayer serverPlayer) {
+            buildcraft.transport.menu.DiamondWoodMenu.open(serverPlayer, pos);
+        }
+        return InteractionResult.SUCCESS;
     }
 
     @Override

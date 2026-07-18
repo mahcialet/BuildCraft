@@ -160,7 +160,8 @@ tasks.named('processResources', ProcessResources) {
             'daizuli_item_filled.png', 'daizuli_item_gray.png', 'daizuli_item_green.png',
             'daizuli_item_light_blue.png', 'daizuli_item_lime.png', 'daizuli_item_magenta.png',
             'daizuli_item_orange.png', 'daizuli_item_pink.png', 'daizuli_item_purple.png',
-            'daizuli_item_red.png', 'daizuli_item_silver.png', 'daizuli_item_white.png', 'daizuli_item_yellow.png'
+            'daizuli_item_red.png', 'daizuli_item_silver.png', 'daizuli_item_white.png', 'daizuli_item_yellow.png',
+            'diamond_wood_item_clear.png', 'diamond_wood_item_filled.png'
         into 'assets/buildcrafttransport/textures/block/pipe'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {

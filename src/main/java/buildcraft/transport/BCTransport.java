@@ -4,6 +4,8 @@ import buildcraft.core.BCCreativeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.fml.loading.FMLEnvironment;
+import buildcraft.transport.client.BCTransportClient;
 
 @Mod(BCTransport.MOD_ID)
 public final class BCTransport {
@@ -13,7 +15,9 @@ public final class BCTransport {
         BCTransportBlocks.register(modBus);
         BCTransportBlockEntities.register(modBus);
         BCTransportItems.register(modBus);
+        BCTransportMenus.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
+        if (FMLEnvironment.getDist().isClient()) BCTransportClient.register(modBus);
     }
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
@@ -31,5 +35,6 @@ public final class BCTransport {
         event.accept(BCTransportItems.PIPE_OBSIDIAN_ITEM.get());
         event.accept(BCTransportItems.PIPE_LAPIS_ITEM.get());
         event.accept(BCTransportItems.PIPE_DAIZULI_ITEM.get());
+        event.accept(BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get());
     }
 }

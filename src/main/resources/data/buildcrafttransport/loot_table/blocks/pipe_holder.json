@@ -94,6 +94,13 @@
             },
             {
               "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_diamond_wood_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "diamond_wood_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
               "name": "buildcrafttransport:pipe_quartz_item"
             }
           ]

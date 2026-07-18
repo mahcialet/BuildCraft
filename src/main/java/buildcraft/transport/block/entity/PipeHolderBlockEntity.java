@@ -50,10 +50,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private @Nullable Direction routingDirection;
     private DyeColor pipeColor = DyeColor.WHITE;
     private int obsidianWaitTicks;
+    private final List<ItemStack> diamondFilters = new ArrayList<>();
+    private DiamondFilterMode diamondFilterMode = DiamondFilterMode.WHITE_LIST;
+    private int diamondFilterCursor;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
         for (Direction direction : Direction.values()) inputs[direction.ordinal()] = new InputHandler();
+        for (int index = 0; index < 9; index++) diamondFilters.add(ItemStack.EMPTY);
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
@@ -212,7 +216,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureWoodDirection(ServerLevel level) {
-        if (pipeType() != PipeType.WOOD_ITEM) {
+        if (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM) {
             extractionDirection = null;
             return;
         }
@@ -257,7 +261,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public boolean rotateExtractionDirection() {
-        if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.WOOD_ITEM) return false;
+        if (!(level instanceof ServerLevel serverLevel)
+            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM)) return false;
         Direction current = extractionDirection == null ? Direction.DOWN : extractionDirection;
         Direction[] directions = Direction.values();
         for (int offset = 1; offset <= directions.length; offset++) {
@@ -273,7 +278,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public boolean rotatePipeDirection() {
         if (!(level instanceof ServerLevel serverLevel)) return false;
-        if (pipeType() == PipeType.WOOD_ITEM) return rotateExtractionDirection();
+        if (pipeType() == PipeType.WOOD_ITEM || pipeType() == PipeType.DIAMOND_WOOD_ITEM) {
+            return rotateExtractionDirection();
+        }
         if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return false;
         Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
         Direction[] directions = Direction.values();
@@ -302,7 +309,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public @Nullable IMjRedstoneReceiver mjReceiver() {
         return switch (pipeType()) {
-            case WOOD_ITEM -> woodReceiver;
+            case WOOD_ITEM, DIAMOND_WOOD_ITEM -> woodReceiver;
             case OBSIDIAN_ITEM -> obsidianReceiver;
             default -> null;
         };
@@ -369,19 +376,21 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private long extractItems(long power, boolean simulate) {
-        if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.WOOD_ITEM
+        if (!(level instanceof ServerLevel serverLevel)
+            || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM)
             || extractionDirection == null || power < MjAPI.MJ) return power;
         var source = serverLevel.getCapability(
             Capabilities.Item.BLOCK, worldPosition.relative(extractionDirection), extractionDirection.getOpposite()
         );
         if (source == null) return power;
-        int remaining = (int) Math.min(512, power / MjAPI.MJ);
+        int remaining = pipeType() == PipeType.DIAMOND_WOOD_ITEM ? 1 : (int) Math.min(512, power / MjAPI.MJ);
         List<ItemStack> extractedStacks = new ArrayList<>();
         int extractedCount = 0;
         try (Transaction transaction = Transaction.openRoot()) {
             for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
                 ItemResource resource = source.getResource(slot);
                 if (resource.isEmpty()) continue;
+                if (pipeType() == PipeType.DIAMOND_WOOD_ITEM && !matchesDiamondFilter(resource.toStack(1))) continue;
                 int extracted = source.extract(slot, resource, remaining, transaction);
                 if (extracted > 0) {
                     extractedStacks.add(resource.toStack(extracted));
@@ -393,8 +402,59 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (!simulate) {
             for (ItemStack stack : extractedStacks) enqueue(stack, extractionDirection, INITIAL_SPEED);
+            if (pipeType() == PipeType.DIAMOND_WOOD_ITEM && extractedCount > 0
+                && diamondFilterMode == DiamondFilterMode.ROUND_ROBIN) advanceDiamondFilter();
         }
         return power - extractedCount * MjAPI.MJ;
+    }
+
+    private boolean matchesDiamondFilter(ItemStack stack) {
+        boolean any = diamondFilters.stream().anyMatch(filter -> !filter.isEmpty());
+        return switch (diamondFilterMode) {
+            case WHITE_LIST -> !any || diamondFilters.stream().anyMatch(filter -> sameFilter(filter, stack));
+            case BLACK_LIST -> diamondFilters.stream().noneMatch(filter -> sameFilter(filter, stack));
+            case ROUND_ROBIN -> sameFilter(diamondFilters.get(diamondFilterCursor), stack);
+        };
+    }
+
+    private static boolean sameFilter(ItemStack filter, ItemStack stack) {
+        return !filter.isEmpty() && ItemStack.isSameItemSameComponents(filter, stack);
+    }
+
+    private void advanceDiamondFilter() {
+        for (int offset = 1; offset <= diamondFilters.size(); offset++) {
+            int candidate = (diamondFilterCursor + offset) % diamondFilters.size();
+            if (!diamondFilters.get(candidate).isEmpty()) {
+                diamondFilterCursor = candidate;
+                sync();
+                return;
+            }
+        }
+    }
+
+    public List<ItemStack> diamondFilters() {
+        return diamondFilters.stream().map(ItemStack::copy).toList();
+    }
+
+    public void setDiamondFilter(int index, ItemStack stack) {
+        if (pipeType() != PipeType.DIAMOND_WOOD_ITEM || index < 0 || index >= diamondFilters.size()) return;
+        diamondFilters.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+        if (index == diamondFilterCursor && stack.isEmpty()) advanceDiamondFilter();
+        sync();
+    }
+
+    public DiamondFilterMode diamondFilterMode() {
+        return diamondFilterMode;
+    }
+
+    public void setDiamondFilterMode(DiamondFilterMode mode) {
+        if (pipeType() != PipeType.DIAMOND_WOOD_ITEM || mode == null) return;
+        diamondFilterMode = mode;
+        sync();
+    }
+
+    public int diamondFilterCursor() {
+        return diamondFilterCursor;
     }
 
     private void drop(ServerLevel level, ItemStack stack, @Nullable Direction direction) {
@@ -435,6 +495,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
         pipeColor = input.read("pipe_color", DyeColor.CODEC).orElse(DyeColor.WHITE);
         obsidianWaitTicks = pipeType() == PipeType.OBSIDIAN_ITEM ? 20 : 0;
+        List<ItemStack> savedFilters = input.read("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf()).orElse(List.of());
+        for (int index = 0; index < diamondFilters.size(); index++) {
+            diamondFilters.set(index, index < savedFilters.size() ? savedFilters.get(index) : ItemStack.EMPTY);
+        }
+        diamondFilterMode = input.read("diamond_filter_mode", DiamondFilterMode.CODEC)
+            .orElse(DiamondFilterMode.WHITE_LIST);
+        diamondFilterCursor = Math.floorMod(input.getIntOr("diamond_filter_cursor", 0), diamondFilters.size());
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -450,6 +517,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
         output.store("pipe_color", DyeColor.CODEC, pipeColor);
+        output.store("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondFilters);
+        output.store("diamond_filter_mode", DiamondFilterMode.CODEC, diamondFilterMode);
+        output.putInt("diamond_filter_cursor", diamondFilterCursor);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
@@ -517,6 +587,23 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         public long receivePower(long microJoules, boolean simulate) {
             if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
             return suckItems(microJoules, simulate);
+        }
+    }
+
+    public enum DiamondFilterMode implements net.minecraft.util.StringRepresentable {
+        WHITE_LIST("white_list"), BLACK_LIST("black_list"), ROUND_ROBIN("round_robin");
+
+        public static final Codec<DiamondFilterMode> CODEC =
+            net.minecraft.util.StringRepresentable.fromEnum(DiamondFilterMode::values);
+        private final String serializedName;
+
+        DiamondFilterMode(String serializedName) {
+            this.serializedName = serializedName;
+        }
+
+        @Override
+        public String getSerializedName() {
+            return serializedName;
         }
     }
 

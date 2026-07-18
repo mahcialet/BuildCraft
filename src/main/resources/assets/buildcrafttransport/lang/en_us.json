@@ -11,5 +11,11 @@
   "item.buildcrafttransport.pipe_void_item": "Void Transport Pipe",
   "item.buildcrafttransport.pipe_obsidian_item": "Obsidian Transport Pipe",
   "item.buildcrafttransport.pipe_lapis_item": "Lapis Transport Pipe",
-  "item.buildcrafttransport.pipe_daizuli_item": "Daizuli Transport Pipe"
+  "item.buildcrafttransport.pipe_daizuli_item": "Daizuli Transport Pipe",
+  "item.buildcrafttransport.pipe_diamond_wood_item": "Diamond Wooden Transport Pipe",
+  "gui.buildcrafttransport.diamond_wood": "Diamond Wooden Pipe Filter",
+  "gui.buildcrafttransport.diamond_wood.mode": "Mode: %s",
+  "gui.buildcrafttransport.diamond_wood.mode.white_list": "Whitelist",
+  "gui.buildcrafttransport.diamond_wood.mode.black_list": "Blacklist",
+  "gui.buildcrafttransport.diamond_wood.mode.round_robin": "Round Robin"
 }

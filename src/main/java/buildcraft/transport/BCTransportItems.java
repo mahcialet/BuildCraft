@@ -20,6 +20,7 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_OBSIDIAN_ITEM = pipe(PipeType.OBSIDIAN_ITEM);
     public static final DeferredItem<PipeItem> PIPE_LAPIS_ITEM = pipe(PipeType.LAPIS_ITEM);
     public static final DeferredItem<PipeItem> PIPE_DAIZULI_ITEM = pipe(PipeType.DAIZULI_ITEM);
+    public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_ITEM = pipe(PipeType.DIAMOND_WOOD_ITEM);
 
     private BCTransportItems() {
     }

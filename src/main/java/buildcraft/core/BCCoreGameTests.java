@@ -131,6 +131,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
+        registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
     }
 
     private static void registerTest(
@@ -1665,6 +1666,98 @@ public final class BCCoreGameTests {
         helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_DAIZULI_ITEM.get()),
             "Daizuli recipe returned wrong item");
         helper.assertValueEqual(recipeOutput.getCount(), 8, "Daizuli recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void transportDiamondWoodItemPipe(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState diamondWood = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.DIAMOND_WOOD_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos diamondPos = sourcePos.east();
+        BlockPos cobblePos = diamondPos.east();
+        BlockPos targetPos = cobblePos.east();
+        helper.getLevel().setBlock(sourcePos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(diamondPos, diamondWood, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(targetPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        net.minecraft.world.Container source = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(sourcePos);
+        net.minecraft.world.Container target = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(targetPos);
+        source.setItem(0, new ItemStack(Items.GOLD_INGOT, 4));
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(diamondPos);
+        helper.assertTrue(holder != null, "diamond wooden holder missing");
+        tickPipes(helper, 1, diamondPos);
+        holder.setDiamondFilter(0, new ItemStack(Items.GOLD_INGOT));
+        buildcraft.api.mj.IMjRedstoneReceiver receiver = holder.mjReceiver();
+        helper.assertTrue(receiver != null, "diamond wooden MJ receiver missing");
+        helper.assertValueEqual(receiver.receivePower(4 * MjAPI.MJ, false), 3 * MjAPI.MJ,
+            "diamond wooden whitelist did not extract exactly one item");
+        tickPipes(helper, 65, diamondPos, cobblePos);
+        helper.assertValueEqual(containerCount(target, Items.GOLD_INGOT), 1,
+            "diamond wooden whitelist extracted wrong item");
+        helper.assertValueEqual(containerCount(target, Items.IRON_INGOT), 0,
+            "diamond wooden whitelist leaked unmatched item");
+
+        source.setItem(1, new ItemStack(Items.IRON_INGOT, 4));
+        holder.setDiamondFilterMode(
+            buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.BLACK_LIST
+        );
+        helper.assertValueEqual(receiver.receivePower(2 * MjAPI.MJ, false), MjAPI.MJ,
+            "diamond wooden blacklist did not extract exactly one item");
+        tickPipes(helper, 65, diamondPos, cobblePos);
+        helper.assertValueEqual(containerCount(target, Items.IRON_INGOT), 1,
+            "diamond wooden blacklist did not extract nonmatching item");
+
+        holder.setDiamondFilter(1, new ItemStack(Items.IRON_INGOT));
+        holder.setDiamondFilterMode(
+            buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.ROUND_ROBIN
+        );
+        helper.assertValueEqual(holder.diamondFilterCursor(), 0, "diamond wooden round-robin cursor started wrong");
+        receiver.receivePower(MjAPI.MJ, false);
+        helper.assertValueEqual(holder.diamondFilterCursor(), 1, "diamond wooden round-robin did not advance");
+        receiver.receivePower(MjAPI.MJ, false);
+        helper.assertValueEqual(holder.diamondFilterCursor(), 0, "diamond wooden round-robin did not wrap");
+        tickPipes(helper, 65, diamondPos, cobblePos);
+        helper.assertValueEqual(containerCount(target, Items.GOLD_INGOT), 2,
+            "diamond wooden round-robin missed gold preset");
+        helper.assertValueEqual(containerCount(target, Items.IRON_INGOT), 2,
+            "diamond wooden round-robin missed iron preset");
+        helper.assertTrue(!buildcraft.transport.PipeType.WOOD_ITEM.connectsTo(
+            buildcraft.transport.PipeType.DIAMOND_WOOD_ITEM), "wood extraction pipes connected together");
+
+        net.minecraft.world.entity.player.Player menuPlayer =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        buildcraft.transport.menu.DiamondWoodMenu menu = new buildcraft.transport.menu.DiamondWoodMenu(
+            0, menuPlayer.getInventory(), diamondPos
+        );
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 0), "diamond wooden menu rejected mode button");
+        helper.assertTrue(holder.diamondFilterMode()
+            == buildcraft.transport.block.entity.PipeHolderBlockEntity.DiamondFilterMode.WHITE_LIST,
+            "diamond wooden menu did not cycle filter mode");
+        net.minecraft.nbt.CompoundTag saved = holder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity loaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    diamondPos, helper.getLevel().getBlockState(diamondPos), saved, helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(loaded != null && loaded.diamondFilters().get(0).is(Items.GOLD_INGOT)
+            && loaded.diamondFilters().get(1).is(Items.IRON_INGOT), "diamond wooden filters failed codec reload");
+        assertPipeLoot(helper, diamondPos, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get());
+        net.minecraft.world.item.crafting.CraftingInput recipeInput =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(Items.OAK_PLANKS), new ItemStack(Items.GLASS), new ItemStack(Items.DIAMOND)
+            ));
+        ItemStack recipeOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get()),
+            "diamond wooden recipe returned wrong item");
+        helper.assertValueEqual(recipeOutput.getCount(), 8, "diamond wooden recipe returned wrong count");
         helper.succeed();
     }
 

@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["WGD"],"key":{"W":"#minecraft:planks","G":"minecraft:glass","D":"minecraft:diamond"},"result":{"id":"buildcrafttransport:pipe_diamond_wood_item","count":8}}
