@@ -24,5 +24,7 @@ public final class BCTransport {
         event.accept(BCTransportItems.PIPE_QUARTZ_ITEM.get());
         event.accept(BCTransportItems.PIPE_WOOD_ITEM.get());
         event.accept(BCTransportItems.PIPE_GOLD_ITEM.get());
+        event.accept(BCTransportItems.PIPE_IRON_ITEM.get());
+        event.accept(BCTransportItems.PIPE_CLAY_ITEM.get());
     }
 }

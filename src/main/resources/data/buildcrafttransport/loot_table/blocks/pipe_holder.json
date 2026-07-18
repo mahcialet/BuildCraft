@@ -45,6 +45,20 @@
             },
             {
               "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_iron_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "iron_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_clay_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "clay_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
               "name": "buildcrafttransport:pipe_quartz_item"
             }
           ]

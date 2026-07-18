@@ -4,5 +4,7 @@
   "item.buildcrafttransport.pipe_stone_item": "Stone Transport Pipe",
   "item.buildcrafttransport.pipe_quartz_item": "Quartz Transport Pipe",
   "item.buildcrafttransport.pipe_wood_item": "Wooden Transport Pipe",
-  "item.buildcrafttransport.pipe_gold_item": "Golden Transport Pipe"
+  "item.buildcrafttransport.pipe_gold_item": "Golden Transport Pipe",
+  "item.buildcrafttransport.pipe_iron_item": "Iron Transport Pipe",
+  "item.buildcrafttransport.pipe_clay_item": "Clay Transport Pipe"
 }

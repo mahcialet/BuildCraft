@@ -127,6 +127,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
+        registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
     }
 
     private static void registerTest(
@@ -1344,6 +1345,98 @@ public final class BCCoreGameTests {
             Items.OAK_PLANKS, Items.GLASS);
         assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_GOLD_ITEM.get(),
             Items.GOLD_INGOT, Items.GLASS);
+        helper.succeed();
+    }
+
+    private static void transportRoutingItemPipes(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState iron = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.IRON_ITEM
+        );
+        BlockPos ironPos = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos northTargetPos = ironPos.north();
+        BlockPos eastTargetPos = ironPos.east();
+        helper.getLevel().setBlock(ironPos, iron, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(northTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(eastTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var ironInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            ironPos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(ironInput, Items.DIAMOND, 2);
+        tickPipes(helper, 25, ironPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity ironHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(ironPos);
+        helper.assertValueEqual(ironHolder.routingDirection(), net.minecraft.core.Direction.NORTH,
+            "iron pipe did not select first connected output");
+        net.minecraft.world.Container northTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(northTargetPos);
+        net.minecraft.world.Container eastTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(eastTargetPos);
+        helper.assertValueEqual(containerCount(northTarget, Items.DIAMOND), 2,
+            "iron pipe did not constrain first stack to selected output");
+        helper.assertValueEqual(containerCount(eastTarget, Items.DIAMOND), 0,
+            "iron pipe leaked first stack to unselected output");
+        for (int attempt = 0; attempt < 6
+            && ironHolder.routingDirection() != net.minecraft.core.Direction.EAST; attempt++) {
+            helper.assertTrue(ironHolder.rotatePipeDirection(), "iron pipe failed to rotate to another output");
+        }
+        helper.assertValueEqual(ironHolder.routingDirection(), net.minecraft.core.Direction.EAST,
+            "iron pipe rotated to wrong output");
+        insertPipeItem(ironInput, Items.EMERALD, 3);
+        tickPipes(helper, 25, ironPos);
+        helper.assertValueEqual(containerCount(eastTarget, Items.EMERALD), 3,
+            "rotated iron pipe did not use new output");
+        net.minecraft.nbt.CompoundTag ironSaved = ironHolder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity ironLoaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    ironPos, helper.getLevel().getBlockState(ironPos), ironSaved,
+                    helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(ironLoaded != null, "iron pipe failed codec reload");
+        helper.assertValueEqual(ironLoaded.routingDirection(), net.minecraft.core.Direction.EAST,
+            "iron pipe lost selected direction on codec reload");
+
+        BlockState clay = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.CLAY_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos clayPos = helper.absolutePos(new BlockPos(5, 1, 2));
+        BlockPos clayTargetPos = clayPos.north();
+        BlockPos branchPipePos = clayPos.east();
+        BlockPos branchTargetPos = branchPipePos.east();
+        helper.getLevel().setBlock(clayPos, clay, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(clayTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(branchPipePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(branchTargetPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var clayInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            clayPos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(clayInput, Items.CLAY_BALL, 5);
+        tickPipes(helper, 35, clayPos, branchPipePos);
+        net.minecraft.world.Container clayTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(clayTargetPos);
+        net.minecraft.world.Container branchTarget =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(branchTargetPos);
+        helper.assertValueEqual(containerCount(clayTarget, Items.CLAY_BALL), 5,
+            "clay pipe did not prioritize adjacent inventory");
+        helper.assertValueEqual(containerCount(branchTarget, Items.CLAY_BALL), 0,
+            "clay pipe routed stack through pipe instead of inventory");
+
+        assertPipeLoot(helper, ironPos, buildcraft.transport.BCTransportItems.PIPE_IRON_ITEM.get());
+        assertPipeLoot(helper, clayPos, buildcraft.transport.BCTransportItems.PIPE_CLAY_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_IRON_ITEM.get(),
+            Items.IRON_INGOT, Items.GLASS);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_CLAY_ITEM.get(),
+            Items.CLAY, Items.GLASS);
         helper.succeed();
     }
 

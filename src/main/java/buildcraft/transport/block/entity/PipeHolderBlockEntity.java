@@ -44,6 +44,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final WoodReceiver woodReceiver = new WoodReceiver();
     private int routeCursor;
     private @Nullable Direction extractionDirection;
+    private @Nullable Direction routingDirection;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
@@ -57,6 +58,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private void serverTick(ServerLevel level) {
         if (!pipeType().carriesItems()) return;
         ensureWoodDirection(level);
+        ensureIronDirection(level);
         drainInputs();
         if (travelling.isEmpty()) return;
         List<Transit> next = new ArrayList<>();
@@ -93,15 +95,23 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private @Nullable Direction chooseDestination(ServerLevel level, Direction from, Optional<Direction> blocked) {
+        if (pipeType() == PipeType.IRON_ITEM) {
+            if (routingDirection == null || !canExit(level, routingDirection)) return null;
+            return routingDirection;
+        }
         List<Direction> candidates = new ArrayList<>();
+        List<Direction> inventories = new ArrayList<>();
         for (Direction direction : Direction.values()) {
             if (direction != from && blocked.filter(direction::equals).isEmpty() && canExit(level, direction)) {
                 candidates.add(direction);
+                if (isInventory(level, direction)) inventories.add(direction);
             }
         }
         if (candidates.isEmpty() && canExit(level, from)) return from;
         if (candidates.isEmpty()) return null;
-        Direction selected = candidates.get(Math.floorMod(routeCursor, candidates.size()));
+        List<Direction> choices = pipeType() == PipeType.CLAY_ITEM && !inventories.isEmpty()
+            ? inventories : candidates;
+        Direction selected = choices.get(Math.floorMod(routeCursor, choices.size()));
         routeCursor = Math.floorMod(routeCursor + 1, Integer.MAX_VALUE);
         return selected;
     }
@@ -192,6 +202,22 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
+    private void ensureIronDirection(ServerLevel level) {
+        if (pipeType() != PipeType.IRON_ITEM) {
+            routingDirection = null;
+            return;
+        }
+        if (routingDirection != null && canExit(level, routingDirection)) return;
+        routingDirection = null;
+        for (Direction direction : Direction.values()) {
+            if (canExit(level, direction)) {
+                routingDirection = direction;
+                sync();
+                return;
+            }
+        }
+    }
+
     private boolean isInventory(ServerLevel level, Direction direction) {
         BlockPos targetPos = worldPosition.relative(direction);
         return !(level.getBlockEntity(targetPos) instanceof PipeHolderBlockEntity)
@@ -213,8 +239,29 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return false;
     }
 
+    public boolean rotatePipeDirection() {
+        if (!(level instanceof ServerLevel serverLevel)) return false;
+        if (pipeType() == PipeType.WOOD_ITEM) return rotateExtractionDirection();
+        if (pipeType() != PipeType.IRON_ITEM) return false;
+        Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
+        Direction[] directions = Direction.values();
+        for (int offset = 1; offset <= directions.length; offset++) {
+            Direction candidate = directions[(current.ordinal() + offset) % directions.length];
+            if (canExit(serverLevel, candidate) && candidate != current) {
+                routingDirection = candidate;
+                sync();
+                return true;
+            }
+        }
+        return false;
+    }
+
     public @Nullable Direction extractionDirection() {
         return extractionDirection;
+    }
+
+    public @Nullable Direction routingDirection() {
+        return routingDirection;
     }
 
     public IMjRedstoneReceiver woodReceiver() {
@@ -285,6 +332,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.addAll(input.read("travelling", Transit.CODEC.listOf()).orElse(List.of()));
         routeCursor = Math.max(0, input.getIntOr("route_cursor", 0));
         extractionDirection = input.read("extraction_direction", Direction.CODEC).orElse(null);
+        routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -298,6 +346,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (extractionDirection != null) {
             output.store("extraction_direction", Direction.CODEC, extractionDirection);
         }
+        if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }

@@ -127,7 +127,7 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
     public InteractionResult onWrenched(UseOnContext context) {
         if (context.getLevel().isClientSide()) return InteractionResult.SUCCESS;
         return context.getLevel().getBlockEntity(context.getClickedPos()) instanceof PipeHolderBlockEntity holder
-            && holder.rotateExtractionDirection() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+            && holder.rotatePipeDirection() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
     @Override

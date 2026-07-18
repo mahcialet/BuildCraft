@@ -6,6 +6,8 @@
     { "when": { "type": "quartz_item" }, "apply": { "model": "buildcrafttransport:block/quartz_item_center" } },
     { "when": { "type": "wood_item" }, "apply": { "model": "buildcrafttransport:block/wood_item_center" } },
     { "when": { "type": "gold_item" }, "apply": { "model": "buildcrafttransport:block/gold_item_center" } },
+    { "when": { "type": "iron_item" }, "apply": { "model": "buildcrafttransport:block/iron_item_center" } },
+    { "when": { "type": "clay_item" }, "apply": { "model": "buildcrafttransport:block/clay_item_center" } },
 
     { "when": { "type": "structure", "up": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm" } },
     { "when": { "type": "structure", "down": "true" }, "apply": { "model": "buildcrafttransport:block/structure_arm", "x": 180 } },
@@ -47,6 +49,20 @@
     { "when": { "type": "gold_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/gold_item_arm", "x": 90 } },
     { "when": { "type": "gold_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/gold_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "gold_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/gold_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "gold_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/gold_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "gold_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/gold_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "iron_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm" } },
+    { "when": { "type": "iron_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm", "x": 180 } },
+    { "when": { "type": "iron_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm", "x": 90 } },
+    { "when": { "type": "iron_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "iron_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "iron_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/iron_item_arm", "x": 90, "y": 270 } },
+
+    { "when": { "type": "clay_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm" } },
+    { "when": { "type": "clay_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 180 } },
+    { "when": { "type": "clay_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90 } },
+    { "when": { "type": "clay_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "clay_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "clay_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/clay_item_arm", "x": 90, "y": 270 } }
   ]
 }
