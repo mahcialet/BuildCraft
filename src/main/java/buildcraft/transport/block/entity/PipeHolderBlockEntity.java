@@ -77,6 +77,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final PowerReceiver powerReceiver = new PowerReceiver();
     private long powerStored;
     private @Nullable Direction powerReceivedFrom;
+    private int powerLimitShift;
     private @Nullable Direction stripesDirection;
     private long stripesPower;
     private long stripesProgress;
@@ -154,7 +155,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 && !getBlockState().getValue(PipeHolderBlock.property(powerReceivedFrom))) {
             powerReceivedFrom = null;
         }
-        long limit = Math.min(powerStored, pipeType().powerTransferPerTick());
+        long limit = Math.min(powerStored, effectivePowerTransferPerTick());
+        if (limit <= 0) return;
         for (int offset = 0; offset < Direction.values().length; offset++) {
             Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
             if (direction == powerReceivedFrom
@@ -165,7 +167,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (targetEntity instanceof PipeHolderBlockEntity pipe
                     && pipeType().connectsTo(pipe.pipeType())) {
                 rejected = pipe.receivePowerFromPipe(limit, direction.getOpposite());
-            } else {
+            } else if (pipeType().connectsPowerHandlers()) {
                 IMjReceiver receiver = level.getCapability(MjAPI.CAP_RECEIVER, targetPos, direction.getOpposite());
                 if (receiver != null && receiver.canReceive() && receiver.canConnect(powerConnector)) {
                     rejected = receiver.receivePower(limit, false);
@@ -181,7 +183,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private long receivePowerFromPipe(long offered, Direction from) {
-        long accepted = Math.min(offered, Math.max(0, pipeType().powerTransferPerTick() - powerStored));
+        long accepted = Math.min(offered, Math.max(0, effectivePowerTransferPerTick() - powerStored));
         if (accepted > 0) {
             powerStored += accepted;
             powerReceivedFrom = from;
@@ -549,6 +551,11 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             return rotateExtractionDirection();
         }
         if (pipeType() == PipeType.STRIPES_ITEM) return rotateStripesDirection();
+        if (pipeType() == PipeType.IRON_POWER) {
+            powerLimitShift = (powerLimitShift + 1) % 7;
+            sync();
+            return true;
+        }
         if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM
                 && pipeType() != PipeType.IRON_FLUID) return false;
         Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
@@ -594,6 +601,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public long powerStored() { return powerStored; }
+    public int powerLimitShift() { return powerLimitShift; }
+    public long effectivePowerTransferPerTick() {
+        if (!pipeType().carriesPower()) return 0;
+        if (pipeType() != PipeType.IRON_POWER) return pipeType().powerTransferPerTick();
+        return powerLimitShift >= 6 ? 0 : pipeType().powerTransferPerTick() >> powerLimitShift;
+    }
 
     public DyeColor pipeColor() {
         return pipeColor;
@@ -1101,6 +1114,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         stripesProgress = Math.max(0, input.getLongOr("stripes_progress", 0));
         powerStored = Math.clamp(input.getLongOr("power_stored", 0), 0, pipeType().powerTransferPerTick());
         powerReceivedFrom = input.read("power_received_from", Direction.CODEC).orElse(null);
+        powerLimitShift = Math.clamp(input.getIntOr("power_limit_shift", 0), 0, 6);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -1132,6 +1146,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (powerReceivedFrom != null) {
             output.store("power_received_from", Direction.CODEC, powerReceivedFrom);
         }
+        if (powerLimitShift > 0) output.putInt("power_limit_shift", powerLimitShift);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }

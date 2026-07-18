@@ -34,7 +34,10 @@ public enum PipeType implements StringRepresentable {
     COBBLESTONE_POWER("cobblestone_power", "pipe_cobble_power", "Cobblestone Power Pipe"),
     STONE_POWER("stone_power", "pipe_stone_power", "Stone Power Pipe"),
     QUARTZ_POWER("quartz_power", "pipe_quartz_power", "Quartz Power Pipe"),
-    WOOD_POWER("wood_power", "pipe_wood_power", "Wooden Power Pipe");
+    WOOD_POWER("wood_power", "pipe_wood_power", "Wooden Power Pipe"),
+    SANDSTONE_POWER("sandstone_power", "pipe_sandstone_power", "Sandstone Power Pipe"),
+    IRON_POWER("iron_power", "pipe_iron_power", "Iron Power Pipe"),
+    GOLD_POWER("gold_power", "pipe_gold_power", "Golden Power Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -84,10 +87,11 @@ public enum PipeType implements StringRepresentable {
 
     public boolean carriesItems() { return this != STRUCTURE && !carriesFluids() && !carriesPower(); }
     public boolean carriesPower() {
-        return this == COBBLESTONE_POWER || this == STONE_POWER || this == QUARTZ_POWER || this == WOOD_POWER;
+        return this == COBBLESTONE_POWER || this == STONE_POWER || this == QUARTZ_POWER || this == WOOD_POWER
+            || this == SANDSTONE_POWER || this == IRON_POWER || this == GOLD_POWER;
     }
     private boolean isGeneralPowerConnector() {
-        return this == WOOD_POWER;
+        return this == WOOD_POWER || this == SANDSTONE_POWER || this == IRON_POWER || this == GOLD_POWER;
     }
     public boolean isWoodenPowerInput() { return this == WOOD_POWER; }
     public long powerTransferPerTick() {
@@ -96,6 +100,9 @@ public enum PipeType implements StringRepresentable {
             case STONE_POWER -> 8_000_000L;
             case QUARTZ_POWER -> 32_000_000L;
             case WOOD_POWER -> 16_000_000L;
+            case SANDSTONE_POWER -> 16_000_000L;
+            case IRON_POWER -> 32_000_000L;
+            case GOLD_POWER -> 128_000_000L;
             default -> 0;
         };
     }
@@ -104,9 +111,11 @@ public enum PipeType implements StringRepresentable {
             case COBBLESTONE_POWER -> 62_500L;
             case STONE_POWER, QUARTZ_POWER -> 31_250L;
             case WOOD_POWER -> 7_812L;
+            case SANDSTONE_POWER, IRON_POWER, GOLD_POWER -> 31_250L;
             default -> 0;
         };
     }
+    public boolean connectsPowerHandlers() { return carriesPower() && this != SANDSTONE_POWER; }
     public boolean carriesFluids() {
         return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID
             || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID

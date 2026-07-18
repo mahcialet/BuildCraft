@@ -106,6 +106,7 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
             ) != null;
         }
         if (type.carriesPower()) {
+            if (!type.connectsPowerHandlers()) return false;
             var connector = actualLevel.getCapability(buildcraft.api.mj.MjAPI.CAP_CONNECTOR,
                 pos.relative(direction), direction.getOpposite());
             return connector != null;

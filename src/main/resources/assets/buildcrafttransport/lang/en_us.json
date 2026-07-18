@@ -37,5 +37,8 @@
   "item.buildcrafttransport.pipe_cobble_power": "Cobblestone Power Pipe",
   "item.buildcrafttransport.pipe_stone_power": "Stone Power Pipe",
   "item.buildcrafttransport.pipe_quartz_power": "Quartz Power Pipe",
-  "item.buildcrafttransport.pipe_wood_power": "Wooden Power Pipe"
+  "item.buildcrafttransport.pipe_wood_power": "Wooden Power Pipe",
+  "item.buildcrafttransport.pipe_sandstone_power": "Sandstone Power Pipe",
+  "item.buildcrafttransport.pipe_iron_power": "Iron Power Pipe",
+  "item.buildcrafttransport.pipe_gold_power": "Golden Power Pipe"
 }

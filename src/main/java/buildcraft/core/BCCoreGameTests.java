@@ -129,6 +129,7 @@ public final class BCCoreGameTests {
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
+registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1181,6 +1182,54 @@ registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::t
                     "wooden pipe lost rejected power");
             helper.succeed();
         });
+    }
+
+    private static void transportGeneralPowerPipes(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos sandstonePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos ironPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos goldPos = helper.absolutePos(new BlockPos(2, 1, 0));
+        helper.getLevel().setBlock(sandstonePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.SANDSTONE_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(ironPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.IRON_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(goldPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.GOLD_POWER), Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(sandstonePos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "sandstone power pipe rejected another power pipe");
+        helper.assertTrue(helper.getLevel().getBlockState(ironPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "iron power pipe rejected golden power pipe");
+        helper.assertTrue(!buildcraft.transport.PipeType.SANDSTONE_POWER.connectsPowerHandlers(),
+                "sandstone power pipe exposed machine connections");
+        helper.assertValueEqual(16 * MjAPI.MJ,
+                buildcraft.transport.PipeType.SANDSTONE_POWER.powerTransferPerTick(),
+                "sandstone power transfer limit");
+        helper.assertValueEqual(32 * MjAPI.MJ,
+                buildcraft.transport.PipeType.IRON_POWER.powerTransferPerTick(),
+                "iron power transfer limit");
+        helper.assertValueEqual(128 * MjAPI.MJ,
+                buildcraft.transport.PipeType.GOLD_POWER.powerTransferPerTick(),
+                "gold power transfer limit");
+        var iron = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(ironPos);
+        long[] limits = { 16, 8, 4, 2, 1, 0, 32 };
+        for (int index = 0; index < limits.length; index++) {
+            helper.assertTrue(iron.rotatePipeDirection(), "iron power limiter did not rotate");
+            helper.assertValueEqual(limits[index] * MjAPI.MJ, iron.effectivePowerTransferPerTick(),
+                    "iron power limiter step " + index);
+        }
+        helper.assertValueEqual(0, iron.powerLimitShift(), "iron power limiter did not wrap");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(goldPos), helper.getLevel(), goldPos,
+                helper.getLevel().getBlockEntity(goldPos));
+        helper.assertValueEqual(1, drops.size(), "gold power pipe returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_GOLD_POWER.get()),
+                "gold power pipe returned wrong drop");
+        helper.succeed();
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {

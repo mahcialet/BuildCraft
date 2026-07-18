@@ -39,6 +39,9 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_STONE_POWER = pipe(PipeType.STONE_POWER);
     public static final DeferredItem<PipeItem> PIPE_QUARTZ_POWER = pipe(PipeType.QUARTZ_POWER);
     public static final DeferredItem<PipeItem> PIPE_WOOD_POWER = pipe(PipeType.WOOD_POWER);
+    public static final DeferredItem<PipeItem> PIPE_SANDSTONE_POWER = pipe(PipeType.SANDSTONE_POWER);
+    public static final DeferredItem<PipeItem> PIPE_IRON_POWER = pipe(PipeType.IRON_POWER);
+    public static final DeferredItem<PipeItem> PIPE_GOLD_POWER = pipe(PipeType.GOLD_POWER);
 
     private BCTransportItems() {
     }

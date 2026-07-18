@@ -233,6 +233,27 @@
 { "when":{"type":"wood_power","north":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90}},
 { "when":{"type":"wood_power","east":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":90}},
 { "when":{"type":"wood_power","south":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":180}},
-{ "when":{"type":"wood_power","west":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":270}}
+{ "when":{"type":"wood_power","west":"true"},"apply":{"model":"buildcrafttransport:block/wood_power_arm","x":90,"y":270}},
+{ "when":{"type":"sandstone_power"},"apply":{"model":"buildcrafttransport:block/sandstone_power_center"}},
+{ "when":{"type":"sandstone_power","up":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm"}},
+{ "when":{"type":"sandstone_power","down":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm","x":180}},
+{ "when":{"type":"sandstone_power","north":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm","x":90}},
+{ "when":{"type":"sandstone_power","east":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm","x":90,"y":90}},
+{ "when":{"type":"sandstone_power","south":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm","x":90,"y":180}},
+{ "when":{"type":"sandstone_power","west":"true"},"apply":{"model":"buildcrafttransport:block/sandstone_power_arm","x":90,"y":270}},
+{ "when":{"type":"iron_power"},"apply":{"model":"buildcrafttransport:block/iron_power_center"}},
+{ "when":{"type":"iron_power","up":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm"}},
+{ "when":{"type":"iron_power","down":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm","x":180}},
+{ "when":{"type":"iron_power","north":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm","x":90}},
+{ "when":{"type":"iron_power","east":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm","x":90,"y":90}},
+{ "when":{"type":"iron_power","south":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm","x":90,"y":180}},
+{ "when":{"type":"iron_power","west":"true"},"apply":{"model":"buildcrafttransport:block/iron_power_arm","x":90,"y":270}},
+{ "when":{"type":"gold_power"},"apply":{"model":"buildcrafttransport:block/gold_power_center"}},
+{ "when":{"type":"gold_power","up":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm"}},
+{ "when":{"type":"gold_power","down":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":180}},
+{ "when":{"type":"gold_power","north":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90}},
+{ "when":{"type":"gold_power","east":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":90}},
+{ "when":{"type":"gold_power","south":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":180}},
+{ "when":{"type":"gold_power","west":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":270}}
   ]
 }
