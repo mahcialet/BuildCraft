@@ -26,6 +26,8 @@
   "block.buildcraftcore.spring.water": "Water Spring",
   "block.buildcraftcore.spring.oil": "Oil Spring",
   "block.buildcraftcore.engine.wood": "Redstone Engine",
+  "block.buildcraftcore.engine.creative": "Creative Engine",
+  "chat.buildcraftcore.engine.output": "Creative Engine output: %s MJ/t",
   "gui.buildcraftcore.list.label": "List label",
   "gui.buildcraftcore.list.precise": "Match data components precisely",
   "gui.buildcraftcore.list.type": "Match item type",

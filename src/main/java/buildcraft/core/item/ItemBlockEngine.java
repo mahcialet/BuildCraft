@@ -16,14 +16,25 @@ public final class ItemBlockEngine extends BlockItem {
     }
 
     public static ItemStack redstoneEngine() {
+        return createStack(EnumEngineType.WOOD);
+    }
+
+    public static ItemStack creativeEngine() {
+        return createStack(EnumEngineType.CREATIVE);
+    }
+
+    public static ItemStack createStack(EnumEngineType type) {
         ItemStack stack = new ItemStack(BCCoreItems.ENGINE.get());
         stack.set(DataComponents.BLOCK_STATE,
-            BlockItemStateProperties.EMPTY.with(BlockEngine.ENGINE_TYPE, EnumEngineType.WOOD));
+            BlockItemStateProperties.EMPTY.with(BlockEngine.ENGINE_TYPE, type));
         return stack;
     }
 
     @Override
     public Component getName(ItemStack stack) {
-        return Component.translatable("block.buildcraftcore.engine.wood");
+        EnumEngineType type = stack.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+            .get(BlockEngine.ENGINE_TYPE);
+        if (type == null) type = EnumEngineType.WOOD;
+        return Component.translatable("block.buildcraftcore.engine." + type.getSerializedName());
     }
 }

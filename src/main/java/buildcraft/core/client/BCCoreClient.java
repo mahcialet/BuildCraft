@@ -2,7 +2,7 @@ package buildcraft.core.client;
 
 import buildcraft.core.BCCoreBlockEntities;
 import buildcraft.core.client.render.PathMarkerRenderer;
-import buildcraft.core.client.render.RedstoneEngineRenderer;
+import buildcraft.core.client.render.EngineRenderer;
 import buildcraft.core.client.render.VolumeMarkerRenderer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
@@ -35,7 +35,8 @@ public final class BCCoreClient {
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BCCoreBlockEntities.MARKER_PATH.get(), PathMarkerRenderer::new);
         event.registerBlockEntityRenderer(BCCoreBlockEntities.MARKER_VOLUME.get(), VolumeMarkerRenderer::new);
-        event.registerBlockEntityRenderer(BCCoreBlockEntities.ENGINE_REDSTONE.get(), RedstoneEngineRenderer::new);
+        event.registerBlockEntityRenderer(BCCoreBlockEntities.ENGINE_REDSTONE.get(), EngineRenderer::new);
+        event.registerBlockEntityRenderer(BCCoreBlockEntities.ENGINE_CREATIVE.get(), EngineRenderer::new);
     }
 
     private static void registerScreens(RegisterMenuScreensEvent event) {

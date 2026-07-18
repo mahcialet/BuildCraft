@@ -1,0 +1,42 @@
+{
+  "textures": {
+    "back": "buildcraftcore:block/engine/creative/back",
+    "side": "buildcraftcore:block/engine/creative/side",
+    "trunk": "buildcraftcore:block/engine/trunk_overheat",
+    "chamber": "buildcraftcore:block/engine/chamber_base",
+    "particle": "buildcraftcore:block/engine/creative/side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0], "to": [16, 4, 16],
+      "faces": {
+        "down": { "texture": "#back" }, "up": { "texture": "#back" },
+        "north": { "texture": "#side" }, "south": { "texture": "#side" },
+        "west": { "texture": "#side" }, "east": { "texture": "#side" }
+      }
+    },
+    {
+      "from": [0, 4, 0], "to": [16, 8, 16],
+      "faces": {
+        "down": { "texture": "#back" }, "up": { "texture": "#back" },
+        "north": { "texture": "#side" }, "south": { "texture": "#side" },
+        "west": { "texture": "#side" }, "east": { "texture": "#side" }
+      }
+    },
+    {
+      "from": [4, 4, 4], "to": [12, 16, 12],
+      "faces": {
+        "down": { "texture": "#trunk" }, "up": { "texture": "#trunk" },
+        "north": { "texture": "#trunk" }, "south": { "texture": "#trunk" },
+        "west": { "texture": "#trunk" }, "east": { "texture": "#trunk" }
+      }
+    },
+    {
+      "from": [3, 4, 3], "to": [13, 5, 13],
+      "faces": {
+        "north": { "texture": "#chamber" }, "south": { "texture": "#chamber" },
+        "west": { "texture": "#chamber" }, "east": { "texture": "#chamber" }
+      }
+    }
+  ]
+}

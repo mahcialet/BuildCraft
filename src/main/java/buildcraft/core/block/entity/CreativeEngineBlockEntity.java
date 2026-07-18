@@ -1,6 +1,5 @@
 package buildcraft.core.block.entity;
 
-import buildcraft.api.enums.EnumPowerStage;
 import buildcraft.api.mj.IMjConnector;
 import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.MjAPI;
@@ -14,36 +13,33 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
-import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 
-/** Redstone engine state, pulse cycle, and sided MJ output. */
-public final class RedstoneEngineBlockEntity extends BlockEntity implements EngineBlockEntity {
-    public static final double MIN_HEAT = 20;
-    public static final double MAX_HEAT = 250;
-    private static final long MAX_POWER = MjAPI.MJ;
-    private static final long MAX_EXTRACT = 4 * MjAPI.MJ;
+/** Development/creative engine with selectable, unlimited MJ generation. */
+public final class CreativeEngineBlockEntity extends BlockEntity implements EngineBlockEntity {
+    public static final long[] OUTPUTS = { 1, 2, 4, 8, 16, 32, 64, 128, 256 };
+    private static final int MAX_CHAIN_LENGTH = 2;
 
-    private final IMjConnector connector = new EngineConnector(true);
-    private double heat = MIN_HEAT;
+    private final IMjConnector connector = new EngineConnector(false);
     private long power;
     private float progress;
     private float previousProgress;
     private int progressPart;
     private boolean pumping;
-    private EnumPowerStage stage = EnumPowerStage.BLUE;
+    private int outputIndex;
 
-    public RedstoneEngineBlockEntity(BlockPos pos, BlockState state) {
-        super(BCCoreBlockEntities.ENGINE_REDSTONE.get(), pos, state);
+    public CreativeEngineBlockEntity(BlockPos pos, BlockState state) {
+        super(BCCoreBlockEntities.ENGINE_CREATIVE.get(), pos, state);
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, RedstoneEngineBlockEntity engine) {
+    public static void tick(Level level, BlockPos pos, BlockState state, CreativeEngineBlockEntity engine) {
         if (level instanceof ServerLevel serverLevel) {
             engine.serverTick(serverLevel, state);
         } else {
@@ -51,93 +47,65 @@ public final class RedstoneEngineBlockEntity extends BlockEntity implements Engi
         }
     }
 
+    private void serverTick(ServerLevel level, BlockState state) {
+        tickCycle(level.hasNeighborSignal(worldPosition), receiver(state.getValue(BlockEngine.FACING)));
+        setChanged();
+        if (level.getGameTime() % 4 == 0) {
+            level.sendBlockUpdated(worldPosition, state, state, Block.UPDATE_CLIENTS);
+        }
+    }
+
     private void clientTick() {
         previousProgress = progress;
         if (progressPart == 0) return;
         progress += pistonSpeed();
-        if (progress >= 1.0F) {
+        if (progress >= 1) {
             progress = 0;
             previousProgress = 0;
             progressPart = 0;
         }
     }
 
-    private void serverTick(ServerLevel level, BlockState state) {
-        boolean powered = level.hasNeighborSignal(worldPosition);
-        tickCycle(powered, receiver(state.getValue(BlockEngine.FACING)), level.getGameTime());
-        sync();
-    }
-
-    /** Advances one deterministic engine cycle after the world-facing receiver lookup. */
-    public void tickCycle(boolean powered, @Nullable IMjReceiver receiver, long gameTime) {
-        cool();
-        stage = computeStage();
+    /** Advances one deterministic engine tick with an already-resolved output receiver. */
+    public void tickCycle(boolean powered, @Nullable IMjReceiver receiver) {
         if (powered) {
-            power = MAX_POWER;
-            if (gameTime % 16 == 0 && heatLevel() < 0.8) heat += 4;
+            power = Math.min(maxPower(), power + currentOutput());
         } else {
             power = 0;
         }
 
+        long available = extractable(receiver);
         if (progressPart != 0) {
             progress += pistonSpeed();
             if (progress > 0.5F && progressPart == 1) {
                 progressPart = 2;
-                sendPower(receiver);
-            } else if (progress >= 1.0F) {
+            } else if (progress >= 1) {
                 progress = 0;
                 progressPart = 0;
             }
-        } else if (powered && extractable(receiver, false) > 0) {
+        } else if (powered && available > 0) {
             progressPart = 1;
             pumping = true;
         } else {
             pumping = false;
         }
+
+        if (powered) sendPower(receiver);
     }
 
-    private void cool() {
-        if (heat > MIN_HEAT) heat = Math.max(MIN_HEAT, heat - 0.2);
-    }
-
-    private double heatLevel() {
-        return (heat - MIN_HEAT) / (MAX_HEAT - MIN_HEAT);
-    }
-
-    private EnumPowerStage computeStage() {
-        double value = heatLevel();
-        if (value < 0.25) return EnumPowerStage.BLUE;
-        if (value < 0.5) return EnumPowerStage.GREEN;
-        if (value < 0.75) return EnumPowerStage.YELLOW;
-        if (value < 0.85) return EnumPowerStage.RED;
-        return EnumPowerStage.OVERHEAT;
-    }
-
-    private float pistonSpeed() {
-        return switch (stage) {
-            case BLUE -> 0.01F;
-            case GREEN -> 0.02F;
-            case YELLOW -> 0.04F;
-            case RED -> 0.06F;
-            default -> 0;
-        };
-    }
-
-    private long extractable(@Nullable IMjReceiver receiver, boolean extract) {
+    private long extractable(@Nullable IMjReceiver receiver) {
         if (receiver == null) return 0;
-        long amount = Math.min(power, Math.min(MAX_EXTRACT, Math.max(0, receiver.getPowerRequested())));
-        if (extract) power -= amount;
-        return amount;
+        return Math.min(power, Math.min(maxExtract(), Math.max(0, receiver.getPowerRequested())));
     }
 
     private void sendPower(@Nullable IMjReceiver receiver) {
-        long offered = extractable(receiver, false);
+        long offered = extractable(receiver);
         if (offered <= 0 || receiver == null) return;
         long excess = receiver.receivePower(offered, false);
-        long accepted = offered - Math.max(0, Math.min(offered, excess));
-        power -= accepted;
+        power -= offered - Math.max(0, Math.min(offered, excess));
     }
 
+    @Override
     public @Nullable IMjConnector connector(@Nullable Direction side) {
         return side == getBlockState().getValue(BlockEngine.FACING) ? connector : null;
     }
@@ -145,10 +113,18 @@ public final class RedstoneEngineBlockEntity extends BlockEntity implements Engi
     private @Nullable IMjReceiver receiver(Direction direction) {
         if (level == null) return null;
         BlockPos target = worldPosition.relative(direction);
+        for (int chain = 0; chain <= MAX_CHAIN_LENGTH; chain++) {
+            BlockEntity next = level.getBlockEntity(target);
+            if (!(next instanceof CreativeEngineBlockEntity creative)) break;
+            if (creative.getBlockState().getValue(BlockEngine.FACING) != direction) return null;
+            target = target.relative(direction);
+        }
+        if (level.getBlockEntity(target) instanceof EngineBlockEntity) return null;
         IMjReceiver receiver = level.getCapability(MjAPI.CAP_RECEIVER, target, direction.getOpposite());
         return receiver != null && receiver.canConnect(connector) && connector.canConnect(receiver) ? receiver : null;
     }
 
+    @Override
     public boolean rotateToNextReceiver() {
         if (!(level instanceof ServerLevel)) return false;
         Direction current = getBlockState().getValue(BlockEngine.FACING);
@@ -160,6 +136,7 @@ public final class RedstoneEngineBlockEntity extends BlockEntity implements Engi
         return false;
     }
 
+    @Override
     public void rotateIfInvalid() {
         Direction current = getBlockState().getValue(BlockEngine.FACING);
         if (receiver(current) == null) rotateToNextReceiver();
@@ -174,47 +151,57 @@ public final class RedstoneEngineBlockEntity extends BlockEntity implements Engi
         return true;
     }
 
-    private void sync() {
+    public int cycleOutput() {
+        outputIndex = (outputIndex + 1) % OUTPUTS.length;
         setChanged();
-        if (level != null && level.getGameTime() % 4 == 0) {
+        if (level != null) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
+        return outputIndex;
     }
 
+    public int outputIndex() { return outputIndex; }
+    public long currentOutput() { return OUTPUTS[outputIndex] * MjAPI.MJ; }
     public long storedPower() { return power; }
-    public double heat() { return heat; }
-    public float progress() { return progress; }
-    public float renderProgress(float partialTicks) { return Mth.lerp(partialTicks, previousProgress, progress); }
     public boolean pumping() { return pumping; }
-    public EnumPowerStage stage() { return stage; }
+    private long maxPower() { return currentOutput() * 10_000; }
+    private long maxExtract() { return 20 * currentOutput(); }
+    private float pistonSpeed() {
+        return 0.01F + outputIndex / (float) (OUTPUTS.length - 1) * 0.07F;
+    }
+
+    @Override
+    public float renderProgress(float partialTicks) {
+        float now = progress;
+        if (previousProgress > 0.5F && now < 0.5F) now += 1;
+        return Mth.lerp(partialTicks, previousProgress, now) % 1;
+    }
+
     @Override
     public String trunkTexture() {
-        return stage == EnumPowerStage.BLACK ? "overheat" : stage.getSerializedName();
+        return "overheat";
     }
-    public long currentOutput() { return MjAPI.MJ / 20; }
 
     @Override
     protected void loadAdditional(ValueInput input) {
         super.loadAdditional(input);
-        heat = Math.max(MIN_HEAT, input.getDoubleOr("heat", MIN_HEAT));
-        power = Math.max(0, Math.min(MAX_POWER, input.getLongOr("power", 0)));
+        outputIndex = Math.max(0, Math.min(OUTPUTS.length - 1, input.getIntOr("output_index", 0)));
+        power = Math.max(0, Math.min(maxPower(), input.getLongOr("power", 0)));
         float loadedProgress = Math.max(0, Math.min(1, input.getFloatOr("progress", 0)));
         previousProgress = level != null && level.isClientSide() ? progress : loadedProgress;
         progress = loadedProgress;
         progressPart = Math.max(0, Math.min(2, input.getIntOr("progress_part", 0)));
         pumping = input.getBooleanOr("pumping", false);
-        stage = input.read("stage", EnumPowerStage.CODEC).orElse(EnumPowerStage.BLUE);
     }
 
     @Override
     protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
-        output.putDouble("heat", heat);
+        output.putInt("output_index", outputIndex);
         output.putLong("power", power);
         output.putFloat("progress", progress);
         output.putInt("progress_part", progressPart);
         output.putBoolean("pumping", pumping);
-        output.store("stage", EnumPowerStage.CODEC, stage);
     }
 
     @Override

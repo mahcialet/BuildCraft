@@ -96,6 +96,9 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/engine/wood') {
         into 'assets/buildcraftcore/textures/block/engine/wood'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks/engine/creative') {
+        into 'assets/buildcraftcore/textures/block/engine/creative'
+    }
     from('buildcraft_resources/assets/buildcraftlib/textures/blocks/engine') {
         include 'chamber_base.png', 'trunk_blue.png', 'trunk_green.png', 'trunk_yellow.png', 'trunk_red.png', 'trunk_overheat.png'
         into 'assets/buildcraftcore/textures/block/engine'

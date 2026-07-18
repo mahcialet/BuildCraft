@@ -4,6 +4,8 @@ import buildcraft.api.enums.EnumEngineType;
 import buildcraft.api.tools.IWrenchable;
 import buildcraft.core.BCCoreBlockEntities;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
+import buildcraft.core.block.entity.CreativeEngineBlockEntity;
+import buildcraft.core.block.entity.EngineBlockEntity;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -12,6 +14,7 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
@@ -27,7 +30,7 @@ import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.level.redstone.Orientation;
 import org.jspecify.annotations.Nullable;
 
-/** Shared engine block, initially backed by the core redstone-engine entity. */
+/** Shared block for the engine variants registered by Core and Energy. */
 public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     public static final MapCodec<BlockEngine> CODEC = simpleCodec(BlockEngine::new);
     public static final EnumProperty<EnumEngineType> ENGINE_TYPE =
@@ -59,28 +62,34 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     @Override
     public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer,
         ItemStack stack) {
-        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof RedstoneEngineBlockEntity engine) {
+        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof EngineBlockEntity engine) {
             engine.rotateIfInvalid();
         }
     }
 
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
-        return state.getValue(ENGINE_TYPE) == EnumEngineType.WOOD
-            ? new RedstoneEngineBlockEntity(pos, state) : null;
+        return switch (state.getValue(ENGINE_TYPE)) {
+            case WOOD -> new RedstoneEngineBlockEntity(pos, state);
+            case CREATIVE -> new CreativeEngineBlockEntity(pos, state);
+            default -> null;
+        };
     }
 
     @Override
     public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(
         Level level, BlockState state, BlockEntityType<T> type
     ) {
-        return createTickerHelper(type, BCCoreBlockEntities.ENGINE_REDSTONE.get(), RedstoneEngineBlockEntity::tick);
+        if (type == BCCoreBlockEntities.ENGINE_REDSTONE.get()) {
+            return createTickerHelper(type, BCCoreBlockEntities.ENGINE_REDSTONE.get(), RedstoneEngineBlockEntity::tick);
+        }
+        return createTickerHelper(type, BCCoreBlockEntities.ENGINE_CREATIVE.get(), CreativeEngineBlockEntity::tick);
     }
 
     @Override
     protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
         @Nullable Orientation orientation, boolean movedByPiston) {
-        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof RedstoneEngineBlockEntity engine) {
+        if (!level.isClientSide() && level.getBlockEntity(pos) instanceof EngineBlockEntity engine) {
             engine.rotateIfInvalid();
         }
     }
@@ -94,7 +103,16 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     public InteractionResult onWrenched(UseOnContext context) {
         if (context.getLevel().isClientSide()) return InteractionResult.SUCCESS;
         BlockEntity blockEntity = context.getLevel().getBlockEntity(context.getClickedPos());
-        return blockEntity instanceof RedstoneEngineBlockEntity engine && engine.rotateToNextReceiver()
+        if (blockEntity instanceof CreativeEngineBlockEntity creative) {
+            int index = creative.cycleOutput();
+            if (context.getPlayer() != null) {
+                context.getPlayer().sendOverlayMessage(Component.translatable(
+                    "chat.buildcraftcore.engine.output", CreativeEngineBlockEntity.OUTPUTS[index]
+                ));
+            }
+            return InteractionResult.SUCCESS;
+        }
+        return blockEntity instanceof EngineBlockEntity engine && engine.rotateToNextReceiver()
             ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 

@@ -1,8 +1,7 @@
 package buildcraft.core.client.render;
 
-import buildcraft.api.enums.EnumPowerStage;
 import buildcraft.core.block.BlockEngine;
-import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
+import buildcraft.core.block.entity.EngineBlockEntity;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.Sheets;
@@ -19,12 +18,13 @@ import net.minecraft.client.resources.model.sprite.SpriteId;
 import net.minecraft.core.Direction;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import org.joml.Quaternionf;
 import org.jspecify.annotations.Nullable;
 
 /** Animated moving assembly for the core redstone engine. */
-public final class RedstoneEngineRenderer
-    implements BlockEntityRenderer<RedstoneEngineBlockEntity, RedstoneEngineRenderState> {
+public final class EngineRenderer<T extends BlockEntity & EngineBlockEntity>
+    implements BlockEntityRenderer<T, EngineRenderState> {
     private static final String MOD_ID = "buildcraftcore";
     private static final SpriteId BACK = sprite("engine/wood/back");
     private static final SpriteId SIDE = sprite("engine/wood/side");
@@ -32,27 +32,27 @@ public final class RedstoneEngineRenderer
 
     private final SpriteGetter sprites;
 
-    public RedstoneEngineRenderer(BlockEntityRendererProvider.Context context) {
+    public EngineRenderer(BlockEntityRendererProvider.Context context) {
         sprites = context.sprites();
     }
 
     @Override
-    public RedstoneEngineRenderState createRenderState() {
-        return new RedstoneEngineRenderState();
+    public EngineRenderState createRenderState() {
+        return new EngineRenderState();
     }
 
     @Override
-    public void extractRenderState(RedstoneEngineBlockEntity engine, RedstoneEngineRenderState state,
+    public void extractRenderState(T engine, EngineRenderState state,
         float partialTicks, Vec3 cameraPosition,
         ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
         BlockEntityRenderer.super.extractRenderState(engine, state, partialTicks, cameraPosition, breakProgress);
         state.progress = engine.renderProgress(partialTicks);
         state.facing = engine.getBlockState().getValue(BlockEngine.FACING);
-        state.stage = engine.stage();
+        state.trunkTexture = engine.trunkTexture();
     }
 
     @Override
-    public void submit(RedstoneEngineRenderState state, PoseStack poseStack, SubmitNodeCollector nodes,
+    public void submit(EngineRenderState state, PoseStack poseStack, SubmitNodeCollector nodes,
         CameraRenderState camera) {
         poseStack.pushPose();
         orientFromUp(poseStack, state.facing);
@@ -60,7 +60,7 @@ public final class RedstoneEngineRenderer
         TextureAtlasSprite back = sprites.get(BACK);
         TextureAtlasSprite side = sprites.get(SIDE);
         TextureAtlasSprite chamber = sprites.get(CHAMBER);
-        TextureAtlasSprite trunk = sprites.get(sprite("engine/trunk_" + stageName(state.stage)));
+        TextureAtlasSprite trunk = sprites.get(sprite("engine/trunk_" + state.trunkTexture));
         float displacement = triangularDisplacement(state.progress);
         int light = state.lightCoords;
 
@@ -165,7 +165,4 @@ public final class RedstoneEngineRenderer
         return Sheets.BLOCKS_MAPPER.apply(Identifier.fromNamespaceAndPath(MOD_ID, path));
     }
 
-    private static String stageName(EnumPowerStage stage) {
-        return stage == EnumPowerStage.BLACK ? "overheat" : stage.getSerializedName();
-    }
 }

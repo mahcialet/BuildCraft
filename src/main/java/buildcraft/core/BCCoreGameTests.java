@@ -35,6 +35,7 @@ import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.enums.EnumEngineType;
 import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
+import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -106,6 +107,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
         registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
+        registerTest(event, environment, "creative_engine", BCCoreGameTests::creativeEngine);
     }
 
     private static void registerTest(
@@ -769,6 +771,50 @@ public final class BCCoreGameTests {
         helper.assertValueEqual(engine.currentOutput(), MjAPI.MJ / 20, "redstone engine nominal output");
         engine.tickCycle(false, receiver, 61);
         helper.assertValueEqual(engine.storedPower(), 0L, "unpowered redstone engine retained power");
+        helper.succeed();
+    }
+
+    private static void creativeEngine(GameTestHelper helper) {
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.CREATIVE)
+            .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
+        BlockPos enginePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        CreativeEngineBlockEntity engine =
+            (CreativeEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        helper.assertTrue(engine != null, "creative engine block entity missing");
+        IMjConnector connector = helper.getLevel().getCapability(
+            MjAPI.CAP_CONNECTOR, enginePos, net.minecraft.core.Direction.UP
+        );
+        helper.assertTrue(connector != null, "creative engine connector capability missing");
+        helper.assertTrue(helper.getLevel().getCapability(
+            MjAPI.CAP_CONNECTOR, enginePos, net.minecraft.core.Direction.DOWN
+        ) == null, "creative engine connector leaked to another side");
+
+        long[] received = { 0 };
+        IMjReceiver receiver = new IMjReceiver() {
+            @Override public boolean canConnect(IMjConnector other) { return true; }
+            @Override public long getPowerRequested() { return 1_000 * MjAPI.MJ; }
+            @Override public long receivePower(long amount, boolean simulate) {
+                if (!simulate) received[0] += amount;
+                return 0;
+            }
+        };
+        helper.assertTrue(connector.canConnect(receiver),
+            "creative engine rejected a normal MJ receiver");
+        for (int tick = 0; tick < 3; tick++) engine.tickCycle(true, receiver);
+        helper.assertValueEqual(received[0], 3 * MjAPI.MJ, "creative engine base output");
+        helper.assertTrue(engine.pumping(), "powered creative engine was not pumping");
+
+        for (int index = 1; index < CreativeEngineBlockEntity.OUTPUTS.length; index++) {
+            helper.assertValueEqual(engine.cycleOutput(), index, "creative engine output index");
+            helper.assertValueEqual(engine.currentOutput(),
+                CreativeEngineBlockEntity.OUTPUTS[index] * MjAPI.MJ,
+                "creative engine selected output");
+        }
+        helper.assertValueEqual(engine.cycleOutput(), 0, "creative engine output wrap");
+        engine.tickCycle(false, receiver);
+        helper.assertValueEqual(engine.storedPower(), 0L, "unpowered creative engine retained power");
         helper.succeed();
     }
 

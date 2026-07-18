@@ -4,6 +4,7 @@ import buildcraft.BuildCraft;
 import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
+import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.core.registries.Registries;
@@ -29,6 +30,10 @@ public final class BCCoreBlockEntities {
         BLOCK_ENTITIES.register("engine_redstone", () -> new BlockEntityType<>(
             RedstoneEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CreativeEngineBlockEntity>> ENGINE_CREATIVE =
+        BLOCK_ENTITIES.register("engine_creative", () -> new BlockEntityType<>(
+            CreativeEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
+        ));
 
     private BCCoreBlockEntities() {
     }
@@ -40,6 +45,8 @@ public final class BCCoreBlockEntities {
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_REDSTONE.get(),
+            (engine, side) -> engine.connector(side));
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_CREATIVE.get(),
             (engine, side) -> engine.connector(side));
     }
 }
