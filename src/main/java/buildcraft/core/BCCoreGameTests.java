@@ -11,6 +11,7 @@ import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
 import buildcraft.core.marker.VolumeSavedData;
 import buildcraft.core.block.entity.PathMarkerBlockEntity;
+import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.BlockPos;
@@ -61,6 +62,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
         registerTest(event, environment, "path_marker_sync", BCCoreGameTests::pathMarkerSync);
         registerTest(event, environment, "volume_graph", BCCoreGameTests::volumeGraph);
+        registerTest(event, environment, "volume_marker_sync", BCCoreGameTests::volumeMarkerSync);
     }
 
     private static void registerTest(
@@ -234,6 +236,15 @@ public final class BCCoreGameTests {
         for (BlockPos marker : java.util.List.of(origin, near, far)) blocked.addMarker(marker);
         helper.assertValueEqual(blocked.validConnections(origin), java.util.List.of(near), "nearest axial marker");
         helper.assertTrue(!blocked.canConnect(origin, far), "Connection skipped an intervening marker");
+        ItemMarkerConnector.Candidate volumeAim = ItemMarkerConnector.findVolumeCandidate(
+            blocked, new Vec3(1.5, 0.5, -2.0), new Vec3(0.0, 0.0, 1.0)
+        );
+        helper.assertTrue(volumeAim != null, "Connector did not select an aimed volume line");
+        helper.assertTrue(
+            (volumeAim.from().equals(origin) && volumeAim.to().equals(near))
+                || (volumeAim.from().equals(near) && volumeAim.to().equals(origin)),
+            "Connector selected the wrong volume line"
+        );
 
         VolumeSavedData merging = new VolumeSavedData();
         BlockPos a0 = new BlockPos(0, 0, 0), a1 = new BlockPos(2, 0, 0);
@@ -245,6 +256,39 @@ public final class BCCoreGameTests {
         helper.assertValueEqual(merging.connections().size(), 1, "merged volume count");
         merging.removeMarker(a1);
         helper.assertTrue(merging.connectionAt(a1).isEmpty(), "Removed volume marker remained connected");
+        helper.succeed();
+    }
+
+    private static void volumeMarkerSync(GameTestHelper helper) {
+        BlockPos first = new BlockPos(0, 1, 0);
+        BlockPos second = new BlockPos(3, 1, 0);
+        for (BlockPos marker : java.util.List.of(first, second)) {
+            helper.setBlock(marker.below(), Blocks.STONE);
+            helper.setBlock(marker, BCCoreBlocks.MARKER_VOLUME.get().defaultBlockState());
+        }
+        BlockPos absoluteFirst = helper.absolutePos(first);
+        BlockPos absoluteSecond = helper.absolutePos(second);
+        VolumeSavedData volumes = VolumeSavedData.get(helper.getLevel());
+        helper.assertTrue(volumes.connectValid(absoluteFirst), "Manual volume connection attempt failed");
+        VolumeMarkerBlockEntity firstEntity = (VolumeMarkerBlockEntity) helper.getLevel().getBlockEntity(absoluteFirst);
+        helper.assertValueEqual(firstEntity.min(), absoluteFirst, "synced volume minimum");
+        helper.assertValueEqual(firstEntity.max(), absoluteSecond, "synced volume maximum");
+        helper.assertValueEqual(
+            firstEntity.axes(), java.util.EnumSet.of(net.minecraft.core.Direction.Axis.X), "synced volume axes"
+        );
+        helper.assertTrue(firstEntity.renderOwner(), "First marker did not own volume rendering");
+        helper.assertTrue(firstEntity.isValidFromLocation(absoluteFirst.west()), "Adjacent corner was not a valid area-provider location");
+        helper.assertTrue(!firstEntity.isValidFromLocation(absoluteFirst), "Inside position was a valid area-provider location");
+
+        helper.setBlock(first.west(), Blocks.REDSTONE_BLOCK);
+        helper.assertTrue(firstEntity.showingSignals(), "Powered marker did not enable signal guides");
+        helper.setBlock(first.west(), Blocks.AIR);
+        helper.assertTrue(!firstEntity.showingSignals(), "Unpowered marker did not disable signal guides");
+
+        helper.destroyBlock(second);
+        helper.assertTrue(volumes.connectionAt(absoluteFirst).isEmpty(), "Destroyed marker left a short volume connection");
+        helper.assertValueEqual(firstEntity.min(), absoluteFirst, "surviving marker minimum was not cleared");
+        helper.assertValueEqual(firstEntity.max(), absoluteFirst, "surviving marker maximum was not cleared");
         helper.succeed();
     }
 

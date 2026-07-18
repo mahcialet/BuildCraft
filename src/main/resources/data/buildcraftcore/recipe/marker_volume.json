@@ -1,0 +1,7 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "key": { "B": "minecraft:blue_dye", "T": "minecraft:redstone_torch" },
+  "pattern": ["B", "T"],
+  "result": { "id": "buildcraftcore:marker_volume" }
+}

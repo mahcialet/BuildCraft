@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:block",
+  "pools": [{
+    "bonus_rolls": 0.0,
+    "entries": [{ "type": "minecraft:item", "name": "buildcraftcore:marker_volume" }],
+    "rolls": 1.0
+  }],
+  "random_sequence": "buildcraftcore:blocks/marker_volume"
+}

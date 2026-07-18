@@ -1,6 +1,7 @@
 package buildcraft.core.item;
 
 import buildcraft.core.marker.PathSavedData;
+import buildcraft.core.marker.VolumeSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -28,9 +29,18 @@ public final class ItemMarkerConnector extends Item {
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         if (level.isClientSide()) return InteractionResult.SUCCESS;
-        PathSavedData paths = PathSavedData.get((ServerLevel) level);
-        Candidate candidate = findCandidate(paths, player.getEyePosition(), player.getLookAngle());
-        if (candidate == null || !paths.connect(candidate.from(), candidate.to())) return InteractionResult.FAIL;
+        ServerLevel serverLevel = (ServerLevel) level;
+        Vec3 eye = player.getEyePosition();
+        Vec3 look = player.getLookAngle();
+        VolumeSavedData volumes = VolumeSavedData.get(serverLevel);
+        Candidate candidate = findVolumeCandidate(volumes, eye, look);
+        boolean connected = candidate != null && volumes.connect(candidate.from(), candidate.to());
+        if (!connected) {
+            PathSavedData paths = PathSavedData.get(serverLevel);
+            candidate = findCandidate(paths, eye, look);
+            connected = candidate != null && paths.connect(candidate.from(), candidate.to());
+        }
+        if (!connected) return InteractionResult.FAIL;
         level.playSound(null, player.blockPosition(), SoundEvents.UI_BUTTON_CLICK.value(), SoundSource.PLAYERS, 0.5F, 1.2F);
         return InteractionResult.SUCCESS;
     }
@@ -55,6 +65,21 @@ public final class ItemMarkerConnector extends Item {
                     continue;
                 }
                 LineDistance distance = distanceToLine(eye, look, Vec3.atCenterOf(a), Vec3.atCenterOf(b));
+                if (distance.alongRay() > MAX_REACH || distance.distance() >= MAX_LINE_DISTANCE) continue;
+                Candidate candidate = new Candidate(from, to, distance.distance(), distance.alongRay());
+                if (best == null || candidate.compareTo(best) < 0) best = candidate;
+            }
+        }
+        return best;
+    }
+
+    public static Candidate findVolumeCandidate(VolumeSavedData volumes, Vec3 eye, Vec3 look) {
+        Candidate best = null;
+        for (BlockPos from : volumes.markers()) {
+            for (BlockPos to : volumes.validConnections(from)) {
+                // Each undirected possible line is evaluated only once.
+                if (from.compareTo(to) >= 0) continue;
+                LineDistance distance = distanceToLine(eye, look, Vec3.atCenterOf(from), Vec3.atCenterOf(to));
                 if (distance.alongRay() > MAX_REACH || distance.distance() >= MAX_LINE_DISTANCE) continue;
                 Candidate candidate = new Candidate(from, to, distance.distance(), distance.alongRay());
                 if (best == null || candidate.compareTo(best) < 0) best = candidate;

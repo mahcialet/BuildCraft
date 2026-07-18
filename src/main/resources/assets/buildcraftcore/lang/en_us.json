@@ -13,5 +13,6 @@
   "block.buildcraftcore.decorated.leather": "Leather Decoration",
   "block.buildcraftcore.decorated.laser_back": "Laser Decoration",
   "block.buildcraftcore.marker_path": "Path Marker",
-  "item.buildcraftcore.marker_connector": "Marker Connector"
+  "item.buildcraftcore.marker_connector": "Marker Connector",
+  "block.buildcraftcore.marker_volume": "Volume Marker"
 }

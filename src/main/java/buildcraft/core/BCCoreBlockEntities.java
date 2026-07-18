@@ -2,6 +2,7 @@ package buildcraft.core;
 
 import buildcraft.BuildCraft;
 import buildcraft.core.block.entity.PathMarkerBlockEntity;
+import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,10 @@ public final class BCCoreBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PathMarkerBlockEntity>> MARKER_PATH =
         BLOCK_ENTITIES.register("marker_path", () -> new BlockEntityType<>(
             PathMarkerBlockEntity::new, BCCoreBlocks.MARKER_PATH.get()
+        ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<VolumeMarkerBlockEntity>> MARKER_VOLUME =
+        BLOCK_ENTITIES.register("marker_volume", () -> new BlockEntityType<>(
+            VolumeMarkerBlockEntity::new, BCCoreBlocks.MARKER_VOLUME.get()
         ));
 
     private BCCoreBlockEntities() {

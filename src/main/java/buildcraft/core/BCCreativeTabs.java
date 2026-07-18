@@ -24,6 +24,7 @@ public final class BCCreativeTabs {
             .displayItems((parameters, output) -> {
                 output.accept(BCCoreItems.WRENCH.get());
                 output.accept(BCCoreItems.MARKER_PATH.get());
+                output.accept(BCCoreItems.MARKER_VOLUME.get());
                 output.accept(BCCoreItems.MARKER_CONNECTOR.get());
                 output.accept(BCCoreItems.GEAR_WOOD.get());
                 output.accept(BCCoreItems.GEAR_STONE.get());

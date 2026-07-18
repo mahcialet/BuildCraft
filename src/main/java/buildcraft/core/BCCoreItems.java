@@ -25,6 +25,7 @@ public final class BCCoreItems {
         properties -> new ItemBlockDecoration(BCCoreBlocks.DECORATED.get(), properties.useBlockDescriptionPrefix())
     );
     public static final DeferredItem<BlockItem> MARKER_PATH = ITEMS.registerSimpleBlockItem(BCCoreBlocks.MARKER_PATH);
+    public static final DeferredItem<BlockItem> MARKER_VOLUME = ITEMS.registerSimpleBlockItem(BCCoreBlocks.MARKER_VOLUME);
     public static final DeferredItem<Item> GEAR_WOOD = ITEMS.registerSimpleItem("gear_wood");
     public static final DeferredItem<Item> GEAR_STONE = ITEMS.registerSimpleItem("gear_stone");
     public static final DeferredItem<Item> GEAR_IRON = ITEMS.registerSimpleItem("gear_iron");

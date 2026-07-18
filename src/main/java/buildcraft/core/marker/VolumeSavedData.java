@@ -9,6 +9,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +28,7 @@ public final class VolumeSavedData extends SavedData {
 
     private final ArrayList<VolumeConnection> connections;
     private final ArrayList<BlockPos> markers;
+    private transient ServerLevel level;
 
     public VolumeSavedData() {
         this(List.of(), List.of());
@@ -38,7 +40,9 @@ public final class VolumeSavedData extends SavedData {
     }
 
     public static VolumeSavedData get(ServerLevel level) {
-        return level.getDataStorage().computeIfAbsent(TYPE);
+        VolumeSavedData data = level.getDataStorage().computeIfAbsent(TYPE);
+        data.level = level;
+        return data;
     }
 
     public List<VolumeConnection> connections() { return List.copyOf(connections); }
@@ -58,6 +62,7 @@ public final class VolumeSavedData extends SavedData {
             }
         }
         setDirty();
+        syncMarkers();
     }
 
     public boolean canConnect(BlockPos from, BlockPos to) {
@@ -85,7 +90,27 @@ public final class VolumeSavedData extends SavedData {
             connections.remove(toConnection);
         }
         setDirty();
+        syncMarkers();
         return true;
+    }
+
+    public boolean connectValid(BlockPos from) {
+        boolean changed = false;
+        for (BlockPos to : validConnections(from)) changed |= connect(from, to);
+        VolumeConnection connection = connectionAt(from).orElse(null);
+        if (connection != null) {
+            for (BlockPos marker : List.copyOf(markers)) {
+                if (!connection.contains(marker) && connection.isCorner(marker) && connection.canAdd(marker)) {
+                    connection.add(marker);
+                    changed = true;
+                }
+            }
+        }
+        if (changed) {
+            setDirty();
+            syncMarkers();
+        }
+        return changed;
     }
 
     public List<BlockPos> validConnections(BlockPos from) {
@@ -128,5 +153,15 @@ public final class VolumeSavedData extends SavedData {
             changed = true;
         }
         if (changed) setDirty();
+        if (changed) syncMarkers();
+    }
+
+    private void syncMarkers() {
+        if (level == null) return;
+        for (BlockPos marker : markers) {
+            if (level.getBlockEntity(marker) instanceof VolumeMarkerBlockEntity blockEntity) {
+                blockEntity.updateFrom(this);
+            }
+        }
     }
 }
