@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "C": "minecraft:cobblestone",
+    "G": "buildcraftcore:gear_wood"
+  },
+  "pattern": [" C ", "CGC", " C "],
+  "result": { "id": "buildcraftcore:gear_stone" }
+}

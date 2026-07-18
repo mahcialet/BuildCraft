@@ -53,6 +53,15 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
 
+tasks.named('processResources', ProcessResources) {
+    // Reuse the original artwork without duplicating binary assets while the
+    // historical resource tree remains available as the migration source.
+    from('buildcraft_resources/assets/buildcraftcore/textures/items') {
+        include 'gear_wood.png', 'gear_stone.png', 'gear_iron.png', 'gear_gold.png', 'gear_diamond.png'
+        into 'assets/buildcraftcore/textures/item'
+    }
+}
+
 tasks.named('jar', Jar) {
     manifest {
         attributes(
