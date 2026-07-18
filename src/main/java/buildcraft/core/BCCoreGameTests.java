@@ -131,6 +131,7 @@ registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTe
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
 registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
 registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTests::transportDiamondPowerPipes);
+registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1281,6 +1282,87 @@ registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTest
         helper.assertValueEqual(1, drops.size(), "diamond power pipe returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_POWER.get()),
                 "diamond power pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void factoryTank(GameTestHelper helper) {
+        BlockPos bottomPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos topPos = helper.absolutePos(new BlockPos(0, 2, 0));
+        BlockState tankState = buildcraft.factory.BCFactoryBlocks.TANK.get().defaultBlockState();
+        helper.getLevel().setBlock(bottomPos, tankState, Block.UPDATE_ALL);
+        helper.getLevel().setBlock(topPos, tankState.setValue(
+                buildcraft.factory.block.TankBlock.JOINED_BELOW, true), Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(topPos).getValue(
+                buildcraft.factory.block.TankBlock.JOINED_BELOW), "upper tank did not join its lower tank");
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                topPos, net.minecraft.core.Direction.NORTH);
+        helper.assertTrue(handler != null, "stacked tank fluid capability missing");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(20_000, handler.insert(water, 20_000, transaction),
+                    "stacked tanks rejected valid water");
+            transaction.commit();
+        }
+        var bottom = (buildcraft.factory.block.entity.TankBlockEntity)
+                helper.getLevel().getBlockEntity(bottomPos);
+        var top = (buildcraft.factory.block.entity.TankBlockEntity)
+                helper.getLevel().getBlockEntity(topPos);
+        helper.assertValueEqual(16_000, bottom.localStorage().getAmountAsInt(0),
+                "liquid did not fill the bottom tank first");
+        helper.assertValueEqual(4_000, top.localStorage().getAmountAsInt(0),
+                "liquid did not overflow into the upper tank");
+        helper.assertValueEqual(32_000L, handler.getCapacityAsLong(0, water),
+                "stacked tank capacity");
+        var lava = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.LAVA);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, handler.insert(lava, 1_000, transaction),
+                    "stacked tanks accepted a mixed fluid");
+        }
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(5_000, handler.extract(water, 5_000, transaction),
+                    "stacked tanks returned wrong drain amount");
+            transaction.commit();
+        }
+        helper.assertValueEqual(0, top.localStorage().getAmountAsInt(0),
+                "liquid did not drain from the upper tank first");
+        helper.assertValueEqual(15_000, bottom.localStorage().getAmountAsInt(0),
+                "stacked tank drain changed the wrong amount");
+        helper.assertValueEqual(14, bottom.comparatorLevel(), "tank comparator level");
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.WATER_BUCKET));
+        var hit = new BlockHitResult(Vec3.atCenterOf(bottomPos), net.minecraft.core.Direction.NORTH,
+                bottomPos, false);
+        helper.assertTrue(helper.getLevel().getBlockState(bottomPos).useItemOn(
+                player.getMainHandItem(), helper.getLevel(), player, InteractionHand.MAIN_HAND, hit
+        ).consumesAction(), "water bucket did not interact with tank");
+        helper.assertTrue(player.getMainHandItem().is(Items.BUCKET),
+                "tank did not return an empty bucket");
+        helper.assertValueEqual(16_000, bottom.localStorage().getAmountAsInt(0),
+                "bucket insertion changed wrong amount");
+        helper.assertTrue(helper.getLevel().getBlockState(bottomPos).useItemOn(
+                player.getMainHandItem(), helper.getLevel(), player, InteractionHand.MAIN_HAND, hit
+        ).consumesAction(), "empty bucket did not interact with tank");
+        helper.assertTrue(player.getMainHandItem().is(Items.WATER_BUCKET),
+                "tank did not fill an empty bucket");
+        helper.assertValueEqual(15_000, bottom.localStorage().getAmountAsInt(0),
+                "bucket extraction changed wrong amount");
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.GLASS), new ItemStack(Items.GLASS), new ItemStack(Items.GLASS),
+                new ItemStack(Items.GLASS), ItemStack.EMPTY, new ItemStack(Items.GLASS),
+                new ItemStack(Items.GLASS), new ItemStack(Items.GLASS), new ItemStack(Items.GLASS)
+        ));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.TANK.get()),
+                "tank recipe returned wrong item");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(topPos), helper.getLevel(), topPos, top);
+        helper.assertValueEqual(1, drops.size(), "tank returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.TANK.get()),
+                "tank returned wrong drop");
         helper.succeed();
     }
 

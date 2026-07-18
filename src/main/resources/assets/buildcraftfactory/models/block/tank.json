@@ -1,0 +1,1 @@
+{"elements":[{"from":[2,0,2],"to":[14,16,14],"faces":{"down":{"texture":"#end"},"up":{"texture":"#end"},"north":{"texture":"#side"},"south":{"texture":"#side"},"west":{"texture":"#side"},"east":{"texture":"#side"}}}],"textures":{"particle":"buildcraftfactory:block/tank/side","end":"buildcraftfactory:block/tank/end","side":"buildcraftfactory:block/tank/side"}}

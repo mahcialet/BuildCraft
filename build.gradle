@@ -59,6 +59,9 @@ neoForge {
         buildcrafttransport {
             sourceSet sourceSets.main
         }
+        buildcraftfactory {
+            sourceSet sourceSets.main
+        }
     }
 }
 
@@ -174,10 +177,14 @@ tasks.named('processResources', ProcessResources) {
  'diamond_wood_fluid_clear.png', 'diamond_wood_fluid_filled.png', 'cobblestone_power.png', 'stone_power.png', 'quartz_power.png', 'wood_power_clear.png', 'sandstone_power.png', 'iron_power_m128.png', 'gold_power.png', 'diamond_power_m128.png', 'diamond_wood_power_clear.png'
             into 'assets/buildcrafttransport/textures/block/pipe'
         }
-        from('buildcraft_resources/assets/buildcrafttransport/textures/gui') {
-            include 'filter.png'
-            into 'assets/buildcrafttransport/textures/gui'
-        }
+    from('buildcraft_resources/assets/buildcrafttransport/textures/gui') {
+        include 'filter.png'
+        into 'assets/buildcrafttransport/textures/gui'
+    }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tank') {
+        include 'end.png', 'side.png', 'side_joined_below.png'
+        into 'assets/buildcraftfactory/textures/block/tank'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'
