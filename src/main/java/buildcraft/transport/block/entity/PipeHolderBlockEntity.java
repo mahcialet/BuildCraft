@@ -91,6 +91,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private void serverTick(ServerLevel level) {
         if (pipeType().carriesFluids()) {
+            ensureWoodDirection(level);
             transferFluid(level);
             return;
         }
@@ -144,7 +145,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         int rate = Math.min(available, pipeType().fluidTransferRate());
         for (int offset = 0; offset < Direction.values().length; offset++) {
             Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
-            if (direction == blocked) continue;
+            if (direction == blocked || direction == extractionDirection) continue;
             if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
             var target = level.getCapability(Capabilities.Fluid.BLOCK,
                     worldPosition.relative(direction), direction.getOpposite());
@@ -349,6 +350,18 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureWoodDirection(ServerLevel level) {
+        if (pipeType() == PipeType.WOOD_FLUID) {
+            if (extractionDirection != null && isFluidHandler(level, extractionDirection)) return;
+            extractionDirection = null;
+            for (Direction direction : Direction.values()) {
+                if (isFluidHandler(level, direction)) {
+                    extractionDirection = direction;
+                    sync();
+                    return;
+                }
+            }
+            return;
+        }
         if (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
             && pipeType() != PipeType.EMZULI_ITEM) {
             extractionDirection = null;
@@ -363,6 +376,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 return;
             }
         }
+    }
+
+    private boolean isFluidHandler(ServerLevel level, Direction direction) {
+        BlockPos target = worldPosition.relative(direction);
+        if (level.getBlockEntity(target) instanceof PipeHolderBlockEntity) return false;
+        return level.getCapability(Capabilities.Fluid.BLOCK, target, direction.getOpposite()) != null;
     }
 
     private void ensureIronDirection(ServerLevel level) {
@@ -446,7 +465,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public @Nullable IMjRedstoneReceiver mjReceiver() {
         return switch (pipeType()) {
-            case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM -> woodReceiver;
+            case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM, WOOD_FLUID -> woodReceiver;
             case OBSIDIAN_ITEM -> obsidianReceiver;
             case STRIPES_ITEM -> stripesReceiver;
             default -> null;
@@ -514,6 +533,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private long extractItems(long power, boolean simulate) {
+        if (pipeType() == PipeType.WOOD_FLUID) return extractFluid(power, simulate);
         if (!(level instanceof ServerLevel serverLevel)
             || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
                 && pipeType() != PipeType.EMZULI_ITEM)
@@ -555,6 +575,30 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             }
         }
         return power - extractedCount * MjAPI.MJ;
+    }
+
+    private long extractFluid(long power, boolean simulate) {
+        if (!(level instanceof ServerLevel serverLevel) || extractionDirection == null || power < 1_000) return power;
+        var source = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
+                worldPosition.relative(extractionDirection), extractionDirection.getOpposite());
+        if (source == null) return power;
+        int remaining = (int) Math.min(Integer.MAX_VALUE, power / 1_000);
+        int extractedTotal = 0;
+        try (Transaction transaction = Transaction.openRoot()) {
+            for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
+                FluidResource resource = source.getResource(slot);
+                if (resource.isEmpty()) continue;
+                int extracted = source.extract(slot, resource, remaining, transaction);
+                if (extracted <= 0) continue;
+                int inserted = fluidBuffer.insert(resource, extracted, transaction);
+                extractedTotal += inserted;
+                remaining -= inserted;
+                if (inserted < extracted) source.insert(resource, extracted - inserted, transaction);
+            }
+            if (!simulate && extractedTotal > 0) transaction.commit();
+        }
+        if (!simulate && extractedTotal > 0) sync();
+        return power - extractedTotal * 1_000L;
     }
 
     private boolean matchesDiamondFilter(ItemStack stack) {

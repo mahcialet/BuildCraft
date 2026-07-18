@@ -149,6 +149,13 @@
     { "when": { "type": "quartz_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90 } },
     { "when": { "type": "quartz_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 90 } },
     { "when": { "type": "quartz_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "quartz_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "quartz_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "wood_fluid" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_center" } },
+    { "when": { "type": "wood_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm" } },
+    { "when": { "type": "wood_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 180 } },
+    { "when": { "type": "wood_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90 } },
+    { "when": { "type": "wood_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "wood_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "wood_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/wood_fluid_arm", "x": 90, "y": 270 } }
   ]
 }

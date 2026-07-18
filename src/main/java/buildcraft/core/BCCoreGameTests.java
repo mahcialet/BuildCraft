@@ -126,6 +126,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
+        registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1084,6 +1085,66 @@ public final class BCCoreGameTests {
             helper.assertValueEqual(drops.size(), 1, "fluid pipe returned wrong drop count");
             helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_FLUID.get()),
                     "fluid pipe returned wrong drop item");
+            helper.succeed();
+        });
+    }
+
+    private static void transportWoodFluidPipe(GameTestHelper helper) {
+        BlockPos tankPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos woodPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos cobblePos = helper.absolutePos(new BlockPos(2, 1, 0));
+        BlockState engineState = BCCoreBlocks.ENGINE.get().defaultBlockState()
+                .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.IRON);
+        helper.getLevel().setBlock(tankPos, engineState, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var pipeBlock = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        helper.getLevel().setBlock(woodPos, pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.WOOD_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_FLUID),
+                net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var engine = (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(tankPos);
+        var fuel = net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get());
+        engine.tanks().set(CombustionEngineBlockEntity.RESIDUE_TANK, fuel, 1_000);
+        helper.assertTrue(helper.getLevel().getBlockState(woodPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.WEST), "wood fluid pipe did not connect to tank");
+        helper.assertTrue(helper.getLevel().getBlockState(woodPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "wood fluid pipe did not connect to separated pipe");
+
+        BlockPos otherWoodPos = helper.absolutePos(new BlockPos(4, 1, 0));
+        BlockPos thirdWoodPos = helper.absolutePos(new BlockPos(5, 1, 0));
+        BlockState woodState = pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.WOOD_FLUID);
+        helper.getLevel().setBlock(otherWoodPos, woodState, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(thirdWoodPos, woodState, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(!helper.getLevel().getBlockState(otherWoodPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "wood fluid pipes connected to each other");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_WOOD_ITEM.get()),
+                new ItemStack(Items.SLIME_BALL)));
+        ItemStack recipeOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_WOOD_FLUID.get()),
+                "wood fluid recipe returned wrong item");
+
+        helper.runAfterDelay(2, () -> {
+            var wood = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                    helper.getLevel().getBlockEntity(woodPos);
+            helper.assertValueEqual(wood.extractionDirection(), net.minecraft.core.Direction.WEST,
+                    "wood fluid pipe selected wrong extraction direction");
+            helper.assertValueEqual(wood.mjReceiver().receivePower(100_000, false), 0L,
+                    "wood fluid pipe returned paid extraction power");
+            helper.assertValueEqual(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.RESIDUE_TANK), 900,
+                    "wood fluid pipe extracted wrong amount");
+            helper.assertValueEqual(wood.fluidBuffer().getAmountAsInt(0), 100,
+                    "wood fluid pipe buffered wrong amount");
+            var drops = net.minecraft.world.level.block.Block.getDrops(
+                    helper.getLevel().getBlockState(woodPos), helper.getLevel(), woodPos, wood);
+            helper.assertValueEqual(drops.size(), 1, "wood fluid pipe returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_WOOD_FLUID.get()),
+                    "wood fluid pipe returned wrong drop item");
             helper.succeed();
         });
     }

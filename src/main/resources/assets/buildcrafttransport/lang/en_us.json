@@ -25,5 +25,6 @@
   "item.buildcrafttransport.pipe_stripes_item": "Stripes Transport Pipe",
   "item.buildcrafttransport.pipe_cobble_fluid": "Cobblestone Fluid Pipe",
   "item.buildcrafttransport.pipe_stone_fluid": "Stone Fluid Pipe",
-  "item.buildcrafttransport.pipe_quartz_fluid": "Quartz Fluid Pipe"
+  "item.buildcrafttransport.pipe_quartz_fluid": "Quartz Fluid Pipe",
+  "item.buildcrafttransport.pipe_wood_fluid": "Wooden Fluid Pipe"
 }
