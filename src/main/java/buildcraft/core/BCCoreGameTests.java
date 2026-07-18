@@ -130,6 +130,7 @@ registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTe
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
 registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
+registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTests::transportDiamondPowerPipes);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1229,6 +1230,57 @@ registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTest
         helper.assertValueEqual(1, drops.size(), "gold power pipe returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_GOLD_POWER.get()),
                 "gold power pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportDiamondPowerPipes(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos inputPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos diamondPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos woodPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        helper.getLevel().setBlock(inputPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.DIAMOND_WOOD_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(diamondPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.DIAMOND_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(woodPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_POWER), Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(inputPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "diamond wooden power pipe rejected diamond power pipe");
+        helper.assertTrue(!helper.getLevel().getBlockState(inputPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.SOUTH),
+                "two wooden power inputs connected");
+        IMjReceiver receiver = helper.getLevel().getCapability(
+                MjAPI.CAP_RECEIVER, inputPos, net.minecraft.core.Direction.WEST);
+        helper.assertTrue(receiver != null, "diamond wooden power receiver missing");
+        helper.assertValueEqual(256 * MjAPI.MJ, receiver.getPowerRequested(),
+                "diamond wooden request ceiling");
+        helper.assertValueEqual(44 * MjAPI.MJ, receiver.receivePower(300 * MjAPI.MJ, true),
+                "diamond wooden simulation excess");
+        var input = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(inputPos);
+        helper.assertValueEqual(0L, input.powerStored(), "diamond wooden simulation mutated power");
+        helper.assertValueEqual(44 * MjAPI.MJ, receiver.receivePower(300 * MjAPI.MJ, false),
+                "diamond wooden committed excess");
+        var diamond = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(diamondPos);
+        long[] limits = { 128, 64, 32, 16, 8, 0, 256 };
+        for (int index = 0; index < limits.length; index++) {
+            helper.assertTrue(diamond.rotatePipeDirection(), "diamond power limiter did not rotate");
+            helper.assertValueEqual(limits[index] * MjAPI.MJ, diamond.effectivePowerTransferPerTick(),
+                    "diamond power limiter step " + index);
+        }
+        helper.assertValueEqual(MjAPI.MJ / 32,
+                buildcraft.transport.PipeType.DIAMOND_WOOD_POWER.powerResistancePerTick(),
+                "diamond wooden resistance");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(diamondPos), helper.getLevel(), diamondPos,
+                diamond);
+        helper.assertValueEqual(1, drops.size(), "diamond power pipe returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_POWER.get()),
+                "diamond power pipe returned wrong drop");
         helper.succeed();
     }
 

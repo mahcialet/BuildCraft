@@ -40,5 +40,7 @@
   "item.buildcrafttransport.pipe_wood_power": "Wooden Power Pipe",
   "item.buildcrafttransport.pipe_sandstone_power": "Sandstone Power Pipe",
   "item.buildcrafttransport.pipe_iron_power": "Iron Power Pipe",
-  "item.buildcrafttransport.pipe_gold_power": "Golden Power Pipe"
+  "item.buildcrafttransport.pipe_gold_power": "Golden Power Pipe",
+  "item.buildcrafttransport.pipe_diamond_power": "Diamond Power Pipe",
+  "item.buildcrafttransport.pipe_diamond_wood_power": "Diamond Wooden Power Pipe"
 }

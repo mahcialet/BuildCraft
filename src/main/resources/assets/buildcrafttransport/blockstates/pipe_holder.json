@@ -254,6 +254,20 @@
 { "when":{"type":"gold_power","north":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90}},
 { "when":{"type":"gold_power","east":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":90}},
 { "when":{"type":"gold_power","south":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":180}},
-{ "when":{"type":"gold_power","west":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":270}}
+{ "when":{"type":"gold_power","west":"true"},"apply":{"model":"buildcrafttransport:block/gold_power_arm","x":90,"y":270}},
+{ "when":{"type":"diamond_power"},"apply":{"model":"buildcrafttransport:block/diamond_power_center"}},
+{ "when":{"type":"diamond_power","up":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm"}},
+{ "when":{"type":"diamond_power","down":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm","x":180}},
+{ "when":{"type":"diamond_power","north":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm","x":90}},
+{ "when":{"type":"diamond_power","east":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm","x":90,"y":90}},
+{ "when":{"type":"diamond_power","south":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm","x":90,"y":180}},
+{ "when":{"type":"diamond_power","west":"true"},"apply":{"model":"buildcrafttransport:block/diamond_power_arm","x":90,"y":270}},
+{ "when":{"type":"diamond_wood_power"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_center"}},
+{ "when":{"type":"diamond_wood_power","up":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm"}},
+{ "when":{"type":"diamond_wood_power","down":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm","x":180}},
+{ "when":{"type":"diamond_wood_power","north":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm","x":90}},
+{ "when":{"type":"diamond_wood_power","east":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm","x":90,"y":90}},
+{ "when":{"type":"diamond_wood_power","south":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm","x":90,"y":180}},
+{ "when":{"type":"diamond_wood_power","west":"true"},"apply":{"model":"buildcrafttransport:block/diamond_wood_power_arm","x":90,"y":270}}
   ]
 }

@@ -39,7 +39,9 @@
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_wood_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"wood_power"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_sandstone_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"sandstone_power"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_iron_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"iron_power"}}]},
-            {"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_power"}}]}
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_power"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_power"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_power"}}]}
       ]
     }]
   }],

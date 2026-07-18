@@ -551,7 +551,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             return rotateExtractionDirection();
         }
         if (pipeType() == PipeType.STRIPES_ITEM) return rotateStripesDirection();
-        if (pipeType() == PipeType.IRON_POWER) {
+        if (pipeType().isPowerLimiter()) {
             powerLimitShift = (powerLimitShift + 1) % 7;
             sync();
             return true;
@@ -604,7 +604,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public int powerLimitShift() { return powerLimitShift; }
     public long effectivePowerTransferPerTick() {
         if (!pipeType().carriesPower()) return 0;
-        if (pipeType() != PipeType.IRON_POWER) return pipeType().powerTransferPerTick();
+        if (!pipeType().isPowerLimiter()) return pipeType().powerTransferPerTick();
         return powerLimitShift >= 6 ? 0 : pipeType().powerTransferPerTick() >> powerLimitShift;
     }
 
