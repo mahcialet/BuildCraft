@@ -4,6 +4,8 @@ import buildcraft.BuildCraft;
 import buildcraft.api.items.MapLocationData;
 import buildcraft.api.items.MapLocationType;
 import buildcraft.api.items.PaintbrushData;
+import buildcraft.api.items.ListData;
+import com.mojang.serialization.Codec;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -28,6 +30,12 @@ public final class BCCoreDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<PaintbrushData>> PAINTBRUSH =
         COMPONENTS.register("paintbrush", () -> DataComponentType.<PaintbrushData>builder()
             .persistent(PaintbrushData.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<ListData>> LIST =
+        COMPONENTS.register("list", () -> DataComponentType.<ListData>builder()
+            .persistent(ListData.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> LIST_USED =
+        COMPONENTS.register("list_used", () -> DataComponentType.<Boolean>builder()
+            .persistent(Codec.BOOL).build());
 
     private BCCoreDataComponents() {
     }

@@ -31,6 +31,7 @@ public final class BCCreativeTabs {
                 for (net.minecraft.world.item.DyeColor color : net.minecraft.world.item.DyeColor.values()) {
                     output.accept(buildcraft.core.item.ItemPaintbrush.colored(BCCoreItems.PAINTBRUSH.get(), color));
                 }
+                output.accept(BCCoreItems.LIST.get());
                 output.accept(BCCoreItems.GEAR_WOOD.get());
                 output.accept(BCCoreItems.GEAR_STONE.get());
                 output.accept(BCCoreItems.GEAR_IRON.get());

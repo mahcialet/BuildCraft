@@ -17,5 +17,10 @@
   "block.buildcraftcore.marker_volume": "Volume Marker",
   "item.buildcraftcore.map_location": "Map Location",
   "item.buildcraftcore.paintbrush": "Paintbrush",
+  "item.buildcraftcore.list": "List",
+  "gui.buildcraftcore.list.label": "List label",
+  "gui.buildcraftcore.list.precise": "Match data components precisely",
+  "gui.buildcraftcore.list.type": "Match item type",
+  "gui.buildcraftcore.list.material": "Match item material (combine with type for exact common tag)",
   "buildcraft.item.nonclean.usage": "Shift-right-click in the air to clear"
 }

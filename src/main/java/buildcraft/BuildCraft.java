@@ -6,6 +6,8 @@ import buildcraft.core.BCCoreBlocks;
 import buildcraft.core.BCCoreGameTests;
 import buildcraft.core.BCCoreBlockEntities;
 import buildcraft.core.BCCoreDataComponents;
+import buildcraft.core.BCCoreMenus;
+import buildcraft.core.BCCoreNetwork;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.api.distmarker.Dist;
@@ -22,6 +24,8 @@ public final class BuildCraft {
         BCCoreBlocks.register(modBus);
         BCCoreDataComponents.register(modBus);
         BCCoreBlockEntities.register(modBus);
+        BCCoreMenus.register(modBus);
+        BCCoreNetwork.register(modBus);
         BCCoreItems.register(modBus);
         BCCreativeTabs.register(modBus);
         BCCoreGameTests.register(modBus);

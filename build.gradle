@@ -74,6 +74,13 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcraftcore/textures/items/paintbrush') {
         into 'assets/buildcraftcore/textures/item/paintbrush'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/items/list') {
+        into 'assets/buildcraftcore/textures/item/list'
+    }
+    from('buildcraft_resources/assets/buildcraftcore/textures/gui') {
+        include 'list_new.png'
+        into 'assets/buildcraftcore/textures/gui'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks') {
         include 'marker_path.png', 'marker_volume.png'
         into 'assets/buildcraftcore/textures/block'

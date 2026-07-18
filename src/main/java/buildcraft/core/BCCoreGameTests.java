@@ -11,6 +11,11 @@ import buildcraft.api.items.MapLocationData;
 import buildcraft.api.items.MapLocationType;
 import buildcraft.api.items.PaintbrushData;
 import buildcraft.core.item.ItemPaintbrush;
+import buildcraft.api.items.ListData;
+import buildcraft.api.items.ListLineData;
+import buildcraft.api.lists.ListMatchMode;
+import buildcraft.core.item.ItemList;
+import buildcraft.core.menu.ListMenu;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -28,10 +33,13 @@ import net.minecraft.gametest.framework.GameTestInstance;
 import net.minecraft.gametest.framework.TestData;
 import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.resources.Identifier;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.world.item.component.BlockItemStateProperties;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.block.Blocks;
@@ -71,6 +79,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "volume_marker_sync", BCCoreGameTests::volumeMarkerSync);
         registerTest(event, environment, "map_location", BCCoreGameTests::mapLocation);
         registerTest(event, environment, "paintbrush", BCCoreGameTests::paintbrush);
+        registerTest(event, environment, "list", BCCoreGameTests::list);
     }
 
     private static void registerTest(
@@ -412,6 +421,55 @@ public final class BCCoreGameTests {
             JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded
         ).getOrThrow();
         helper.assertValueEqual(decoded, expected, "persisted paintbrush data");
+        helper.succeed();
+    }
+
+    private static void list(GameTestHelper helper) {
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        ItemStack listStack = new ItemStack(BCCoreItems.LIST.get());
+        player.setItemInHand(InteractionHand.MAIN_HAND, listStack);
+        ListMenu menu = new ListMenu(1, player.getInventory(), InteractionHand.MAIN_HAND);
+
+        menu.setCarried(new ItemStack(Items.IRON_INGOT, 32));
+        menu.clicked(0, 0, ContainerInput.PICKUP, player);
+        helper.assertValueEqual(ItemList.data(listStack).lines().getFirst().stacks().getFirst().getCount(), 1,
+            "phantom slot stack count");
+        helper.assertValueEqual(menu.getCarried().getCount(), 32, "phantom slot changed carried stack");
+
+        helper.assertTrue(menu.clickMenuButton(player, 0), "Could not toggle precise matching");
+        helper.assertTrue(menu.precise(0), "Precise matching did not enable");
+        helper.assertTrue(menu.clickMenuButton(player, 1), "Could not toggle type matching");
+        helper.assertValueEqual(menu.mode(0), ListMatchMode.TYPE, "type matching mode");
+        helper.assertTrue(ItemList.data(listStack).matches(new ItemStack(Items.GOLD_INGOT)),
+            "Type mode did not match another ingot");
+
+        helper.assertTrue(menu.clickMenuButton(player, 1), "Could not disable type matching");
+        helper.assertTrue(menu.clickMenuButton(player, 2), "Could not toggle material matching");
+        helper.assertValueEqual(menu.mode(0), ListMatchMode.MATERIAL, "material matching mode");
+        helper.assertTrue(ItemList.data(listStack).matches(new ItemStack(Items.IRON_NUGGET)),
+            "Material mode did not match another iron form");
+
+        menu.setLabel("Quarry supplies");
+        helper.assertValueEqual(ItemList.data(listStack).label(), "Quarry supplies", "list label");
+        helper.assertValueEqual(listStack.get(BCCoreDataComponents.LIST_USED.get()), true, "used-list model state");
+
+        ItemStack namedIron = new ItemStack(Items.IRON_INGOT);
+        namedIron.set(DataComponents.CUSTOM_NAME, Component.literal("Special"));
+        ListLineData direct = new ListLineData(java.util.List.of(new ItemStack(Items.IRON_INGOT)), false,
+            ListMatchMode.DIRECT);
+        ListLineData precise = new ListLineData(java.util.List.of(new ItemStack(Items.IRON_INGOT)), true,
+            ListMatchMode.DIRECT);
+        helper.assertTrue(direct.matches(namedIron), "Non-precise direct mode rejected component difference");
+        helper.assertTrue(!precise.matches(namedIron), "Precise direct mode ignored component difference");
+
+        ListData expected = new ListData("Codec", java.util.List.of(direct, ListLineData.empty()));
+        net.minecraft.resources.RegistryOps<com.google.gson.JsonElement> ops = net.minecraft.resources.RegistryOps.create(
+            JsonOps.INSTANCE, helper.getLevel().registryAccess()
+        );
+        Object encoded = ListData.CODEC.encodeStart(ops, expected).getOrThrow();
+        ListData decoded = ListData.CODEC.parse(ops, (com.google.gson.JsonElement) encoded).getOrThrow();
+        helper.assertValueEqual(decoded.label(), expected.label(), "persisted list label");
+        helper.assertTrue(decoded.lines().getFirst().matches(namedIron), "persisted list entries");
         helper.succeed();
     }
 
