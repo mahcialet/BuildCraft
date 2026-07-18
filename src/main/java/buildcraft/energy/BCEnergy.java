@@ -19,8 +19,10 @@ public final class BCEnergy {
 
     public BCEnergy(IEventBus modBus) {
         BCEnergyFluids.register(modBus);
+        BCEnergyBlocks.register(modBus);
         BCEnergyBlockEntities.register(modBus);
         BCEnergyMenus.register(modBus);
+        BCEnergyItems.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());
         FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.OIL, 3_000_000L, 10_000);
@@ -36,6 +38,7 @@ public final class BCEnergy {
             event.accept(ItemBlockEngine.rfEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
+            event.accept(BCEnergyItems.MJ_DYNAMO.get());
         }
         if (event.getTabKey().equals(CreativeModeTabs.FUNCTIONAL_BLOCKS)) {
             event.accept(BCEnergyFluids.OIL_BUCKET.get());

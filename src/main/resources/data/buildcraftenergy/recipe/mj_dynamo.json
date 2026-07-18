@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["RGR"," P ","IGI"],"key":{"R":"minecraft:redstone","G":"minecraft:glass","P":"minecraft:piston","I":"buildcraftcore:gear_iron"},"result":{"id":"buildcraftenergy:mj_dynamo"}}

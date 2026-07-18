@@ -8,6 +8,8 @@ import buildcraft.energy.BCEnergyMenus;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
 import buildcraft.energy.block.entity.RfEngineBlockEntity;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
+import buildcraft.energy.block.entity.DynamoMjBlockEntity;
+import buildcraft.energy.BCEnergyBlocks;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -51,6 +53,12 @@ public final class EngineMenu extends AbstractContainerMenu {
         } else if (blockEntity instanceof RfEngineBlockEntity rf) {
             for (int slot = 0; slot < 4; slot++) {
                 addSlot(new ResourceHandlerSlot(rf.upgrades(), rf.upgrades()::set,
+                    slot, 53 + slot * 18, 35));
+            }
+            count = 4;
+        } else if (blockEntity instanceof DynamoMjBlockEntity dynamo) {
+            for (int slot = 0; slot < 4; slot++) {
+                addSlot(new ResourceHandlerSlot(dynamo.upgrades(), dynamo.upgrades()::set,
                     slot, 53 + slot * 18, 35));
             }
             count = 4;
@@ -109,7 +117,8 @@ public final class EngineMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        return player.level().getBlockState(pos).is(BCCoreBlocks.ENGINE.get())
+        return (player.level().getBlockState(pos).is(BCCoreBlocks.ENGINE.get())
+            || player.level().getBlockState(pos).is(BCEnergyBlocks.MJ_DYNAMO.get()))
             && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64;
     }
 
@@ -124,12 +133,13 @@ public final class EngineMenu extends AbstractContainerMenu {
     public int burnTotal() { return data.get(7); }
 
     public enum EngineKind {
-        STIRLING, COMBUSTION, RF, UNKNOWN;
+        STIRLING, COMBUSTION, RF, DYNAMO, UNKNOWN;
 
         static EngineKind of(BlockEntity entity) {
             if (entity instanceof StirlingEngineBlockEntity) return STIRLING;
             if (entity instanceof CombustionEngineBlockEntity) return COMBUSTION;
             if (entity instanceof RfEngineBlockEntity) return RF;
+            if (entity instanceof DynamoMjBlockEntity) return DYNAMO;
             return UNKNOWN;
         }
     }
@@ -141,6 +151,7 @@ public final class EngineMenu extends AbstractContainerMenu {
                 case STIRLING -> stirling(index, (StirlingEngineBlockEntity) engine);
                 case COMBUSTION -> combustion(index, (CombustionEngineBlockEntity) engine);
                 case RF -> rf(index, (RfEngineBlockEntity) engine);
+                case DYNAMO -> dynamo(index, (DynamoMjBlockEntity) engine);
                 case UNKNOWN -> 0;
             };
         }
@@ -175,6 +186,15 @@ public final class EngineMenu extends AbstractContainerMenu {
                 case 3 -> (int) Math.round(engine.heat() * 100);
                 case 4 -> mjHundredths(engine.storedPower());
                 case 5 -> mjHundredths(engine.mjPerTick());
+                default -> 0;
+            };
+        }
+
+        private static int dynamo(int index, DynamoMjBlockEntity dynamo) {
+            return switch (index) {
+                case 0 -> dynamo.energy().getAmountAsInt();
+                case 4 -> mjHundredths(dynamo.storedMj());
+                case 5 -> mjHundredths(dynamo.currentOutputMj());
                 default -> 0;
             };
         }

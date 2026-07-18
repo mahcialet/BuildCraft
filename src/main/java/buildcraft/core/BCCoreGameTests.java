@@ -123,6 +123,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "combustion_containers", BCCoreGameTests::combustionContainers);
         registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
+        registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
     }
 
     private static void registerTest(
@@ -967,6 +968,66 @@ public final class BCCoreGameTests {
                 .get(BlockEngine.ENGINE_TYPE);
             helper.assertValueEqual(actual, expected, expected + " engine drop lost its block state");
         }
+        helper.succeed();
+    }
+
+    private static void mjDynamo(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockState state = buildcraft.energy.BCEnergyBlocks.MJ_DYNAMO.get().defaultBlockState()
+            .setValue(buildcraft.energy.block.BlockDynamoMj.FACING, net.minecraft.core.Direction.UP);
+        helper.getLevel().setBlock(pos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.energy.block.entity.DynamoMjBlockEntity dynamo =
+            (buildcraft.energy.block.entity.DynamoMjBlockEntity) helper.getLevel().getBlockEntity(pos);
+        helper.assertTrue(dynamo != null, "MJ Dynamo block entity missing");
+
+        buildcraft.api.mj.IMjReceiver mjInput = helper.getLevel().getCapability(
+            MjAPI.CAP_RECEIVER, pos, net.minecraft.core.Direction.NORTH
+        );
+        helper.assertTrue(mjInput != null, "MJ Dynamo input capability missing");
+        helper.assertTrue(helper.getLevel().getCapability(
+            MjAPI.CAP_RECEIVER, pos, net.minecraft.core.Direction.UP
+        ) == null, "MJ Dynamo exposed MJ input on its output face");
+        helper.assertTrue(helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+            pos, net.minecraft.core.Direction.UP
+        ) != null, "MJ Dynamo energy output capability missing");
+        helper.assertValueEqual(mjInput.receivePower(20 * MjAPI.MJ, false), 0L,
+            "MJ Dynamo rejected MJ input");
+
+        dynamo.upgrades().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(BCCoreItems.GEAR_IRON.get()), 1);
+        dynamo.upgrades().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(BCCoreItems.GEAR_GOLD.get()), 1);
+        helper.assertValueEqual(dynamo.mjPerTick(), 9 * MjAPI.MJ, "MJ Dynamo upgrade rate mismatch");
+        net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler target =
+            new net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler(10_000, 10_000, 0);
+        dynamo.tickCycle(true, target);
+        helper.assertValueEqual(target.getAmountAsInt(), 90, "MJ Dynamo did not emit converted energy");
+        helper.assertValueEqual(dynamo.storedMj(), 11 * MjAPI.MJ, "MJ Dynamo consumed wrong MJ amount");
+        net.minecraft.world.entity.player.Player menuPlayer =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        EngineMenu menu = new EngineMenu(4, menuPlayer.getInventory(), pos);
+        helper.assertValueEqual(menu.kind(), EngineMenu.EngineKind.DYNAMO, "MJ Dynamo menu kind");
+        helper.assertValueEqual(menu.fuelOrEnergy(), 0, "MJ Dynamo menu energy status");
+        helper.assertValueEqual(menu.storedMjHundredths(), 1_100, "MJ Dynamo menu MJ status");
+        helper.assertValueEqual(menu.outputMjHundredths(), 900, "MJ Dynamo menu output status");
+
+        net.minecraft.world.item.crafting.CraftingInput recipeInput =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.REDSTONE), new ItemStack(Items.GLASS), new ItemStack(Items.REDSTONE),
+                ItemStack.EMPTY, new ItemStack(Items.PISTON), ItemStack.EMPTY,
+                new ItemStack(BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.GLASS),
+                new ItemStack(BCCoreItems.GEAR_IRON.get())
+            ));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.energy.BCEnergyItems.MJ_DYNAMO.get()),
+            "MJ Dynamo recipe returned wrong item");
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+            state, helper.getLevel(), pos, dynamo
+        );
+        helper.assertValueEqual(drops.size(), 1, "MJ Dynamo returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.energy.BCEnergyItems.MJ_DYNAMO.get()),
+            "MJ Dynamo returned wrong drop item");
         helper.succeed();
     }
 

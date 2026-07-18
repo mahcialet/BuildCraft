@@ -35,7 +35,7 @@ public final class EngineScreen extends AbstractContainerScreen<EngineMenu> {
                 bar(graphics, 62, 25, 12, 38, menu.residue(), 10_000, 0xFF8A308A);
                 bar(graphics, 82, 25, 12, 38, menu.heatHundredths(), 25_000, 0xFFE03020);
             }
-            case RF -> {
+            case RF, DYNAMO -> {
                 for (int slot = 0; slot < 4; slot++) slot(graphics, 53 + slot * 18, 35);
                 bar(graphics, 22, 25, 12, 38, menu.fuelOrEnergy(), 10_000, 0xFFE02020);
             }

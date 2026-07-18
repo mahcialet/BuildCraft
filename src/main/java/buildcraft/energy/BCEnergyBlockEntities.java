@@ -5,6 +5,7 @@ import buildcraft.core.BCCoreBlocks;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
 import buildcraft.energy.block.entity.RfEngineBlockEntity;
+import buildcraft.energy.block.entity.DynamoMjBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -31,6 +32,11 @@ public final class BCEnergyBlockEntities {
             RfEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
         ));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DynamoMjBlockEntity>> MJ_DYNAMO =
+        BLOCK_ENTITIES.register("mj_dynamo", () -> new BlockEntityType<>(
+            DynamoMjBlockEntity::new, BCEnergyBlocks.MJ_DYNAMO.get()
+        ));
+
     private BCEnergyBlockEntities() {
     }
 
@@ -52,5 +58,15 @@ public final class BCEnergyBlockEntities {
             (engine, side) -> engine.connector(side));
         event.registerBlockEntity(Capabilities.Energy.BLOCK, ENGINE_RF.get(),
             (engine, side) -> engine.energy());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, MJ_DYNAMO.get(),
+            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReceiver() : null);
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MJ_DYNAMO.get(),
+            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReceiver() : null);
+        event.registerBlockEntity(MjAPI.CAP_READABLE, MJ_DYNAMO.get(),
+            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReadable() : null);
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, MJ_DYNAMO.get(),
+            (dynamo, side) -> side == dynamo.outputDirection() ? dynamo.energy() : null);
+        event.registerBlockEntity(Capabilities.Item.BLOCK, MJ_DYNAMO.get(),
+            (dynamo, side) -> dynamo.upgrades());
     }
 }
