@@ -35,6 +35,8 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import org.jspecify.annotations.Nullable;
@@ -48,6 +50,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public static final int TRAVEL_TICKS = 10;
     public static final double INITIAL_SPEED = 0.05;
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
+    private final FluidBuffer fluidBuffer = new FluidBuffer();
+    private @Nullable Direction fluidReceivedFrom;
+    private int fluidInputCooldown;
     private final List<Transit> travelling = new ArrayList<>();
     private final WoodReceiver woodReceiver = new WoodReceiver();
     private final ObsidianReceiver obsidianReceiver = new ObsidianReceiver();
@@ -85,6 +90,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void serverTick(ServerLevel level) {
+        if (pipeType().carriesFluids()) {
+            transferFluid(level);
+            return;
+        }
         if (!pipeType().carriesItems()) return;
         tickEmzuliActivations();
         tickStripes(level);
@@ -123,6 +132,38 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.clear();
         travelling.addAll(next);
         sync();
+    }
+
+    private void transferFluid(ServerLevel level) {
+        Direction blocked = fluidReceivedFrom;
+        if (fluidInputCooldown > 0) fluidInputCooldown--;
+        else fluidReceivedFrom = null;
+        FluidResource resource = fluidBuffer.getResource(0);
+        int available = fluidBuffer.getAmountAsInt(0);
+        if (resource.isEmpty() || available <= 0) return;
+        int rate = Math.min(available, pipeType().fluidTransferRate());
+        for (int offset = 0; offset < Direction.values().length; offset++) {
+            Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
+            if (direction == blocked) continue;
+            if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            var target = level.getCapability(Capabilities.Fluid.BLOCK,
+                    worldPosition.relative(direction), direction.getOpposite());
+            if (target == null || target == fluidBuffer) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int extracted = fluidBuffer.extract(0, resource, rate, transaction);
+                int inserted = target.insert(resource, extracted, transaction);
+                if (inserted <= 0) continue;
+                if (inserted < extracted) fluidBuffer.insert(0, resource, extracted - inserted, transaction);
+                transaction.commit();
+                if (level.getBlockEntity(worldPosition.relative(direction)) instanceof PipeHolderBlockEntity pipe) {
+                    pipe.fluidReceivedFrom = direction.getOpposite();
+                    pipe.fluidInputCooldown = 60;
+                }
+                routeCursor = Math.floorMod(direction.ordinal() + 1, Direction.values().length);
+                sync();
+                return;
+            }
+        }
     }
 
     private void drainInputs() {
@@ -793,6 +834,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return inputs[side.ordinal()];
     }
 
+    public FluidStacksResourceHandler fluidBuffer() {
+        return fluidBuffer;
+    }
+
     public int travellingCount() {
         return travelling.size();
     }
@@ -850,6 +895,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
+        fluidBuffer.deserialize(input.childOrEmpty("fluid_buffer"));
     }
 
     @Override
@@ -876,6 +922,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
+        fluidBuffer.serialize(output.child("fluid_buffer"));
     }
 
     @Override
@@ -903,6 +950,26 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         @Override
         public int extract(int index, ItemResource resource, int amount, TransactionContext transaction) {
             return 0;
+        }
+    }
+
+    private final class FluidBuffer extends FluidStacksResourceHandler {
+        private FluidBuffer() {
+            super(1, 1_000);
+        }
+
+        @Override
+        public int insert(int index, FluidResource resource, int amount, TransactionContext transaction) {
+            int inserted = super.insert(index, resource, amount, transaction);
+            if (inserted > 0) PipeHolderBlockEntity.this.setChanged();
+            return inserted;
+        }
+
+        @Override
+        public int extract(int index, FluidResource resource, int amount, TransactionContext transaction) {
+            int extracted = super.extract(index, resource, amount, transaction);
+            if (extracted > 0) PipeHolderBlockEntity.this.setChanged();
+            return extracted;
         }
     }
 

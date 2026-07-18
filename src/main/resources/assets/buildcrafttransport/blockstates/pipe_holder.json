@@ -128,6 +128,27 @@
     { "when": { "type": "stripes_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90 } },
     { "when": { "type": "stripes_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "stripes_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "stripes_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "stripes_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "cobblestone_fluid" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_center" } },
+    { "when": { "type": "cobblestone_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm" } },
+    { "when": { "type": "cobblestone_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm", "x": 180 } },
+    { "when": { "type": "cobblestone_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm", "x": 90 } },
+    { "when": { "type": "cobblestone_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "cobblestone_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "cobblestone_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/cobblestone_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "stone_fluid" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_center" } },
+    { "when": { "type": "stone_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm" } },
+    { "when": { "type": "stone_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm", "x": 180 } },
+    { "when": { "type": "stone_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm", "x": 90 } },
+    { "when": { "type": "stone_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "stone_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "stone_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/stone_fluid_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "quartz_fluid" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_center" } },
+    { "when": { "type": "quartz_fluid", "up": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm" } },
+    { "when": { "type": "quartz_fluid", "down": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 180 } },
+    { "when": { "type": "quartz_fluid", "north": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90 } },
+    { "when": { "type": "quartz_fluid", "east": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "quartz_fluid", "south": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "quartz_fluid", "west": "true" }, "apply": { "model": "buildcrafttransport:block/quartz_fluid_arm", "x": 90, "y": 270 } }
   ]
 }

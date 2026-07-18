@@ -19,7 +19,10 @@ public enum PipeType implements StringRepresentable {
     DIAMOND_WOOD_ITEM("diamond_wood_item", "pipe_diamond_wood_item", "Diamond Wooden Transport Pipe"),
     EMZULI_ITEM("emzuli_item", "pipe_emzuli_item", "Emzuli Transport Pipe"),
     DIAMOND_ITEM("diamond_item", "pipe_diamond_item", "Diamond Transport Pipe"),
-    STRIPES_ITEM("stripes_item", "pipe_stripes_item", "Stripes Transport Pipe");
+    STRIPES_ITEM("stripes_item", "pipe_stripes_item", "Stripes Transport Pipe"),
+    COBBLESTONE_FLUID("cobblestone_fluid", "pipe_cobble_fluid", "Cobblestone Fluid Pipe"),
+    STONE_FLUID("stone_fluid", "pipe_stone_fluid", "Stone Fluid Pipe"),
+    QUARTZ_FLUID("quartz_fluid", "pipe_quartz_fluid", "Quartz Fluid Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -32,26 +35,18 @@ public enum PipeType implements StringRepresentable {
         this.englishName = englishName;
     }
 
-    @Override
-    public String getSerializedName() {
-        return serializedName;
-    }
-
-    public String itemId() {
-        return itemId;
-    }
-
-    public String englishName() {
-        return englishName;
-    }
+    @Override public String getSerializedName() { return serializedName; }
+    public String itemId() { return itemId; }
+    public String englishName() { return englishName; }
 
     public boolean connectsTo(PipeType other) {
+        if (carriesFluids() || other.carriesFluids()) return this == other;
         if (this == STRUCTURE || other == STRUCTURE) return this == other;
         if (isWoodenExtraction() && other.isWoodenExtraction()) return false;
+        if (isWoodenExtraction() || other.isWoodenExtraction()) return true;
         if (this == OBSIDIAN_ITEM && other == OBSIDIAN_ITEM) return false;
         if (this == STRIPES_ITEM && other == STRIPES_ITEM) return false;
-        if (isGeneralConnector() || other.isGeneralConnector()) return true;
-        return this == other;
+        return this == other || isGeneralConnector() || other.isGeneralConnector();
     }
 
     private boolean isGeneralConnector() {
@@ -65,11 +60,17 @@ public enum PipeType implements StringRepresentable {
         return this == WOOD_ITEM || this == DIAMOND_WOOD_ITEM || this == EMZULI_ITEM;
     }
 
-    public boolean carriesItems() {
-        return this != STRUCTURE;
+    public boolean carriesItems() { return this != STRUCTURE && !carriesFluids(); }
+    public boolean carriesFluids() {
+        return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID;
     }
-
-    public boolean connectsInventories() {
-        return carriesItems() && this != SANDSTONE_ITEM;
+    public int fluidTransferRate() {
+        return switch (this) {
+            case COBBLESTONE_FLUID -> 10;
+            case STONE_FLUID -> 20;
+            case QUARTZ_FLUID -> 40;
+            default -> 0;
+        };
     }
+    public boolean connectsInventories() { return carriesItems() && this != SANDSTONE_ITEM; }
 }

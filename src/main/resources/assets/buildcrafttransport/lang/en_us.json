@@ -22,5 +22,8 @@
   "gui.buildcrafttransport.emzuli": "Extraction Presets",
   "item.buildcrafttransport.pipe_diamond_item": "Diamond Transport Pipe",
   "gui.buildcrafttransport.diamond_route": "Diamond Pipe Filters",
-  "item.buildcrafttransport.pipe_stripes_item": "Stripes Transport Pipe"
+  "item.buildcrafttransport.pipe_stripes_item": "Stripes Transport Pipe",
+  "item.buildcrafttransport.pipe_cobble_fluid": "Cobblestone Fluid Pipe",
+  "item.buildcrafttransport.pipe_stone_fluid": "Stone Fluid Pipe",
+  "item.buildcrafttransport.pipe_quartz_fluid": "Quartz Fluid Pipe"
 }

@@ -1,133 +1,32 @@
 {
-  "type": "minecraft:block",
-  "pools": [
-    {
-      "rolls": 1.0,
-      "bonus_rolls": 0.0,
-      "entries": [
-        {
-          "type": "minecraft:alternatives",
-          "children": [
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_structure",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "structure" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_cobble_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "cobblestone_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_stone_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "stone_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_wood_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "wood_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_gold_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "gold_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_iron_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "iron_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_clay_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "clay_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_sandstone_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "sandstone_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_void_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "void_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_obsidian_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "obsidian_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_lapis_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "lapis_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_daizuli_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "daizuli_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_diamond_wood_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "diamond_wood_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_emzuli_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "emzuli_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_diamond_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "diamond_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_stripes_item",
-              "conditions": [
-                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "stripes_item" } }
-              ]
-            },
-            {
-              "type": "minecraft:item",
-              "name": "buildcrafttransport:pipe_quartz_item"
-            }
-          ]
-        }
+  "type":"minecraft:block",
+  "pools":[{
+    "rolls":1,
+    "entries":[{
+      "type":"minecraft:alternatives",
+      "children":[
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_structure","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"structure"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_cobble_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"cobblestone_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_stone_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"stone_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_quartz_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"quartz_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_wood_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"wood_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_iron_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"iron_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_clay_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"clay_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_sandstone_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"sandstone_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_void_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"void_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_obsidian_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"obsidian_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_lapis_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"lapis_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_daizuli_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"daizuli_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_emzuli_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"emzuli_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_stripes_item","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"stripes_item"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_cobble_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"cobblestone_fluid"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_stone_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"stone_fluid"}}]},
+            {"type":"minecraft:item","name":"buildcrafttransport:pipe_quartz_fluid","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"quartz_fluid"}}]}
       ]
-    }
-  ],
-  "random_sequence": "buildcrafttransport:blocks/pipe_holder"
+    }]
+  }],
+  "random_sequence":"buildcrafttransport:blocks/pipe_holder"
 }

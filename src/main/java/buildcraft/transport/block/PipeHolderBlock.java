@@ -98,11 +98,17 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
         if (neighbour.getBlock() instanceof PipeHolderBlock) {
             return type.connectsTo(neighbour.getValue(TYPE));
         }
-        return type.connectsInventories() && level instanceof Level actualLevel
-            && actualLevel.getCapability(
+        if (!(level instanceof Level actualLevel)) return false;
+        if (type.carriesFluids()) {
+            return actualLevel.getCapability(
+                    net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                    pos.relative(direction), direction.getOpposite()
+            ) != null;
+        }
+        return type.connectsInventories() && actualLevel.getCapability(
                 net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
                 pos.relative(direction), direction.getOpposite()
-            ) != null;
+        ) != null;
     }
 
     public static BooleanProperty property(Direction direction) {

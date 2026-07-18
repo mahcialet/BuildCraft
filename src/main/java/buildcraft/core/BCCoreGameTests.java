@@ -125,6 +125,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
+        registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
@@ -1040,6 +1041,51 @@ public final class BCCoreGameTests {
         helper.assertTrue(drops.getFirst().is(buildcraft.energy.BCEnergyItems.MJ_DYNAMO.get()),
             "MJ Dynamo returned wrong drop item");
         helper.succeed();
+    }
+
+    private static void transportFluidPipeFoundation(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos firstPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos secondPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos stonePos = helper.absolutePos(new BlockPos(2, 1, 0));
+        helper.getLevel().setBlock(firstPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_FLUID), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(secondPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_FLUID), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stonePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.STONE_FLUID), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.assertTrue(helper.getLevel().getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "matching fluid pipes did not connect");
+        helper.assertTrue(!helper.getLevel().getBlockState(secondPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST), "different fluid pipe materials connected");
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                firstPos, net.minecraft.core.Direction.WEST);
+        helper.assertTrue(handler != null, "fluid pipe did not expose a sided fluid capability");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(handler.insert(water, 500, transaction), 500,
+                    "fluid pipe rejected valid water insertion");
+            transaction.commit();
+        }
+        helper.runAfterDelay(5, () -> {
+            var second = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                    helper.getLevel().getBlockEntity(secondPos);
+            helper.assertTrue(second.fluidBuffer().getAmountAsInt(0) > 0,
+                    "fluid pipe did not transfer fluid to its neighbour");
+            helper.assertTrue(second.fluidBuffer().getResource(0).equals(water),
+                    "fluid pipe changed the transferred resource");
+            var drops = net.minecraft.world.level.block.Block.getDrops(
+                    helper.getLevel().getBlockState(secondPos), helper.getLevel(), secondPos, second);
+            helper.assertValueEqual(drops.size(), 1, "fluid pipe returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_FLUID.get()),
+                    "fluid pipe returned wrong drop item");
+            helper.succeed();
+        });
     }
 
     private static void transportPipeFoundation(GameTestHelper helper) {
