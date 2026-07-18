@@ -1,6 +1,7 @@
 package buildcraft.core;
 
 import buildcraft.BuildCraft;
+import buildcraft.core.item.ItemWrench;
 import net.minecraft.world.item.Item;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -10,6 +11,9 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class BCCoreItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BuildCraft.MOD_ID);
 
+    public static final DeferredItem<ItemWrench> WRENCH = ITEMS.registerItem(
+        "wrench", ItemWrench::new, properties -> properties.stacksTo(1)
+    );
     public static final DeferredItem<Item> GEAR_WOOD = ITEMS.registerSimpleItem("gear_wood");
     public static final DeferredItem<Item> GEAR_STONE = ITEMS.registerSimpleItem("gear_stone");
     public static final DeferredItem<Item> GEAR_IRON = ITEMS.registerSimpleItem("gear_iron");
