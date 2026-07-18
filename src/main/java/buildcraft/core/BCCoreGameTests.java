@@ -40,6 +40,7 @@ import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.energy.BCEnergyFluids;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
+import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -114,6 +115,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "creative_engine", BCCoreGameTests::creativeEngine);
         registerTest(event, environment, "energy_fluids", BCCoreGameTests::energyFluids);
         registerTest(event, environment, "stirling_engine", BCCoreGameTests::stirlingEngine);
+        registerTest(event, environment, "combustion_engine", BCCoreGameTests::combustionEngine);
     }
 
     private static void registerTest(
@@ -731,6 +733,53 @@ public final class BCCoreGameTests {
             "stirling engine retained consumed fuel");
         helper.assertTrue(receiver.received > 0, "stirling engine did not emit MJ");
         helper.assertTrue(engine.storedPower() > 0, "stirling engine did not buffer MJ");
+        helper.succeed();
+    }
+
+    private static void combustionEngine(GameTestHelper helper) {
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.IRON)
+            .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
+        BlockPos enginePos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        CombustionEngineBlockEntity engine =
+            (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        helper.assertTrue(engine != null, "combustion engine block entity missing");
+        net.neoforged.neoforge.transfer.ResourceHandler<
+            net.neoforged.neoforge.transfer.fluid.FluidResource
+        > fluidHandler = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+            enginePos, net.minecraft.core.Direction.NORTH
+        );
+        helper.assertTrue(fluidHandler != null, "combustion engine fluid capability missing");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(fluidHandler.insert(
+                CombustionEngineBlockEntity.FUEL_TANK,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get()),
+                1_000, transaction
+            ), 1_000, "combustion engine rejected fuel");
+            helper.assertValueEqual(fluidHandler.insert(
+                CombustionEngineBlockEntity.COOLANT_TANK,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(net.minecraft.world.level.material.Fluids.WATER),
+                1_000, transaction
+            ), 1_000, "combustion engine rejected water coolant");
+            helper.assertValueEqual(fluidHandler.insert(
+                CombustionEngineBlockEntity.RESIDUE_TANK,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(net.minecraft.world.level.material.Fluids.WATER),
+                1, transaction
+            ), 0, "combustion engine accepted residue input");
+            transaction.commit();
+        }
+        TestMjReceiver receiver = new TestMjReceiver();
+        for (int tick = 0; tick < 6_000; tick++) engine.tickCycle(true, receiver);
+        helper.assertTrue(receiver.received > 0, "combustion engine did not emit MJ");
+        helper.assertTrue(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.FUEL_TANK) < 1_000,
+            "combustion engine did not consume fuel");
+        helper.assertTrue(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.COOLANT_TANK) < 1_000,
+            "combustion engine did not consume coolant above ideal heat");
+        helper.assertTrue(engine.heat() < CombustionEngineBlockEntity.MAX_HEAT,
+            "cooled combustion engine overheated");
         helper.succeed();
     }
 

@@ -31,6 +31,7 @@ public final class BCEnergy {
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
             event.accept(ItemBlockEngine.stirlingEngine());
+            event.accept(ItemBlockEngine.combustionEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
         }

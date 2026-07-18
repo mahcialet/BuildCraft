@@ -25,6 +25,9 @@ public final class ItemBlockEngine extends BlockItem {
     public static ItemStack stirlingEngine() {
         return createStack(EnumEngineType.STONE);
     }
+    public static ItemStack combustionEngine() {
+        return createStack(EnumEngineType.IRON);
+    }
 
     public static ItemStack createStack(EnumEngineType type) {
         ItemStack stack = new ItemStack(BCCoreItems.ENGINE.get());

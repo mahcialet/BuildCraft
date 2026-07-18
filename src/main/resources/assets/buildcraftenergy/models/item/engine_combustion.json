@@ -1,0 +1,8 @@
+{
+  "parent": "buildcraftcore:block/engine_redstone",
+  "textures": {
+    "back": "buildcraftenergy:block/engine/iron/back",
+    "side": "buildcraftenergy:block/engine/iron/side",
+    "particle": "buildcraftenergy:block/engine/iron/side"
+  }
+}
