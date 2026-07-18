@@ -2,6 +2,7 @@ package buildcraft.transport;
 
 import buildcraft.transport.menu.DiamondWoodMenu;
 import buildcraft.transport.menu.EmzuliMenu;
+import buildcraft.transport.menu.DiamondRouteMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,8 @@ public final class BCTransportMenus {
         MENUS.register("diamond_wood", () -> IMenuTypeExtension.create(DiamondWoodMenu::new));
     public static final DeferredHolder<MenuType<?>, MenuType<EmzuliMenu>> EMZULI =
         MENUS.register("emzuli", () -> IMenuTypeExtension.create(EmzuliMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<DiamondRouteMenu>> DIAMOND_ROUTE =
+        MENUS.register("diamond_route", () -> IMenuTypeExtension.create(DiamondRouteMenu::new));
 
     private BCTransportMenus() {
     }

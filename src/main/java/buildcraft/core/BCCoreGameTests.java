@@ -133,6 +133,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
+        registerTest(event, environment, "transport_diamond_item_pipe", BCCoreGameTests::transportDiamondItemPipe);
     }
 
     private static void registerTest(
@@ -1851,6 +1852,84 @@ public final class BCCoreGameTests {
         helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_EMZULI_ITEM.get()),
             "Emzuli upgrade recipe returned wrong item");
         helper.assertValueEqual(recipeOutput.getCount(), 1, "Emzuli upgrade recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void transportDiamondItemPipe(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState diamond = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.DIAMOND_ITEM
+        );
+        BlockPos pipePos = helper.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos eastPos = pipePos.east();
+        BlockPos southPos = pipePos.south();
+        BlockPos northPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos, diamond, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(eastPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(southPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(northPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(pipePos);
+        helper.assertTrue(holder != null, "Diamond pipe holder missing");
+        holder.setDiamondRouteFilter(net.minecraft.core.Direction.EAST.ordinal() * 9,
+            new ItemStack(Items.GOLD_INGOT, 2));
+        holder.setDiamondRouteFilter(net.minecraft.core.Direction.SOUTH.ordinal() * 9,
+            new ItemStack(Items.GOLD_INGOT, 1));
+        holder.setDiamondRouteFilter(net.minecraft.core.Direction.NORTH.ordinal() * 9,
+            new ItemStack(Items.IRON_INGOT, 1));
+        var input = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            pipePos, net.minecraft.core.Direction.WEST
+        );
+        helper.assertTrue(input != null, "Diamond pipe input capability missing");
+        insertPipeItem(input, Items.GOLD_INGOT, 6);
+        tickPipes(helper, 25, pipePos);
+        net.minecraft.world.Container east = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(eastPos);
+        net.minecraft.world.Container south = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(southPos);
+        net.minecraft.world.Container north = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(northPos);
+        helper.assertValueEqual(containerCount(east, Items.GOLD_INGOT), 4,
+            "Diamond pipe did not honor east weight two");
+        helper.assertValueEqual(containerCount(south, Items.GOLD_INGOT), 2,
+            "Diamond pipe did not honor south weight one");
+        helper.assertValueEqual(containerCount(north, Items.GOLD_INGOT), 0,
+            "Diamond pipe leaked gold into nonmatching configured side");
+        insertPipeItem(input, Items.IRON_INGOT, 2);
+        tickPipes(helper, 25, pipePos);
+        helper.assertValueEqual(containerCount(north, Items.IRON_INGOT), 2,
+            "Diamond pipe did not prioritize matching north side");
+
+        insertPipeItem(input, Items.EMERALD, 1);
+        tickPipes(helper, 12, pipePos);
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+            net.minecraft.world.entity.item.ItemEntity.class, new net.minecraft.world.phys.AABB(pipePos).inflate(1.5),
+            entity -> entity.getItem().is(Items.EMERALD)
+        ).isEmpty(), "Diamond pipe did not drop item when every output filter rejected it");
+        holder.setDiamondRouteFilter(net.minecraft.core.Direction.EAST.ordinal() * 9, ItemStack.EMPTY);
+        insertPipeItem(input, Items.DIAMOND, 3);
+        tickPipes(helper, 25, pipePos);
+        helper.assertValueEqual(containerCount(east, Items.DIAMOND), 3,
+            "Diamond pipe did not use empty-filter fallback output");
+
+        net.minecraft.nbt.CompoundTag saved = holder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity loaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    pipePos, helper.getLevel().getBlockState(pipePos), saved, helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(loaded != null && loaded.diamondRouteFilters()
+            .get(net.minecraft.core.Direction.SOUTH.ordinal() * 9).getCount() == 1,
+            "Diamond route filters failed codec reload");
+        net.minecraft.world.entity.player.Player menuPlayer =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        menuPlayer.setPos(pipePos.getX() + 0.5, pipePos.getY() + 0.5, pipePos.getZ() + 0.5);
+        buildcraft.transport.menu.DiamondRouteMenu menu = new buildcraft.transport.menu.DiamondRouteMenu(
+            0, menuPlayer.getInventory(), pipePos
+        );
+        helper.assertTrue(menu.stillValid(menuPlayer) && menu.slots.size() == 90,
+            "Diamond route menu did not expose 54 filters plus player inventory");
+        assertPipeLoot(helper, pipePos, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get(),
+            Items.DIAMOND, Items.GLASS);
         helper.succeed();
     }
 

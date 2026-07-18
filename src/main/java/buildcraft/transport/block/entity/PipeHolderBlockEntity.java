@@ -57,6 +57,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final List<Optional<DyeColor>> emzuliColors = new ArrayList<>();
     private final int[] emzuliTtl = new int[4];
     private int emzuliCurrent = -1;
+    private final List<ItemStack> diamondRouteFilters = new ArrayList<>();
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
@@ -66,6 +67,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             emzuliFilters.add(ItemStack.EMPTY);
             emzuliColors.add(Optional.empty());
         }
+        for (int index = 0; index < 54; index++) diamondRouteFilters.add(ItemStack.EMPTY);
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
@@ -87,6 +89,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             } else if (transit.toCenter()) {
                 if (pipeType() == PipeType.VOID_ITEM) continue;
                 if (pipeType() == PipeType.LAPIS_ITEM) transit = transit.withColor(Optional.of(pipeColor));
+                if (pipeType() == PipeType.DIAMOND_ITEM) {
+                    next.addAll(splitDiamondTransit(level, transit));
+                    continue;
+                }
                 Direction destination = chooseDestination(level, transit.from(), transit.blocked(), transit.color());
                 if (destination == null) drop(level, transit.stack(), null);
                 else {
@@ -142,6 +148,67 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         Direction selected = choices.get(Math.floorMod(routeCursor, choices.size()));
         routeCursor = Math.floorMod(routeCursor + 1, Integer.MAX_VALUE);
         return selected;
+    }
+
+    private List<Transit> splitDiamondTransit(ServerLevel level, Transit transit) {
+        List<Direction> matching = new ArrayList<>();
+        List<Integer> weights = new ArrayList<>();
+        List<Direction> fallback = new ArrayList<>();
+        for (Direction direction : Direction.values()) {
+            if (direction == transit.from() || transit.blocked().filter(direction::equals).isPresent()
+                || !canExit(level, direction)) continue;
+            int base = direction.ordinal() * 9;
+            boolean configured = false;
+            int weight = 0;
+            for (int index = 0; index < 9; index++) {
+                ItemStack filter = diamondRouteFilters.get(base + index);
+                if (filter.isEmpty()) continue;
+                configured = true;
+                if (sameFilter(filter, transit.stack())) weight += filter.getCount();
+            }
+            if (weight > 0) {
+                matching.add(direction);
+                weights.add(weight);
+            } else if (!configured) {
+                fallback.add(direction);
+            }
+        }
+        List<Direction> destinations = matching.isEmpty() ? fallback : matching;
+        if (destinations.isEmpty() && canExit(level, transit.from())) destinations = List.of(transit.from());
+        if (destinations.isEmpty()) {
+            drop(level, transit.stack(), null);
+            return List.of();
+        }
+        if (matching.isEmpty()) {
+            weights = new ArrayList<>();
+            for (int ignored = 0; ignored < destinations.size(); ignored++) weights.add(1);
+        }
+        int totalWeight = 0;
+        for (int weight : weights) totalWeight += weight;
+        int[] counts = new int[destinations.size()];
+        int multiples = transit.stack().getCount() / totalWeight;
+        int remaining = transit.stack().getCount() % totalWeight;
+        for (int index = 0; index < counts.length; index++) counts[index] = weights.get(index) * multiples;
+        int cursor = Math.floorMod(routeCursor, totalWeight);
+        while (remaining-- > 0) {
+            int weighted = cursor++ % totalWeight;
+            for (int index = 0; index < weights.size(); index++) {
+                if (weighted < weights.get(index)) {
+                    counts[index]++;
+                    break;
+                }
+                weighted -= weights.get(index);
+            }
+        }
+        routeCursor = Math.floorMod(cursor, Integer.MAX_VALUE);
+        double speed = modifySpeed(transit.speed());
+        List<Transit> result = new ArrayList<>();
+        for (int index = 0; index < destinations.size(); index++) {
+            if (counts[index] <= 0) continue;
+            result.add(new Transit(transit.stack().copyWithCount(counts[index]), transit.from(),
+                destinations.get(index), false, segmentTicks(speed), speed, Optional.empty(), transit.color()));
+        }
+        return result;
     }
 
     private boolean canExit(ServerLevel level, Direction direction) {
@@ -556,6 +623,18 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return index >= 0 && index < emzuliTtl.length && emzuliTtl[index] > 0;
     }
 
+    public List<ItemStack> diamondRouteFilters() {
+        return diamondRouteFilters.stream().map(ItemStack::copy).toList();
+    }
+
+    public void setDiamondRouteFilter(int index, ItemStack stack) {
+        if (pipeType() != PipeType.DIAMOND_ITEM || index < 0 || index >= diamondRouteFilters.size()) return;
+        diamondRouteFilters.set(index, stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(
+            Math.min(stack.getCount(), stack.getMaxStackSize())
+        ));
+        sync();
+    }
+
     private void drop(ServerLevel level, ItemStack stack, @Nullable Direction direction) {
         double x = worldPosition.getX() + 0.5 + (direction == null ? 0 : direction.getStepX() * 0.6);
         double y = worldPosition.getY() + 0.5 + (direction == null ? 0 : direction.getStepY() * 0.6);
@@ -611,6 +690,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             emzuliTtl[index] = input.getIntOr("emzuli_ttl_" + index, 0);
         }
         emzuliCurrent = input.getIntOr("emzuli_current", -1);
+        List<ItemStack> savedRouteFilters = input.read(
+            "diamond_route_filters", ItemStack.OPTIONAL_CODEC.listOf()
+        ).orElse(List.of());
+        for (int index = 0; index < diamondRouteFilters.size(); index++) {
+            diamondRouteFilters.set(index,
+                index < savedRouteFilters.size() ? savedRouteFilters.get(index) : ItemStack.EMPTY);
+        }
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -633,6 +719,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         output.store("emzuli_colors", DyeColor.CODEC.optionalFieldOf("value").codec().listOf(), emzuliColors);
         for (int index = 0; index < emzuliTtl.length; index++) output.putInt("emzuli_ttl_" + index, emzuliTtl[index]);
         output.putInt("emzuli_current", emzuliCurrent);
+        output.store("diamond_route_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondRouteFilters);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }

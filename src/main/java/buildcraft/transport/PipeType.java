@@ -17,7 +17,8 @@ public enum PipeType implements StringRepresentable {
     LAPIS_ITEM("lapis_item", "pipe_lapis_item", "Lapis Transport Pipe"),
     DAIZULI_ITEM("daizuli_item", "pipe_daizuli_item", "Daizuli Transport Pipe"),
     DIAMOND_WOOD_ITEM("diamond_wood_item", "pipe_diamond_wood_item", "Diamond Wooden Transport Pipe"),
-    EMZULI_ITEM("emzuli_item", "pipe_emzuli_item", "Emzuli Transport Pipe");
+    EMZULI_ITEM("emzuli_item", "pipe_emzuli_item", "Emzuli Transport Pipe"),
+    DIAMOND_ITEM("diamond_item", "pipe_diamond_item", "Diamond Transport Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -54,7 +55,8 @@ public enum PipeType implements StringRepresentable {
     private boolean isGeneralConnector() {
         return this == WOOD_ITEM || this == GOLD_ITEM || this == IRON_ITEM || this == CLAY_ITEM
             || this == SANDSTONE_ITEM || this == VOID_ITEM || this == OBSIDIAN_ITEM || this == LAPIS_ITEM
-            || this == DAIZULI_ITEM || this == DIAMOND_WOOD_ITEM || this == EMZULI_ITEM;
+            || this == DAIZULI_ITEM || this == DIAMOND_WOOD_ITEM || this == EMZULI_ITEM
+            || this == DIAMOND_ITEM;
     }
 
     private boolean isWoodenExtraction() {

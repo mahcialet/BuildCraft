@@ -126,14 +126,17 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
         BlockHitResult hitResult) {
-        if (state.getValue(TYPE) != PipeType.DIAMOND_WOOD_ITEM && state.getValue(TYPE) != PipeType.EMZULI_ITEM) {
+        if (state.getValue(TYPE) != PipeType.DIAMOND_WOOD_ITEM && state.getValue(TYPE) != PipeType.EMZULI_ITEM
+            && state.getValue(TYPE) != PipeType.DIAMOND_ITEM) {
             return InteractionResult.PASS;
         }
         if (player instanceof ServerPlayer serverPlayer) {
             if (state.getValue(TYPE) == PipeType.DIAMOND_WOOD_ITEM) {
                 buildcraft.transport.menu.DiamondWoodMenu.open(serverPlayer, pos);
-            } else {
+            } else if (state.getValue(TYPE) == PipeType.EMZULI_ITEM) {
                 buildcraft.transport.menu.EmzuliMenu.open(serverPlayer, pos);
+            } else {
+                buildcraft.transport.menu.DiamondRouteMenu.open(serverPlayer, pos);
             }
         }
         return InteractionResult.SUCCESS;

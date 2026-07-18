@@ -147,7 +147,7 @@ tasks.named('processResources', ProcessResources) {
         into 'assets/buildcraftenergy/textures/block/mj_dynamo'
     }
 
-    from('buildcraft_resources/assets/buildcrafttransport/textures/pipes') {
+        from('buildcraft_resources/assets/buildcrafttransport/textures/pipes') {
         include 'structure.png', 'cobblestone_item.png', 'stone_item.png', 'quartz_item.png',
             'wood_item_clear.png', 'wood_item_filled.png', 'gold_item.png',
             'iron_item_clear.png', 'iron_item_filled.png', 'clay_item.png',
@@ -162,9 +162,16 @@ tasks.named('processResources', ProcessResources) {
             'daizuli_item_orange.png', 'daizuli_item_pink.png', 'daizuli_item_purple.png',
             'daizuli_item_red.png', 'daizuli_item_silver.png', 'daizuli_item_white.png', 'daizuli_item_yellow.png',
             'diamond_wood_item_clear.png', 'diamond_wood_item_filled.png',
-            'emzuli_item_clear.png', 'emzuli_item_filled.png'
-        into 'assets/buildcrafttransport/textures/block/pipe'
-    }
+            'emzuli_item_clear.png', 'emzuli_item_filled.png', 'diamond_item.png',
+            'diamond_item_down.png', 'diamond_item_up.png', 'diamond_item_north.png',
+            'diamond_item_south.png', 'diamond_item_west.png', 'diamond_item_east.png',
+            'diamond_item_itemstack.png'
+            into 'assets/buildcrafttransport/textures/block/pipe'
+        }
+        from('buildcraft_resources/assets/buildcrafttransport/textures/gui') {
+            include 'filter.png'
+            into 'assets/buildcrafttransport/textures/gui'
+        }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'
