@@ -26,6 +26,9 @@ import buildcraft.core.item.ItemBlockSpring;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.api.mj.MjCapabilityHelper;
+import buildcraft.api.mj.MjEnergyAdapter;
+import buildcraft.api.mj.MjRfConversion;
+import buildcraft.api.mj.IMjToRfStatus;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -95,6 +98,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
+        registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
     }
 
     private static void registerTest(
@@ -658,6 +662,70 @@ public final class BCCoreGameTests {
         helper.assertTrue(MjAPI.CAP_CONNECTOR != null && MjAPI.CAP_RECEIVER != null
             && MjAPI.CAP_REDSTONE_RECEIVER != null && MjAPI.CAP_READABLE != null
             && MjAPI.CAP_PASSIVE_PROVIDER != null, "MJ capabilities were not created");
+        helper.succeed();
+    }
+
+    private static void mjEnergyConversion(GameTestHelper helper) {
+        MjRfConversion conversion = MjRfConversion.createDefault();
+        helper.assertValueEqual(conversion.mjPerRf, 100_000L, "default MJ conversion");
+        helper.assertTrue(conversion.usingDefaultValue, "default MJ conversion marker");
+        helper.assertTrue(MjRfConversion.createRaw(99).usingDefaultValue, "invalid MJ conversion accepted");
+
+        MjBattery battery = new MjBattery(MjAPI.MJ);
+        MjRedstoneBatteryReceiver receiver = new MjRedstoneBatteryReceiver(battery);
+        MjEnergyAdapter energy = new MjEnergyAdapter(receiver, receiver, conversion);
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(energy.insert(4, transaction), 4, "aborted energy insertion");
+            helper.assertValueEqual(energy.getAmountAsLong(), 4L, "pending energy amount");
+            helper.assertValueEqual(battery.getStored(), 0L, "energy inserted before commit");
+        }
+        helper.assertValueEqual(energy.getAmountAsLong(), 0L, "aborted pending energy");
+
+        try (net.neoforged.neoforge.transfer.transaction.Transaction root =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(energy.insert(2, root), 2, "root energy insertion");
+            try (net.neoforged.neoforge.transfer.transaction.Transaction nested =
+                net.neoforged.neoforge.transfer.transaction.Transaction.open(root)) {
+                helper.assertValueEqual(energy.insert(3, nested), 3, "nested energy insertion");
+                nested.commit();
+            }
+            helper.assertValueEqual(battery.getStored(), 0L, "nested energy committed before root");
+        }
+        helper.assertValueEqual(energy.getAmountAsLong(), 0L, "aborted nested energy");
+
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(energy.insert(4, transaction), 4, "committed energy insertion");
+            transaction.commit();
+        }
+        helper.assertValueEqual(battery.getStored(), 400_000L, "converted MJ amount");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(energy.insert(10, transaction), 6, "capacity-limited energy insertion");
+            helper.assertValueEqual(energy.extract(10, transaction), 0, "unsupported energy extraction");
+            transaction.commit();
+        }
+        helper.assertValueEqual(battery.getStored(), MjAPI.MJ, "full converted MJ amount");
+
+        IMjToRfStatus previous = MjAPI.getRfStatus();
+        try {
+            MjAPI.setRfStatus(new IMjToRfStatus() {
+                @Override
+                public MjRfConversion getConversion() {
+                    return conversion;
+                }
+
+                @Override
+                public boolean isAutoconvertEnabled() {
+                    return true;
+                }
+            });
+            helper.assertTrue(new MjCapabilityHelper(receiver).energy() != null,
+                "enabled MJ helper did not expose NeoForge energy");
+        } finally {
+            MjAPI.setRfStatus(previous);
+        }
         helper.succeed();
     }
 

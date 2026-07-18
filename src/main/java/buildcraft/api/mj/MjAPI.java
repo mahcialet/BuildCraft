@@ -27,12 +27,30 @@ public final class MjAPI {
         sided("mj_passive_provider", IMjPassiveProvider.class);
 
     public static IMjEffectManager EFFECT_MANAGER = NullEffectManager.INSTANCE;
+    private static volatile IMjToRfStatus rfStatus = DisabledRfStatus.INSTANCE;
 
     private MjAPI() {
     }
 
     public static String formatMj(long microJoules) {
         return MJ_DISPLAY_FORMAT.format(microJoules / (double) MJ);
+    }
+
+    public static MjRfConversion getRfConversion() {
+        return rfStatus.getConversion();
+    }
+
+    public static boolean isRfAutoConversionEnabled() {
+        return rfStatus.isAutoconvertEnabled();
+    }
+
+    public static IMjToRfStatus getRfStatus() {
+        return rfStatus;
+    }
+
+    public static void setRfStatus(IMjToRfStatus status) {
+        if (status == null) throw new NullPointerException("status");
+        rfStatus = status;
     }
 
     private static <T> BlockCapability<T, Direction> sided(String path, Class<T> type) {
@@ -52,6 +70,22 @@ public final class MjAPI {
 
         @Override
         public void createPowerLossEffect(Level level, Vec3 center, Vec3 direction, long microJoulesLost) {
+        }
+    }
+
+    private enum DisabledRfStatus implements IMjToRfStatus {
+        INSTANCE;
+
+        private final MjRfConversion conversion = MjRfConversion.createDefault();
+
+        @Override
+        public MjRfConversion getConversion() {
+            return conversion;
+        }
+
+        @Override
+        public boolean isAutoconvertEnabled() {
+            return false;
         }
     }
 }
