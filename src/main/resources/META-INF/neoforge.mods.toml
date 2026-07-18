@@ -1,0 +1,26 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="MPL-2.0"
+
+[[mods]]
+modId="buildcraft"
+version="${file.jarVersion}"
+displayName="BuildCraft"
+authors="The BuildCraft Team"
+description='''
+BuildCraft technology and automation, under active migration to modern NeoForge.
+'''
+
+[[dependencies.buildcraft]]
+modId="neoforge"
+type="required"
+versionRange="[26.1.2.71,26.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.buildcraft]]
+modId="minecraft"
+type="required"
+versionRange="[26.1.2,26.1.3)"
+ordering="NONE"
+side="BOTH"
