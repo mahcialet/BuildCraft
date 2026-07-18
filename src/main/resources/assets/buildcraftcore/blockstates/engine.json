@@ -1,10 +1,10 @@
 {
   "variants": {
-    "facing=down,type=wood": { "model": "buildcraftcore:block/engine_redstone", "x": 180 },
-    "facing=up,type=wood": { "model": "buildcraftcore:block/engine_redstone" },
-    "facing=north,type=wood": { "model": "buildcraftcore:block/engine_redstone", "x": 90 },
-    "facing=south,type=wood": { "model": "buildcraftcore:block/engine_redstone", "x": 90, "y": 180 },
-    "facing=west,type=wood": { "model": "buildcraftcore:block/engine_redstone", "x": 90, "y": 270 },
-    "facing=east,type=wood": { "model": "buildcraftcore:block/engine_redstone", "x": 90, "y": 90 }
+    "facing=down,type=wood": { "model": "buildcraftcore:block/engine_redstone_base", "x": 180 },
+    "facing=up,type=wood": { "model": "buildcraftcore:block/engine_redstone_base" },
+    "facing=north,type=wood": { "model": "buildcraftcore:block/engine_redstone_base", "x": 90 },
+    "facing=south,type=wood": { "model": "buildcraftcore:block/engine_redstone_base", "x": 90, "y": 180 },
+    "facing=west,type=wood": { "model": "buildcraftcore:block/engine_redstone_base", "x": 90, "y": 270 },
+    "facing=east,type=wood": { "model": "buildcraftcore:block/engine_redstone_base", "x": 90, "y": 90 }
   }
 }

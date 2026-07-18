@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 
 /** Redstone engine state, pulse cycle, and sided MJ output. */
@@ -33,6 +34,7 @@ public final class RedstoneEngineBlockEntity extends BlockEntity {
     private double heat = MIN_HEAT;
     private long power;
     private float progress;
+    private float previousProgress;
     private int progressPart;
     private boolean pumping;
     private EnumPowerStage stage = EnumPowerStage.BLUE;
@@ -42,8 +44,22 @@ public final class RedstoneEngineBlockEntity extends BlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, RedstoneEngineBlockEntity engine) {
-        if (!(level instanceof ServerLevel serverLevel)) return;
-        engine.serverTick(serverLevel, state);
+        if (level instanceof ServerLevel serverLevel) {
+            engine.serverTick(serverLevel, state);
+        } else {
+            engine.clientTick();
+        }
+    }
+
+    private void clientTick() {
+        previousProgress = progress;
+        if (progressPart == 0) return;
+        progress += pistonSpeed();
+        if (progress >= 1.0F) {
+            progress = 0;
+            previousProgress = 0;
+            progressPart = 0;
+        }
     }
 
     private void serverTick(ServerLevel level, BlockState state) {
@@ -168,6 +184,7 @@ public final class RedstoneEngineBlockEntity extends BlockEntity {
     public long storedPower() { return power; }
     public double heat() { return heat; }
     public float progress() { return progress; }
+    public float renderProgress(float partialTicks) { return Mth.lerp(partialTicks, previousProgress, progress); }
     public boolean pumping() { return pumping; }
     public EnumPowerStage stage() { return stage; }
     public long currentOutput() { return MjAPI.MJ / 20; }
@@ -177,7 +194,9 @@ public final class RedstoneEngineBlockEntity extends BlockEntity {
         super.loadAdditional(input);
         heat = Math.max(MIN_HEAT, input.getDoubleOr("heat", MIN_HEAT));
         power = Math.max(0, Math.min(MAX_POWER, input.getLongOr("power", 0)));
-        progress = Math.max(0, Math.min(1, input.getFloatOr("progress", 0)));
+        float loadedProgress = Math.max(0, Math.min(1, input.getFloatOr("progress", 0)));
+        previousProgress = level != null && level.isClientSide() ? progress : loadedProgress;
+        progress = loadedProgress;
         progressPart = Math.max(0, Math.min(2, input.getIntOr("progress_part", 0)));
         pumping = input.getBooleanOr("pumping", false);
         stage = input.read("stage", EnumPowerStage.CODEC).orElse(EnumPowerStage.BLUE);
