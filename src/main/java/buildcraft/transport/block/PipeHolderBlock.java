@@ -11,12 +11,15 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.ScheduledTickAccess;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityTicker;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
@@ -67,7 +70,8 @@ public final class PipeHolderBlock extends BaseEntityBlock {
             ? item.pipeType() : PipeType.STRUCTURE;
         BlockState state = defaultBlockState().setValue(TYPE, type);
         for (Direction direction : Direction.values()) {
-            state = state.setValue(property(direction), connects(type,
+            state = state.setValue(property(direction), connects(type, context.getLevel(),
+                context.getClickedPos(), direction,
                 context.getLevel().getBlockState(context.getClickedPos().relative(direction))));
         }
         return state;
@@ -76,12 +80,21 @@ public final class PipeHolderBlock extends BaseEntityBlock {
     @Override
     protected BlockState updateShape(BlockState state, LevelReader level, ScheduledTickAccess ticks, BlockPos pos,
         Direction direction, BlockPos neighbourPos, BlockState neighbourState, RandomSource random) {
-        return state.setValue(property(direction), connects(state.getValue(TYPE), neighbourState));
+        return state.setValue(property(direction), connects(
+            state.getValue(TYPE), level, pos, direction, neighbourState
+        ));
     }
 
-    private static boolean connects(PipeType type, BlockState neighbour) {
-        return neighbour.getBlock() instanceof PipeHolderBlock
-            && type.connectsTo(neighbour.getValue(TYPE));
+    private static boolean connects(PipeType type, LevelReader level, BlockPos pos,
+        Direction direction, BlockState neighbour) {
+        if (neighbour.getBlock() instanceof PipeHolderBlock) {
+            return type.connectsTo(neighbour.getValue(TYPE));
+        }
+        return type.carriesItems() && level instanceof Level actualLevel
+            && actualLevel.getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+                pos.relative(direction), direction.getOpposite()
+            ) != null;
     }
 
     private static BooleanProperty property(Direction direction) {
@@ -105,5 +118,11 @@ public final class PipeHolderBlock extends BaseEntityBlock {
     @Override
     public @Nullable BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new PipeHolderBlockEntity(pos, state);
+    }
+
+    @Override
+    public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(
+        net.minecraft.world.level.Level level, BlockState state, BlockEntityType<T> type) {
+        return createTickerHelper(type, BCTransportBlockEntities.PIPE_HOLDER.get(), PipeHolderBlockEntity::tick);
     }
 }

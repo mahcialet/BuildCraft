@@ -125,6 +125,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
+        registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
     }
 
     private static void registerTest(
@@ -1080,12 +1081,12 @@ public final class BCCoreGameTests {
         helper.assertTrue(!cobbleBState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
             && !stoneState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
             "stone and cobblestone pipes incorrectly connected");
-        helper.assertTrue(stoneState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
-            && structureState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
-            "structure pipe did not connect to stone pipe");
-        helper.assertTrue(structureState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
-            && quartzState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
-            "structure pipe did not connect to quartz pipe");
+        helper.assertTrue(!stoneState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
+            && !structureState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "structure pipe incorrectly connected to item flow");
+        helper.assertTrue(!structureState.getValue(buildcraft.transport.block.PipeHolderBlock.EAST)
+            && !quartzState.getValue(buildcraft.transport.block.PipeHolderBlock.WEST),
+            "structure pipe incorrectly connected to quartz item flow");
         helper.assertTrue(helper.getLevel().getBlockEntity(structure)
             instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity,
             "pipe holder block entity missing");
@@ -1125,6 +1126,137 @@ public final class BCCoreGameTests {
         ).orElseThrow().value().assemble(input);
         helper.assertTrue(output.is(expected), "pipe recipe returned wrong item");
         helper.assertValueEqual(output.getCount(), 8, "pipe recipe returned wrong count");
+    }
+
+    private static void transportItemFlow(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos firstPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        BlockPos secondPos = helper.absolutePos(new BlockPos(1, 1, 0));
+        BlockPos chestPos = helper.absolutePos(new BlockPos(2, 1, 0));
+        helper.getLevel().setBlock(firstPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(secondPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(chestPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity first =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(firstPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity second =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(secondPos);
+        helper.assertTrue(helper.getLevel().getBlockState(secondPos).getValue(
+            buildcraft.transport.block.PipeHolderBlock.EAST),
+            "item pipe did not expose its inventory connection arm");
+        var input = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            firstPos, net.minecraft.core.Direction.WEST
+        );
+        helper.assertTrue(input != null, "item pipe input capability missing");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(input.insert(
+                net.neoforged.neoforge.transfer.item.ItemResource.of(Items.DIAMOND), 12, transaction
+            ), 12, "item pipe rejected committed insertion");
+            helper.assertValueEqual(input.extract(
+                net.neoforged.neoforge.transfer.item.ItemResource.of(Items.DIAMOND), 1, transaction
+            ), 0, "item pipe allowed external extraction");
+            transaction.commit();
+        }
+        helper.assertTrue(helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            firstPos, null
+        ) == null, "item pipe exposed an unsided capability");
+        tickPipes(helper, 50, firstPos, secondPos);
+        net.minecraft.world.Container chest = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(chestPos);
+        helper.assertValueEqual(containerCount(chest, Items.DIAMOND), 12,
+            "straight item pipes did not deliver into inventory");
+
+        BlockPos branchPos = helper.absolutePos(new BlockPos(5, 1, 2));
+        BlockPos northChestPos = branchPos.north();
+        BlockPos southChestPos = branchPos.south();
+        helper.getLevel().setBlock(branchPos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(northChestPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(southChestPos, Blocks.CHEST.defaultBlockState(),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        var branchInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            branchPos, net.minecraft.core.Direction.WEST
+        );
+        insertPipeItem(branchInput, Items.GOLD_INGOT, 3);
+        tickPipes(helper, 25, branchPos);
+        insertPipeItem(branchInput, Items.IRON_INGOT, 4);
+        tickPipes(helper, 25, branchPos);
+        net.minecraft.world.Container northChest =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(northChestPos);
+        net.minecraft.world.Container southChest =
+            (net.minecraft.world.Container) helper.getLevel().getBlockEntity(southChestPos);
+        helper.assertValueEqual(containerCount(northChest, Items.GOLD_INGOT)
+            + containerCount(southChest, Items.GOLD_INGOT), 3, "branch lost first item stack");
+        helper.assertValueEqual(containerCount(northChest, Items.IRON_INGOT)
+            + containerCount(southChest, Items.IRON_INGOT), 4, "branch lost second item stack");
+        helper.assertTrue((containerCount(northChest, Items.GOLD_INGOT) > 0
+            && containerCount(southChest, Items.IRON_INGOT) > 0)
+            || (containerCount(southChest, Items.GOLD_INGOT) > 0
+            && containerCount(northChest, Items.IRON_INGOT) > 0),
+            "branch did not round-robin successive stacks");
+
+        insertPipeItem(branchInput, Items.EMERALD, 2);
+        tickPipes(helper, 1, branchPos);
+        net.minecraft.nbt.CompoundTag saved = helper.getLevel().getBlockEntity(branchPos)
+            .saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity loaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    branchPos, helper.getLevel().getBlockState(branchPos), saved,
+                    helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(loaded != null && loaded.travellingCount() == 1,
+            "travelling item state did not survive codec reload");
+        helper.assertTrue(loaded.travellingItems().getFirst().stack().is(Items.EMERALD),
+            "reloaded travelling item had wrong stack");
+        insertPipeItem(input, Items.LAPIS_LAZULI, 5);
+        net.minecraft.nbt.CompoundTag pendingSaved = first.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity pendingLoaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    firstPos, helper.getLevel().getBlockState(firstPos), pendingSaved,
+                    helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(pendingLoaded != null, "pending pipe input block entity failed to reload");
+        helper.assertValueEqual(pendingLoaded.input(net.minecraft.core.Direction.WEST).getAmountAsInt(0), 5,
+            "pending pipe capability input did not survive codec reload");
+        helper.succeed();
+    }
+
+    private static void insertPipeItem(net.neoforged.neoforge.transfer.ResourceHandler<
+        net.neoforged.neoforge.transfer.item.ItemResource> handler, net.minecraft.world.item.Item item, int amount) {
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+            net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            if (handler.insert(net.neoforged.neoforge.transfer.item.ItemResource.of(item), amount, transaction)
+                != amount) throw new IllegalStateException("pipe test insertion failed");
+            transaction.commit();
+        }
+    }
+
+    private static void tickPipes(GameTestHelper helper, int ticks, BlockPos... positions) {
+        for (int tick = 0; tick < ticks; tick++) {
+            for (BlockPos pos : positions) {
+                buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+                    (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(pos);
+                buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                    helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder
+                );
+            }
+        }
+    }
+
+    private static int containerCount(net.minecraft.world.Container container, net.minecraft.world.item.Item item) {
+        int count = 0;
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            if (container.getItem(slot).is(item)) count += container.getItem(slot).getCount();
+        }
+        return count;
     }
 
     private static void mjFoundation(GameTestHelper helper) {

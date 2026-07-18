@@ -33,6 +33,10 @@ public enum PipeType implements StringRepresentable {
     }
 
     public boolean connectsTo(PipeType other) {
-        return this == STRUCTURE || other == STRUCTURE || this == other;
+        return this == other;
+    }
+
+    public boolean carriesItems() {
+        return this != STRUCTURE;
     }
 }
