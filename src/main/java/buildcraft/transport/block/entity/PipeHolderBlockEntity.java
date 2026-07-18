@@ -18,12 +18,14 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
@@ -42,9 +44,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
     private final List<Transit> travelling = new ArrayList<>();
     private final WoodReceiver woodReceiver = new WoodReceiver();
+    private final ObsidianReceiver obsidianReceiver = new ObsidianReceiver();
     private int routeCursor;
     private @Nullable Direction extractionDirection;
     private @Nullable Direction routingDirection;
+    private DyeColor pipeColor = DyeColor.WHITE;
+    private int obsidianWaitTicks;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
@@ -57,6 +62,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private void serverTick(ServerLevel level) {
         if (!pipeType().carriesItems()) return;
+        if (obsidianWaitTicks > 0) obsidianWaitTicks--;
         ensureWoodDirection(level);
         ensureIronDirection(level);
         drainInputs();
@@ -67,12 +73,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 next.add(transit.withTicks(transit.ticks() - 1));
             } else if (transit.toCenter()) {
                 if (pipeType() == PipeType.VOID_ITEM) continue;
+                if (pipeType() == PipeType.LAPIS_ITEM) transit = transit.withColor(Optional.of(pipeColor));
                 Direction destination = chooseDestination(level, transit.from(), transit.blocked());
                 if (destination == null) drop(level, transit.stack(), null);
                 else {
                     double speed = modifySpeed(transit.speed());
                     next.add(new Transit(transit.stack(), transit.from(), destination, false,
-                        segmentTicks(speed), speed, Optional.empty()));
+                        segmentTicks(speed), speed, Optional.empty(), transit.color()));
                 }
             } else {
                 deliver(level, transit, next);
@@ -91,7 +98,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (resource.isEmpty() || amount <= 0) continue;
             input.set(0, ItemResource.EMPTY, 0);
             travelling.add(new Transit(resource.toStack(amount), direction, direction, true,
-                segmentTicks(INITIAL_SPEED), INITIAL_SPEED, Optional.empty()));
+                segmentTicks(INITIAL_SPEED), INITIAL_SPEED, Optional.empty(), Optional.empty()));
         }
     }
 
@@ -146,13 +153,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (inserted >= transit.stack().getCount()) return;
         ItemStack excess = transit.stack().copyWithCount(transit.stack().getCount() - inserted);
         next.add(new Transit(excess, direction, direction, true,
-            segmentTicks(transit.speed()), transit.speed(), Optional.of(direction)));
+            segmentTicks(transit.speed()), transit.speed(), Optional.of(direction), transit.color()));
     }
 
     private void enqueue(ItemStack stack, Direction from, double speed) {
         if (stack.isEmpty()) return;
         travelling.add(new Transit(stack.copy(), from, from, true,
-            segmentTicks(speed), speed, Optional.empty()));
+            segmentTicks(speed), speed, Optional.empty(), Optional.empty()));
         sync();
     }
 
@@ -274,6 +281,66 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return woodReceiver;
     }
 
+    public @Nullable IMjRedstoneReceiver mjReceiver() {
+        return switch (pipeType()) {
+            case WOOD_ITEM -> woodReceiver;
+            case OBSIDIAN_ITEM -> obsidianReceiver;
+            default -> null;
+        };
+    }
+
+    public DyeColor pipeColor() {
+        return pipeColor;
+    }
+
+    public boolean cycleLapisColor(boolean reverse) {
+        if (pipeType() != PipeType.LAPIS_ITEM) return false;
+        DyeColor[] colors = DyeColor.values();
+        pipeColor = colors[Math.floorMod(pipeColor.ordinal() + (reverse ? -1 : 1), colors.length)];
+        sync();
+        return true;
+    }
+
+    public void absorbCollidingItem(ItemEntity item) {
+        if (pipeType() != PipeType.OBSIDIAN_ITEM || item.isRemoved() || item.getItem().isEmpty()) return;
+        Direction open = openFace();
+        if (open == null) return;
+        enqueue(item.getItem(), open, 0.04);
+        item.discard();
+    }
+
+    private @Nullable Direction openFace() {
+        Direction connected = null;
+        for (Direction direction : Direction.values()) {
+            if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            if (connected != null) return null;
+            connected = direction;
+        }
+        return connected == null ? null : connected.getOpposite();
+    }
+
+    private long suckItems(long power, boolean simulate) {
+        if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.OBSIDIAN_ITEM
+            || obsidianWaitTicks > 0) return power;
+        Direction open = openFace();
+        if (open == null) return power;
+        for (int distance = 1; distance <= 4; distance++) {
+            long cost = MjAPI.MJ / 2 + distance * MjAPI.MJ / 4;
+            if (power < cost) break;
+            BlockPos scanPos = worldPosition.relative(open, distance);
+            List<ItemEntity> items = serverLevel.getEntitiesOfClass(ItemEntity.class, new AABB(scanPos));
+            for (ItemEntity item : items) {
+                if (item.isRemoved() || item.getItem().isEmpty()) continue;
+                if (!simulate) {
+                    enqueue(item.getItem(), open, 0.04);
+                    item.discard();
+                }
+                return power - cost;
+            }
+        }
+        return power >= MjAPI.MJ ? power - MjAPI.MJ : power;
+    }
+
     private long extractItems(long power, boolean simulate) {
         if (!(level instanceof ServerLevel serverLevel) || pipeType() != PipeType.WOOD_ITEM
             || extractionDirection == null || power < MjAPI.MJ) return power;
@@ -339,6 +406,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         routeCursor = Math.max(0, input.getIntOr("route_cursor", 0));
         extractionDirection = input.read("extraction_direction", Direction.CODEC).orElse(null);
         routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
+        pipeColor = input.read("pipe_color", DyeColor.CODEC).orElse(DyeColor.WHITE);
+        obsidianWaitTicks = pipeType() == PipeType.OBSIDIAN_ITEM ? 20 : 0;
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -353,6 +422,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             output.store("extraction_direction", Direction.CODEC, extractionDirection);
         }
         if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
+        output.store("pipe_color", DyeColor.CODEC, pipeColor);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
@@ -405,8 +475,26 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
+    private final class ObsidianReceiver implements IMjRedstoneReceiver {
+        @Override
+        public boolean canConnect(IMjConnector other) {
+            return other != null;
+        }
+
+        @Override
+        public long getPowerRequested() {
+            return 512 * MjAPI.MJ;
+        }
+
+        @Override
+        public long receivePower(long microJoules, boolean simulate) {
+            if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
+            return suckItems(microJoules, simulate);
+        }
+    }
+
     public record Transit(ItemStack stack, Direction from, Direction to, boolean toCenter, int ticks,
-                          double speed, Optional<Direction> blocked) {
+                          double speed, Optional<Direction> blocked, Optional<DyeColor> color) {
         public static final Codec<Transit> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             ItemStack.CODEC.fieldOf("stack").forGetter(Transit::stack),
             Direction.CODEC.fieldOf("from").forGetter(Transit::from),
@@ -414,11 +502,16 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             Codec.BOOL.fieldOf("to_center").forGetter(Transit::toCenter),
             ExtraCodecs.NON_NEGATIVE_INT.fieldOf("ticks").forGetter(Transit::ticks),
             Codec.DOUBLE.optionalFieldOf("speed", INITIAL_SPEED).forGetter(Transit::speed),
-            Direction.CODEC.optionalFieldOf("blocked").forGetter(Transit::blocked)
+            Direction.CODEC.optionalFieldOf("blocked").forGetter(Transit::blocked),
+            DyeColor.CODEC.optionalFieldOf("color").forGetter(Transit::color)
         ).apply(instance, Transit::new));
 
         private Transit withTicks(int newTicks) {
-            return new Transit(stack, from, to, toCenter, newTicks, speed, blocked);
+            return new Transit(stack, from, to, toCenter, newTicks, speed, blocked, color);
+        }
+
+        private Transit withColor(Optional<DyeColor> newColor) {
+            return new Transit(stack, from, to, toCenter, ticks, speed, blocked, newColor);
         }
     }
 }

@@ -28,5 +28,7 @@ public final class BCTransport {
         event.accept(BCTransportItems.PIPE_CLAY_ITEM.get());
         event.accept(BCTransportItems.PIPE_SANDSTONE_ITEM.get());
         event.accept(BCTransportItems.PIPE_VOID_ITEM.get());
+        event.accept(BCTransportItems.PIPE_OBSIDIAN_ITEM.get());
+        event.accept(BCTransportItems.PIPE_LAPIS_ITEM.get());
     }
 }

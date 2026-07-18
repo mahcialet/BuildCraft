@@ -129,6 +129,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
+        registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
     }
 
     private static void registerTest(
@@ -1515,6 +1516,77 @@ public final class BCCoreGameTests {
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void transportColoredItemPipes(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState obsidian = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.OBSIDIAN_ITEM
+        );
+        BlockState lapis = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.LAPIS_ITEM
+        );
+        BlockPos obsidianPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos outputPos = obsidianPos.east();
+        helper.getLevel().setBlock(obsidianPos, obsidian, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(outputPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity obsidianHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(obsidianPos);
+        helper.assertTrue(obsidianHolder != null, "obsidian pipe holder missing");
+        net.minecraft.world.entity.item.ItemEntity colliding = new net.minecraft.world.entity.item.ItemEntity(
+            helper.getLevel(), obsidianPos.getX() + 0.5, obsidianPos.getY() + 0.5, obsidianPos.getZ() + 0.5,
+            new ItemStack(Items.OBSIDIAN, 2)
+        );
+        helper.getLevel().addFreshEntity(colliding);
+        obsidianHolder.absorbCollidingItem(colliding);
+        helper.assertTrue(colliding.isRemoved(), "obsidian pipe did not absorb colliding item");
+        helper.assertValueEqual(obsidianHolder.travellingCount(), 1, "obsidian pipe did not enqueue colliding item");
+        helper.assertTrue(!buildcraft.transport.PipeType.OBSIDIAN_ITEM.connectsTo(
+            buildcraft.transport.PipeType.OBSIDIAN_ITEM), "obsidian pipes connected to each other");
+        net.minecraft.world.entity.item.ItemEntity distant = new net.minecraft.world.entity.item.ItemEntity(
+            helper.getLevel(), obsidianPos.getX() - 1.5, obsidianPos.getY() + 0.5, obsidianPos.getZ() + 0.5,
+            new ItemStack(Items.DIAMOND)
+        );
+        helper.getLevel().addFreshEntity(distant);
+        buildcraft.api.mj.IMjRedstoneReceiver obsidianReceiver = obsidianHolder.mjReceiver();
+        helper.assertTrue(obsidianReceiver != null, "obsidian pipe MJ receiver missing");
+        helper.assertValueEqual(obsidianReceiver.receivePower(4 * MjAPI.MJ, true), 3 * MjAPI.MJ,
+            "obsidian pipe simulated wrong distance-two suction cost");
+        helper.assertTrue(!distant.isRemoved(), "obsidian pipe simulation removed distant item");
+        helper.assertValueEqual(obsidianReceiver.receivePower(4 * MjAPI.MJ, false), 3 * MjAPI.MJ,
+            "obsidian pipe consumed wrong distance-two suction cost");
+        helper.assertTrue(distant.isRemoved(), "obsidian pipe did not absorb distant powered item");
+
+        BlockPos lapisPos = helper.absolutePos(new BlockPos(5, 1, 1));
+        BlockPos lapisOutputPos = lapisPos.east();
+        helper.getLevel().setBlock(lapisPos, lapis, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(lapisOutputPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity lapisHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(lapisPos);
+        helper.assertTrue(lapisHolder != null, "lapis pipe holder missing");
+        helper.assertTrue(lapisHolder.pipeColor() == net.minecraft.world.item.DyeColor.WHITE,
+            "lapis pipe default color was not white");
+        helper.assertTrue(lapisHolder.cycleLapisColor(false), "lapis pipe color did not advance");
+        net.minecraft.world.item.DyeColor advanced = lapisHolder.pipeColor();
+        helper.assertTrue(advanced != net.minecraft.world.item.DyeColor.WHITE, "lapis pipe color remained white");
+        helper.assertTrue(lapisHolder.cycleLapisColor(true), "lapis pipe color did not reverse");
+        helper.assertTrue(lapisHolder.pipeColor() == net.minecraft.world.item.DyeColor.WHITE,
+            "lapis pipe reverse color cycle did not restore white");
+        var lapisInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            lapisPos, net.minecraft.core.Direction.WEST
+        );
+        helper.assertTrue(lapisInput != null, "lapis pipe input capability missing");
+        insertPipeItem(lapisInput, Items.LAPIS_LAZULI, 1);
+        tickPipes(helper, 10, lapisPos);
+        helper.assertTrue(lapisHolder.travellingItems().getFirst().color().orElse(null)
+            == net.minecraft.world.item.DyeColor.WHITE, "lapis pipe did not color item at center");
+
+        assertPipeLoot(helper, obsidianPos, buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_ITEM.get());
+        assertPipeLoot(helper, lapisPos, buildcraft.transport.BCTransportItems.PIPE_LAPIS_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_ITEM.get(), Items.OBSIDIAN, Items.GLASS);
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_LAPIS_ITEM.get(), Items.LAPIS_BLOCK, Items.GLASS);
         helper.succeed();
     }
 

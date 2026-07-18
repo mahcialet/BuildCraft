@@ -79,6 +79,20 @@
     { "when": { "type": "void_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90 } },
     { "when": { "type": "void_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "void_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "void_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "void_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/void_item_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "obsidian_item" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_center" } },
+    { "when": { "type": "lapis_item" }, "apply": { "model": "buildcrafttransport:block/lapis_item_center" } },
+    { "when": { "type": "obsidian_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm" } },
+    { "when": { "type": "obsidian_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm", "x": 180 } },
+    { "when": { "type": "obsidian_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm", "x": 90 } },
+    { "when": { "type": "obsidian_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "obsidian_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "obsidian_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/obsidian_item_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "lapis_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm" } },
+    { "when": { "type": "lapis_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 180 } },
+    { "when": { "type": "lapis_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90 } },
+    { "when": { "type": "lapis_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "lapis_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "lapis_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 270 } }
   ]
 }

@@ -30,10 +30,10 @@ public final class BCTransportBlockEntities {
         event.registerBlockEntity(Capabilities.Item.BLOCK, PIPE_HOLDER.get(), (holder, side) ->
             side != null && holder.pipeType().carriesItems() ? holder.input(side) : null);
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) ->
-            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
+            holder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, PIPE_HOLDER.get(), (holder, side) ->
-            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
+            holder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_REDSTONE_RECEIVER, PIPE_HOLDER.get(), (holder, side) ->
-            holder.pipeType() == PipeType.WOOD_ITEM ? holder.woodReceiver() : null);
+            holder.mjReceiver());
     }
 }

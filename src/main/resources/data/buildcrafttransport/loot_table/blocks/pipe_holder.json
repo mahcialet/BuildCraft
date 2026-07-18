@@ -73,6 +73,20 @@
             },
             {
               "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_obsidian_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "obsidian_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
+              "name": "buildcrafttransport:pipe_lapis_item",
+              "conditions": [
+                { "condition": "minecraft:block_state_property", "block": "buildcrafttransport:pipe_holder", "properties": { "type": "lapis_item" } }
+              ]
+            },
+            {
+              "type": "minecraft:item",
               "name": "buildcrafttransport:pipe_quartz_item"
             }
           ]

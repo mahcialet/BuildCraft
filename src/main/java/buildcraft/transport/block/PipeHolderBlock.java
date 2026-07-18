@@ -12,6 +12,8 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.InsideBlockEffectApplier;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.Level;
@@ -100,7 +102,7 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
             ) != null;
     }
 
-    private static BooleanProperty property(Direction direction) {
+    public static BooleanProperty property(Direction direction) {
         return CONNECTIONS[direction.ordinal()];
     }
 
@@ -126,8 +128,22 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
     @Override
     public InteractionResult onWrenched(UseOnContext context) {
         if (context.getLevel().isClientSide()) return InteractionResult.SUCCESS;
-        return context.getLevel().getBlockEntity(context.getClickedPos()) instanceof PipeHolderBlockEntity holder
-            && holder.rotatePipeDirection() ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+        if (!(context.getLevel().getBlockEntity(context.getClickedPos()) instanceof PipeHolderBlockEntity holder)) {
+            return InteractionResult.FAIL;
+        }
+        boolean changed = holder.pipeType() == PipeType.LAPIS_ITEM
+            ? holder.cycleLapisColor(context.getPlayer() != null && context.getPlayer().isShiftKeyDown())
+            : holder.rotatePipeDirection();
+        return changed ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+    }
+
+    @Override
+    protected void entityInside(BlockState state, Level level, BlockPos pos, Entity entity,
+        InsideBlockEffectApplier effects, boolean intersects) {
+        if (!level.isClientSide() && entity instanceof net.minecraft.world.entity.item.ItemEntity item
+            && level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder) {
+            holder.absorbCollidingItem(item);
+        }
     }
 
     @Override

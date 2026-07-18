@@ -151,7 +151,11 @@ tasks.named('processResources', ProcessResources) {
         include 'structure.png', 'cobblestone_item.png', 'stone_item.png', 'quartz_item.png',
             'wood_item_clear.png', 'wood_item_filled.png', 'gold_item.png',
             'iron_item_clear.png', 'iron_item_filled.png', 'clay_item.png',
-            'sandstone_item.png', 'void_item.png'
+            'sandstone_item.png', 'void_item.png', 'obsidian_item.png', 'lapis_item_base.png',
+            'lapis_item_black.png', 'lapis_item_blue.png', 'lapis_item_brown.png', 'lapis_item_cyan.png',
+            'lapis_item_gray.png', 'lapis_item_green.png', 'lapis_item_light_blue.png', 'lapis_item_lime.png',
+            'lapis_item_magenta.png', 'lapis_item_orange.png', 'lapis_item_pink.png', 'lapis_item_purple.png',
+            'lapis_item_red.png', 'lapis_item_silver.png', 'lapis_item_white.png', 'lapis_item_yellow.png'
         into 'assets/buildcrafttransport/textures/block/pipe'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
