@@ -122,6 +122,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "engine_menus", BCCoreGameTests::engineMenus);
         registerTest(event, environment, "combustion_containers", BCCoreGameTests::combustionContainers);
         registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
+        registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
     }
 
     private static void registerTest(
@@ -946,6 +947,27 @@ public final class BCCoreGameTests {
         EnumEngineType actual = output.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
             .get(BlockEngine.ENGINE_TYPE);
         helper.assertValueEqual(actual, expected, expected + " recipe returned wrong engine state");
+    }
+
+    private static void energyEngineLoot(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(0, 1, 0));
+        for (EnumEngineType expected : java.util.List.of(
+            EnumEngineType.STONE, EnumEngineType.IRON, EnumEngineType.RF
+        )) {
+            BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+                .setValue(BlockEngine.ENGINE_TYPE, expected);
+            helper.getLevel().setBlock(pos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+            java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, helper.getLevel(), pos, helper.getLevel().getBlockEntity(pos)
+            );
+            helper.assertValueEqual(drops.size(), 1, expected + " engine returned wrong drop count");
+            ItemStack drop = drops.getFirst();
+            helper.assertTrue(drop.is(BCCoreItems.ENGINE.get()), expected + " engine returned wrong drop item");
+            EnumEngineType actual = drop.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+                .get(BlockEngine.ENGINE_TYPE);
+            helper.assertValueEqual(actual, expected, expected + " engine drop lost its block state");
+        }
+        helper.succeed();
     }
 
     private static void mjFoundation(GameTestHelper helper) {
