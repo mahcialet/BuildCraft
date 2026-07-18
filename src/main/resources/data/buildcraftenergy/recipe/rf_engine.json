@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["RRR", " G ", "IpI"],
+  "key": {
+    "R": "minecraft:redstone",
+    "G": "minecraft:glass",
+    "I": "buildcraftcore:gear_iron",
+    "p": "minecraft:piston"
+  },
+  "result": {
+    "id": "buildcraftcore:engine",
+    "components": {
+      "minecraft:block_state": { "type": "rf" }
+    }
+  }
+}

@@ -120,6 +120,8 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "combustion_engine", BCCoreGameTests::combustionEngine);
         registerTest(event, environment, "rf_engine", BCCoreGameTests::rfEngine);
         registerTest(event, environment, "engine_menus", BCCoreGameTests::engineMenus);
+        registerTest(event, environment, "combustion_containers", BCCoreGameTests::combustionContainers);
+        registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
     }
 
     private static void registerTest(
@@ -873,6 +875,77 @@ public final class BCCoreGameTests {
         helper.assertTrue(combustionMenu.heatHundredths() > 2_000,
             "combustion menu heat was not synchronized");
         helper.succeed();
+    }
+
+    private static void combustionContainers(GameTestHelper helper) {
+        BlockPos relativePos = new BlockPos(0, 1, 0);
+        BlockPos enginePos = helper.absolutePos(relativePos);
+        BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.IRON);
+        helper.getLevel().setBlock(enginePos, state, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        CombustionEngineBlockEntity engine =
+            (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(enginePos);
+        net.minecraft.world.entity.player.Player player =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(enginePos),
+            net.minecraft.core.Direction.UP, enginePos, false);
+
+        player.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(BCEnergyFluids.OIL_BUCKET.get()));
+        InteractionResult inserted = state.useItemOn(player.getMainHandItem(), helper.getLevel(), player,
+            InteractionHand.MAIN_HAND, hit);
+        helper.assertTrue(inserted.consumesAction(), "combustion engine rejected oil bucket interaction");
+        helper.assertValueEqual(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.FUEL_TANK), 1_000,
+            "oil bucket did not fill combustion fuel tank");
+        helper.assertTrue(player.getMainHandItem().is(Items.BUCKET),
+            "oil bucket did not return an empty bucket");
+
+        engine.tanks().set(CombustionEngineBlockEntity.RESIDUE_TANK,
+            net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.FUEL_LIGHT.get()), 1_000);
+        InteractionResult extracted = state.useItemOn(player.getMainHandItem(), helper.getLevel(), player,
+            InteractionHand.MAIN_HAND, hit);
+        helper.assertTrue(extracted.consumesAction(), "combustion engine rejected residue bucket interaction");
+        helper.assertTrue(player.getMainHandItem().is(BCEnergyFluids.FUEL_LIGHT_BUCKET.get()),
+            "empty bucket did not collect combustion residue");
+        helper.assertValueEqual(engine.tanks().getAmountAsInt(CombustionEngineBlockEntity.RESIDUE_TANK), 0,
+            "residue tank was not drained into bucket");
+        helper.succeed();
+    }
+
+    private static void energyEngineRecipes(GameTestHelper helper) {
+        assertEngineRecipe(helper, EnumEngineType.STONE, java.util.List.of(
+            new ItemStack(Items.COBBLESTONE), new ItemStack(Items.COBBLESTONE), new ItemStack(Items.COBBLESTONE),
+            ItemStack.EMPTY, new ItemStack(Items.GLASS), ItemStack.EMPTY,
+            new ItemStack(BCCoreItems.GEAR_STONE.get()), new ItemStack(Items.PISTON),
+            new ItemStack(BCCoreItems.GEAR_STONE.get())
+        ));
+        assertEngineRecipe(helper, EnumEngineType.IRON, java.util.List.of(
+            new ItemStack(Items.IRON_INGOT), new ItemStack(Items.IRON_INGOT), new ItemStack(Items.IRON_INGOT),
+            ItemStack.EMPTY, new ItemStack(Items.GLASS), ItemStack.EMPTY,
+            new ItemStack(BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.PISTON),
+            new ItemStack(BCCoreItems.GEAR_IRON.get())
+        ));
+        assertEngineRecipe(helper, EnumEngineType.RF, java.util.List.of(
+            new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE),
+            ItemStack.EMPTY, new ItemStack(Items.GLASS), ItemStack.EMPTY,
+            new ItemStack(BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.PISTON),
+            new ItemStack(BCCoreItems.GEAR_IRON.get())
+        ));
+        helper.succeed();
+    }
+
+    private static void assertEngineRecipe(GameTestHelper helper, EnumEngineType expected,
+        java.util.List<ItemStack> stacks) {
+        net.minecraft.world.item.crafting.CraftingInput input =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        net.minecraft.world.item.crafting.RecipeHolder<net.minecraft.world.item.crafting.CraftingRecipe> recipe =
+            helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel()
+            ).orElseThrow();
+        ItemStack output = recipe.value().assemble(input);
+        helper.assertTrue(output.is(BCCoreItems.ENGINE.get()), expected + " recipe returned wrong item");
+        EnumEngineType actual = output.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+            .get(BlockEngine.ENGINE_TYPE);
+        helper.assertValueEqual(actual, expected, expected + " recipe returned wrong engine state");
     }
 
     private static void mjFoundation(GameTestHelper helper) {

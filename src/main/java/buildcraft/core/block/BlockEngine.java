@@ -152,4 +152,17 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
         }
         return InteractionResult.SUCCESS;
     }
+
+    @Override
+    protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
+        Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hitResult) {
+        if (state.getValue(ENGINE_TYPE) == EnumEngineType.IRON
+            && level.getBlockEntity(pos) instanceof buildcraft.energy.block.entity.CombustionEngineBlockEntity engine
+            && net.neoforged.neoforge.transfer.fluid.FluidUtil.interactWithFluidHandler(
+                player, hand, pos, engine.tanks()
+            )) {
+            return InteractionResult.SUCCESS;
+        }
+        return InteractionResult.TRY_WITH_EMPTY_HAND;
+    }
 }

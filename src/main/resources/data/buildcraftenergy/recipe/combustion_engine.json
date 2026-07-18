@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["III", " G ", "RpR"],
+  "key": {
+    "I": "minecraft:iron_ingot",
+    "G": "minecraft:glass",
+    "R": "buildcraftcore:gear_iron",
+    "p": "minecraft:piston"
+  },
+  "result": {
+    "id": "buildcraftcore:engine",
+    "components": {
+      "minecraft:block_state": { "type": "iron" }
+    }
+  }
+}
