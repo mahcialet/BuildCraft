@@ -5,6 +5,8 @@ import buildcraft.api.enums.EnumDecoratedBlock;
 import buildcraft.core.block.BlockDecoration;
 import buildcraft.core.gametest.BuildCraftGameTestInstance;
 import buildcraft.core.item.ItemBlockDecoration;
+import buildcraft.core.marker.PathConnection;
+import buildcraft.core.marker.PathSavedData;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -51,6 +53,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(id("core"));
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
+        registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
     }
 
     private static void registerTest(
@@ -101,6 +104,33 @@ public final class BCCoreGameTests {
 
         helper.assertTrue(result.consumesAction(), "Wrench did not consume a valid rotation action");
         helper.assertBlockProperty(relativePos, BlockStateProperties.HORIZONTAL_FACING, net.minecraft.core.Direction.EAST);
+        helper.succeed();
+    }
+
+    private static void pathGraph(GameTestHelper helper) {
+        PathSavedData paths = new PathSavedData();
+        BlockPos a = new BlockPos(0, 1, 0);
+        BlockPos b = new BlockPos(2, 1, 0);
+        BlockPos c = new BlockPos(4, 1, 0);
+        BlockPos d = new BlockPos(6, 1, 0);
+        BlockPos e = new BlockPos(8, 1, 0);
+
+        helper.assertTrue(paths.connect(a, b), "Could not create a path");
+        helper.assertTrue(paths.connect(b, c), "Could not extend a path");
+        helper.assertTrue(paths.connect(d, e), "Could not create the second path");
+        helper.assertTrue(paths.connect(c, d), "Could not merge paths");
+        PathConnection path = paths.connectionAt(a).orElseThrow();
+        helper.assertValueEqual(path.positions(), java.util.List.of(a, b, c, d, e), "merged path order");
+
+        helper.assertTrue(paths.reverse(c), "Could not reverse path");
+        helper.assertValueEqual(path.positions(), java.util.List.of(e, d, c, b, a), "reversed path order");
+        helper.assertTrue(paths.connect(a, e), "Could not close path loop");
+        helper.assertTrue(path.loop(), "Path did not become a loop");
+
+        paths.removeMarker(c);
+        PathConnection opened = paths.connectionAt(a).orElseThrow();
+        helper.assertTrue(!opened.loop(), "Removing a loop marker did not open the loop");
+        helper.assertValueEqual(opened.positions(), java.util.List.of(b, a, e, d), "opened loop order");
         helper.succeed();
     }
 
