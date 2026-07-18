@@ -10,5 +10,6 @@
   "item.buildcrafttransport.pipe_sandstone_item": "Sandstone Transport Pipe",
   "item.buildcrafttransport.pipe_void_item": "Void Transport Pipe",
   "item.buildcrafttransport.pipe_obsidian_item": "Obsidian Transport Pipe",
-  "item.buildcrafttransport.pipe_lapis_item": "Lapis Transport Pipe"
+  "item.buildcrafttransport.pipe_lapis_item": "Lapis Transport Pipe",
+  "item.buildcrafttransport.pipe_daizuli_item": "Daizuli Transport Pipe"
 }

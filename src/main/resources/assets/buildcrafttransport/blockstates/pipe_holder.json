@@ -93,6 +93,13 @@
     { "when": { "type": "lapis_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90 } },
     { "when": { "type": "lapis_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 90 } },
     { "when": { "type": "lapis_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "lapis_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "lapis_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/lapis_item_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "daizuli_item" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_center" } },
+    { "when": { "type": "daizuli_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm" } },
+    { "when": { "type": "daizuli_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm", "x": 180 } },
+    { "when": { "type": "daizuli_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm", "x": 90 } },
+    { "when": { "type": "daizuli_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "daizuli_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "daizuli_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/daizuli_item_arm", "x": 90, "y": 270 } }
   ]
 }

@@ -74,7 +74,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             } else if (transit.toCenter()) {
                 if (pipeType() == PipeType.VOID_ITEM) continue;
                 if (pipeType() == PipeType.LAPIS_ITEM) transit = transit.withColor(Optional.of(pipeColor));
-                Direction destination = chooseDestination(level, transit.from(), transit.blocked());
+                Direction destination = chooseDestination(level, transit.from(), transit.blocked(), transit.color());
                 if (destination == null) drop(level, transit.stack(), null);
                 else {
                     double speed = modifySpeed(transit.speed());
@@ -102,15 +102,22 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
-    private @Nullable Direction chooseDestination(ServerLevel level, Direction from, Optional<Direction> blocked) {
+    private @Nullable Direction chooseDestination(ServerLevel level, Direction from, Optional<Direction> blocked,
+        Optional<DyeColor> color) {
         if (pipeType() == PipeType.IRON_ITEM) {
             if (routingDirection == null || !canExit(level, routingDirection)) return null;
             return routingDirection;
         }
+        if (pipeType() == PipeType.DAIZULI_ITEM && routingDirection != null) {
+            if (color.filter(pipeColor::equals).isPresent() && canExit(level, routingDirection)) {
+                return routingDirection;
+            }
+        }
         List<Direction> candidates = new ArrayList<>();
         List<Direction> inventories = new ArrayList<>();
         for (Direction direction : Direction.values()) {
-            if (direction != from && blocked.filter(direction::equals).isEmpty() && canExit(level, direction)) {
+            if (direction != from && blocked.filter(direction::equals).isEmpty() && canExit(level, direction)
+                && !(pipeType() == PipeType.DAIZULI_ITEM && direction == routingDirection)) {
                 candidates.add(direction);
                 if (isInventory(level, direction)) inventories.add(direction);
             }
@@ -138,7 +145,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         BlockPos targetPos = worldPosition.relative(direction);
         if (level.getBlockEntity(targetPos) instanceof PipeHolderBlockEntity other
             && pipeType().connectsTo(other.pipeType()) && other.pipeType().carriesItems()) {
-            other.enqueue(transit.stack(), direction.getOpposite(), transit.speed());
+            other.enqueue(transit.stack(), direction.getOpposite(), transit.speed(), transit.color());
             return;
         }
         var target = level.getCapability(Capabilities.Item.BLOCK, targetPos, direction.getOpposite());
@@ -157,11 +164,16 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void enqueue(ItemStack stack, Direction from, double speed) {
+        enqueue(stack, from, speed, Optional.empty());
+    }
+
+    private void enqueue(ItemStack stack, Direction from, double speed, Optional<DyeColor> color) {
         if (stack.isEmpty()) return;
         travelling.add(new Transit(stack.copy(), from, from, true,
-            segmentTicks(speed), speed, Optional.empty(), Optional.empty()));
+            segmentTicks(speed), speed, Optional.empty(), color));
         sync();
     }
+
 
     private double modifySpeed(double speed) {
         double target;
@@ -216,8 +228,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void ensureIronDirection(ServerLevel level) {
-        if (pipeType() != PipeType.IRON_ITEM) {
+        if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) {
             routingDirection = null;
+            return;
+        }
+        if (pipeType() == PipeType.DAIZULI_ITEM) {
+            if (routingDirection != null && !canExit(level, routingDirection)) {
+                routingDirection = null;
+                sync();
+            }
             return;
         }
         if (routingDirection != null && canExit(level, routingDirection)) return;
@@ -255,7 +274,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public boolean rotatePipeDirection() {
         if (!(level instanceof ServerLevel serverLevel)) return false;
         if (pipeType() == PipeType.WOOD_ITEM) return rotateExtractionDirection();
-        if (pipeType() != PipeType.IRON_ITEM) return false;
+        if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return false;
         Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
         Direction[] directions = Direction.values();
         for (int offset = 1; offset <= directions.length; offset++) {
@@ -295,6 +314,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public boolean cycleLapisColor(boolean reverse) {
         if (pipeType() != PipeType.LAPIS_ITEM) return false;
+        DyeColor[] colors = DyeColor.values();
+        pipeColor = colors[Math.floorMod(pipeColor.ordinal() + (reverse ? -1 : 1), colors.length)];
+        sync();
+        return true;
+    }
+
+    public boolean cycleDaizuliColor(boolean reverse) {
+        if (pipeType() != PipeType.DAIZULI_ITEM) return false;
         DyeColor[] colors = DyeColor.values();
         pipeColor = colors[Math.floorMod(pipeColor.ordinal() + (reverse ? -1 : 1), colors.length)];
         sync();

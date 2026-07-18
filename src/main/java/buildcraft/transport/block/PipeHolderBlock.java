@@ -133,7 +133,9 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
         }
         boolean changed = holder.pipeType() == PipeType.LAPIS_ITEM
             ? holder.cycleLapisColor(context.getPlayer() != null && context.getPlayer().isShiftKeyDown())
-            : holder.rotatePipeDirection();
+            : holder.pipeType() == PipeType.DAIZULI_ITEM && context.getPlayer() != null
+                && context.getPlayer().isShiftKeyDown()
+                ? holder.cycleDaizuliColor(true) : holder.rotatePipeDirection();
         return changed ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 

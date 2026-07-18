@@ -130,6 +130,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
+        registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
     }
 
     private static void registerTest(
@@ -1587,6 +1588,83 @@ public final class BCCoreGameTests {
         assertPipeLoot(helper, lapisPos, buildcraft.transport.BCTransportItems.PIPE_LAPIS_ITEM.get());
         assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_ITEM.get(), Items.OBSIDIAN, Items.GLASS);
         assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_LAPIS_ITEM.get(), Items.LAPIS_BLOCK, Items.GLASS);
+        helper.succeed();
+    }
+
+    private static void transportDaizuliItemPipe(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState lapis = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.LAPIS_ITEM
+        );
+        BlockState daizuli = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.DAIZULI_ITEM
+        );
+        BlockPos lapisPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos daizuliPos = lapisPos.east();
+        BlockPos normalOutputPos = daizuliPos.east();
+        BlockPos coloredOutputPos = daizuliPos.south();
+        helper.getLevel().setBlock(lapisPos, lapis, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(daizuliPos, daizuli, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(normalOutputPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(coloredOutputPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity lapisHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(lapisPos);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity daizuliHolder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(daizuliPos);
+        helper.assertTrue(lapisHolder != null && daizuliHolder != null, "colored pipe holders missing");
+        helper.assertTrue(daizuliHolder.rotatePipeDirection(), "daizuli pipe direction did not rotate");
+        helper.assertTrue(daizuliHolder.routingDirection() == net.minecraft.core.Direction.SOUTH,
+            "daizuli pipe did not select first valid colored output");
+        var lapisInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            lapisPos, net.minecraft.core.Direction.WEST
+        );
+        helper.assertTrue(lapisInput != null, "lapis input capability missing");
+        insertPipeItem(lapisInput, Items.WHITE_WOOL, 2);
+        tickPipes(helper, 45, lapisPos, daizuliPos);
+        net.minecraft.world.Container normalOutput = (net.minecraft.world.Container)
+            helper.getLevel().getBlockEntity(normalOutputPos);
+        net.minecraft.world.Container coloredOutput = (net.minecraft.world.Container)
+            helper.getLevel().getBlockEntity(coloredOutputPos);
+        helper.assertValueEqual(containerCount(coloredOutput, Items.WHITE_WOOL), 2,
+            "matching Daizuli color did not use selected output");
+        helper.assertValueEqual(containerCount(normalOutput, Items.WHITE_WOOL), 0,
+            "matching Daizuli color escaped through normal output");
+
+        helper.assertTrue(lapisHolder.cycleLapisColor(false), "lapis source color did not change");
+        insertPipeItem(lapisInput, Items.ORANGE_WOOL, 3);
+        tickPipes(helper, 45, lapisPos, daizuliPos);
+        helper.assertValueEqual(containerCount(normalOutput, Items.ORANGE_WOOL), 3,
+            "nonmatching Daizuli color did not avoid selected output");
+        helper.assertValueEqual(containerCount(coloredOutput, Items.ORANGE_WOOL), 0,
+            "nonmatching Daizuli color used selected output");
+        helper.assertTrue(daizuliHolder.cycleDaizuliColor(true), "Daizuli color did not cycle");
+        helper.assertTrue(daizuliHolder.pipeColor() != net.minecraft.world.item.DyeColor.WHITE,
+            "Daizuli color remained white after cycle");
+        net.minecraft.nbt.CompoundTag daizuliSaved =
+            daizuliHolder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity daizuliLoaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    daizuliPos, helper.getLevel().getBlockState(daizuliPos), daizuliSaved,
+                    helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(daizuliLoaded != null, "Daizuli holder failed codec reload");
+        helper.assertTrue(daizuliLoaded.routingDirection() == net.minecraft.core.Direction.SOUTH,
+            "Daizuli selected output did not survive codec reload");
+        helper.assertTrue(daizuliLoaded.pipeColor() == daizuliHolder.pipeColor(),
+            "Daizuli selected color did not survive codec reload");
+        assertPipeLoot(helper, daizuliPos, buildcraft.transport.BCTransportItems.PIPE_DAIZULI_ITEM.get());
+        net.minecraft.world.item.crafting.CraftingInput recipeInput =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(Items.LAPIS_BLOCK), new ItemStack(Items.GLASS), new ItemStack(Items.DIAMOND)
+            ));
+        ItemStack recipeOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(recipeOutput.is(buildcraft.transport.BCTransportItems.PIPE_DAIZULI_ITEM.get()),
+            "Daizuli recipe returned wrong item");
+        helper.assertValueEqual(recipeOutput.getCount(), 8, "Daizuli recipe returned wrong count");
         helper.succeed();
     }
 
