@@ -165,7 +165,7 @@ tasks.named('processResources', ProcessResources) {
             'emzuli_item_clear.png', 'emzuli_item_filled.png', 'diamond_item.png',
             'diamond_item_down.png', 'diamond_item_up.png', 'diamond_item_north.png',
             'diamond_item_south.png', 'diamond_item_west.png', 'diamond_item_east.png',
-            'diamond_item_itemstack.png'
+            'diamond_item_itemstack.png', 'stripes_item.png'
             into 'assets/buildcrafttransport/textures/block/pipe'
         }
         from('buildcraft_resources/assets/buildcrafttransport/textures/gui') {

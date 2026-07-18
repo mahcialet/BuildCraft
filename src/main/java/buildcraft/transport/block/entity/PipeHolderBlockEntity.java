@@ -19,6 +19,10 @@ import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -26,6 +30,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
@@ -58,6 +64,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final int[] emzuliTtl = new int[4];
     private int emzuliCurrent = -1;
     private final List<ItemStack> diamondRouteFilters = new ArrayList<>();
+    private final StripesReceiver stripesReceiver = new StripesReceiver();
+    private @Nullable Direction stripesDirection;
+    private long stripesPower;
+    private long stripesProgress;
 
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
@@ -77,6 +87,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private void serverTick(ServerLevel level) {
         if (!pipeType().carriesItems()) return;
         tickEmzuliActivations();
+        tickStripes(level);
         if (obsidianWaitTicks > 0) obsidianWaitTicks--;
         ensureWoodDirection(level);
         ensureIronDirection(level);
@@ -89,6 +100,11 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             } else if (transit.toCenter()) {
                 if (pipeType() == PipeType.VOID_ITEM) continue;
                 if (pipeType() == PipeType.LAPIS_ITEM) transit = transit.withColor(Optional.of(pipeColor));
+                if (pipeType() == PipeType.STRIPES_ITEM && stripesDirection != null
+                    && transit.from() != stripesDirection) {
+                    useOrDropStripesItem(level, transit);
+                    continue;
+                }
                 if (pipeType() == PipeType.DIAMOND_ITEM) {
                     next.addAll(splitDiamondTransit(level, transit));
                     continue;
@@ -360,6 +376,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             || pipeType() == PipeType.EMZULI_ITEM) {
             return rotateExtractionDirection();
         }
+        if (pipeType() == PipeType.STRIPES_ITEM) return rotateStripesDirection();
         if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return false;
         Direction current = routingDirection == null ? Direction.DOWN : routingDirection;
         Direction[] directions = Direction.values();
@@ -390,6 +407,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return switch (pipeType()) {
             case WOOD_ITEM, DIAMOND_WOOD_ITEM, EMZULI_ITEM -> woodReceiver;
             case OBSIDIAN_ITEM -> obsidianReceiver;
+            case STRIPES_ITEM -> stripesReceiver;
             default -> null;
         };
     }
@@ -635,6 +653,135 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         sync();
     }
 
+    public @Nullable Direction stripesDirection() {
+        return stripesDirection;
+    }
+
+    public long stripesPower() {
+        return stripesPower;
+    }
+
+    public long stripesProgress() {
+        return stripesProgress;
+    }
+
+    private boolean rotateStripesDirection() {
+        if (pipeType() != PipeType.STRIPES_ITEM) return false;
+        Direction current = stripesDirection == null ? Direction.DOWN : stripesDirection;
+        for (int offset = 1; offset <= Direction.values().length; offset++) {
+            Direction candidate = Direction.values()[(current.ordinal() + offset) % Direction.values().length];
+            if (!getBlockState().getValue(PipeHolderBlock.property(candidate))) {
+                stripesDirection = candidate;
+                stripesProgress = 0;
+                sync();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void tickStripes(ServerLevel level) {
+        if (pipeType() != PipeType.STRIPES_ITEM) return;
+        if (stripesDirection == null || getBlockState().getValue(PipeHolderBlock.property(stripesDirection))) {
+            Direction connected = null;
+            for (Direction direction : Direction.values()) {
+                if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+                if (connected != null) {
+                    stripesDirection = null;
+                    stripesProgress = 0;
+                    return;
+                }
+                connected = direction;
+            }
+            stripesDirection = connected == null ? null : connected.getOpposite();
+            sync();
+        }
+        if (stripesDirection == null) return;
+        BlockPos targetPos = worldPosition.relative(stripesDirection);
+        BlockState targetState = level.getBlockState(targetPos);
+        if (targetState.isAir()) {
+            stripesProgress = 0;
+            return;
+        }
+        float hardness = targetState.getDestroySpeed(level, targetPos);
+        if (hardness < 0) {
+            stripesProgress = 0;
+            return;
+        }
+        long target = Math.max(1, (long) Math.floor(32 * MjAPI.MJ * (hardness + 1)));
+        if (stripesProgress < target) {
+            long used = Math.min(Math.min(10 * MjAPI.MJ, target - stripesProgress), stripesPower);
+            stripesPower -= used;
+            stripesProgress += used;
+            if (used > 0) sync();
+            return;
+        }
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.DIAMOND_PICKAXE));
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+            level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer, targetPos, targetState
+        );
+        if (event.isCanceled()) {
+            stripesProgress = 0;
+            return;
+        }
+        List<ItemStack> drops = Block.getDrops(
+            targetState, level, targetPos, level.getBlockEntity(targetPos), fakePlayer, fakePlayer.getMainHandItem()
+        );
+        level.removeBlock(targetPos, false);
+        for (ItemStack stack : drops) enqueue(stack, stripesDirection, 0.02);
+        stripesProgress = 0;
+        sync();
+    }
+
+    private void useOrDropStripesItem(ServerLevel level, Transit transit) {
+        Direction direction = stripesDirection;
+        if (direction == null) {
+            drop(level, transit.stack(), null);
+            return;
+        }
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack working = transit.stack().copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, working);
+        BlockPos targetPos = worldPosition.relative(direction);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(targetPos), direction.getOpposite(), targetPos, false);
+        InteractionResult result = working.useOn(new UseOnContext(fakePlayer, InteractionHand.MAIN_HAND, hit));
+        boolean handled = result.consumesAction();
+        if (!handled) {
+            for (net.minecraft.world.entity.LivingEntity entity : level.getEntitiesOfClass(
+                net.minecraft.world.entity.LivingEntity.class, new AABB(targetPos))) {
+                result = fakePlayer.interactOn(entity, InteractionHand.MAIN_HAND, entity.position());
+                if (result.consumesAction()) {
+                    handled = true;
+                    break;
+                }
+            }
+        }
+        if (!handled) {
+            var behavior = net.minecraft.world.level.block.DispenserBlock.DISPENSER_REGISTRY.get(working.getItem());
+            if (behavior != null) {
+                BlockState dispenserState = net.minecraft.world.level.block.Blocks.DISPENSER.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.DispenserBlock.FACING, direction);
+                var dispenser = new net.minecraft.world.level.block.entity.DispenserBlockEntity(
+                    worldPosition, dispenserState
+                );
+                ItemStack dispensed = behavior.dispense(
+                    new net.minecraft.core.dispenser.BlockSource(level, worldPosition, dispenserState, dispenser),
+                    working.copy()
+                );
+                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, dispensed);
+                handled = true;
+            }
+        }
+        ItemStack remaining = fakePlayer.getMainHandItem().copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        if (handled) {
+            if (!remaining.isEmpty()) enqueue(remaining, direction, 0.02, transit.color());
+        } else {
+            drop(level, transit.stack(), direction);
+        }
+    }
+
     private void drop(ServerLevel level, ItemStack stack, @Nullable Direction direction) {
         double x = worldPosition.getX() + 0.5 + (direction == null ? 0 : direction.getStepX() * 0.6);
         double y = worldPosition.getY() + 0.5 + (direction == null ? 0 : direction.getStepY() * 0.6);
@@ -697,6 +844,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             diamondRouteFilters.set(index,
                 index < savedRouteFilters.size() ? savedRouteFilters.get(index) : ItemStack.EMPTY);
         }
+        stripesDirection = input.read("stripes_direction", Direction.CODEC).orElse(null);
+        stripesPower = Math.clamp(input.getLongOr("stripes_power", 0), 0, 256 * MjAPI.MJ);
+        stripesProgress = Math.max(0, input.getLongOr("stripes_progress", 0));
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
@@ -720,6 +870,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         for (int index = 0; index < emzuliTtl.length; index++) output.putInt("emzuli_ttl_" + index, emzuliTtl[index]);
         output.putInt("emzuli_current", emzuliCurrent);
         output.store("diamond_route_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondRouteFilters);
+        if (stripesDirection != null) output.store("stripes_direction", Direction.CODEC, stripesDirection);
+        output.putLong("stripes_power", stripesPower);
+        output.putLong("stripes_progress", stripesProgress);
         for (Direction direction : Direction.values()) {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
@@ -787,6 +940,20 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         public long receivePower(long microJoules, boolean simulate) {
             if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
             return suckItems(microJoules, simulate);
+        }
+    }
+
+    private final class StripesReceiver implements IMjRedstoneReceiver {
+        @Override public boolean canConnect(IMjConnector other) { return other != null; }
+        @Override public long getPowerRequested() { return 256 * MjAPI.MJ - stripesPower; }
+        @Override public long receivePower(long microJoules, boolean simulate) {
+            if (microJoules < 0) throw new IllegalArgumentException("microJoules must not be negative");
+            long accepted = Math.min(microJoules, getPowerRequested());
+            if (!simulate && accepted > 0) {
+                stripesPower += accepted;
+                sync();
+            }
+            return microJoules - accepted;
         }
     }
 

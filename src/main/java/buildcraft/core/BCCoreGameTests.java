@@ -134,6 +134,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
         registerTest(event, environment, "transport_diamond_item_pipe", BCCoreGameTests::transportDiamondItemPipe);
+        registerTest(event, environment, "transport_stripes_item_pipe", BCCoreGameTests::transportStripesItemPipe);
     }
 
     private static void registerTest(
@@ -1930,6 +1931,81 @@ public final class BCCoreGameTests {
         assertPipeLoot(helper, pipePos, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get());
         assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get(),
             Items.DIAMOND, Items.GLASS);
+        helper.succeed();
+    }
+
+    private static void transportStripesItemPipe(GameTestHelper helper) {
+        buildcraft.transport.block.PipeHolderBlock block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState stripes = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.STRIPES_ITEM
+        );
+        BlockState cobble = block.defaultBlockState().setValue(
+            buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM
+        );
+        BlockPos targetChestPos = helper.absolutePos(new BlockPos(0, 1, 1));
+        BlockPos cobblePos = targetChestPos.east();
+        BlockPos stripesPos = cobblePos.east();
+        BlockPos workPos = stripesPos.east();
+        helper.getLevel().setBlock(targetChestPos, Blocks.CHEST.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stripesPos, stripes, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        helper.getLevel().setBlock(workPos, Blocks.STONE.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(stripesPos);
+        helper.assertTrue(holder != null, "Stripes pipe holder missing");
+        tickPipes(helper, 1, stripesPos);
+        helper.assertTrue(holder.stripesDirection() == net.minecraft.core.Direction.EAST,
+            "Stripes pipe did not select opposite of sole connection");
+        buildcraft.api.mj.IMjRedstoneReceiver receiver = holder.mjReceiver();
+        helper.assertTrue(receiver != null, "Stripes MJ receiver missing");
+        helper.assertValueEqual(receiver.getPowerRequested(), 256 * MjAPI.MJ,
+            "Stripes battery requested wrong capacity");
+        helper.assertValueEqual(receiver.receivePower(100 * MjAPI.MJ, true), 0L,
+            "Stripes battery simulation rejected valid power");
+        helper.assertValueEqual(holder.stripesPower(), 0L, "Stripes battery simulation mutated state");
+        receiver.receivePower(100 * MjAPI.MJ, false);
+        tickPipes(helper, 3, stripesPos);
+        helper.assertValueEqual(holder.stripesProgress(), 30 * MjAPI.MJ,
+            "Stripes breaker did not consume 10 MJ per tick");
+        net.minecraft.nbt.CompoundTag progressSaved = holder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity progressLoaded =
+            (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                    stripesPos, helper.getLevel().getBlockState(stripesPos), progressSaved,
+                    helper.getLevel().registryAccess()
+                );
+        helper.assertTrue(progressLoaded != null && progressLoaded.stripesProgress() == 30 * MjAPI.MJ
+            && progressLoaded.stripesPower() == 70 * MjAPI.MJ,
+            "Stripes battery or progress failed codec reload");
+        tickPipes(helper, 100, stripesPos, cobblePos);
+        helper.assertTrue(helper.getLevel().getBlockState(workPos).isAir(),
+            "Stripes pipe did not break powered stone");
+        net.minecraft.world.Container targetChest = (net.minecraft.world.Container)
+            helper.getLevel().getBlockEntity(targetChestPos);
+        helper.assertValueEqual(containerCount(targetChest, Items.COBBLESTONE), 1,
+            "Stripes pipe did not reinsert block drop toward connected pipe");
+
+        var stripesInput = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+            stripesPos, net.minecraft.core.Direction.WEST
+        );
+        helper.assertTrue(stripesInput != null, "Stripes placement input capability missing");
+        insertPipeItem(stripesInput, Items.DIRT, 1);
+        tickPipes(helper, 15, stripesPos);
+        helper.assertTrue(helper.getLevel().getBlockState(workPos).is(Blocks.DIRT),
+            "Stripes pipe did not use incoming block item on open side");
+        helper.getLevel().removeBlock(workPos, false);
+        insertPipeItem(stripesInput, Items.ARROW, 1);
+        tickPipes(helper, 12, stripesPos);
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+            net.minecraft.world.entity.projectile.arrow.AbstractArrow.class,
+            new net.minecraft.world.phys.AABB(workPos).inflate(20)
+        ).isEmpty(), "Stripes pipe did not invoke dispenser behavior for arrow");
+        helper.assertTrue(!buildcraft.transport.PipeType.STRIPES_ITEM.connectsTo(
+            buildcraft.transport.PipeType.STRIPES_ITEM), "Stripes pipes connected directly");
+        assertPipeLoot(helper, stripesPos, buildcraft.transport.BCTransportItems.PIPE_STRIPES_ITEM.get());
+        assertPipeRecipe(helper, buildcraft.transport.BCTransportItems.PIPE_STRIPES_ITEM.get(),
+            BCCoreItems.GEAR_GOLD.get(), Items.GLASS);
         helper.succeed();
     }
 

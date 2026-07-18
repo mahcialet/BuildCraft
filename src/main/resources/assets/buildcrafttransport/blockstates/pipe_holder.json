@@ -121,6 +121,13 @@
     { "when": { "type": "diamond_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_item_north_arm", "x": 90 } },
     { "when": { "type": "diamond_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_item_east_arm", "x": 90, "y": 90 } },
     { "when": { "type": "diamond_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_item_south_arm", "x": 90, "y": 180 } },
-    { "when": { "type": "diamond_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_item_west_arm", "x": 90, "y": 270 } }
+    { "when": { "type": "diamond_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/diamond_item_west_arm", "x": 90, "y": 270 } },
+    { "when": { "type": "stripes_item" }, "apply": { "model": "buildcrafttransport:block/stripes_item_center" } },
+    { "when": { "type": "stripes_item", "up": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm" } },
+    { "when": { "type": "stripes_item", "down": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 180 } },
+    { "when": { "type": "stripes_item", "north": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90 } },
+    { "when": { "type": "stripes_item", "east": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 90 } },
+    { "when": { "type": "stripes_item", "south": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 180 } },
+    { "when": { "type": "stripes_item", "west": "true" }, "apply": { "model": "buildcrafttransport:block/stripes_item_arm", "x": 90, "y": 270 } }
   ]
 }

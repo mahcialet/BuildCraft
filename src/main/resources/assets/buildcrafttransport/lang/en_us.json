@@ -21,5 +21,6 @@
   "item.buildcrafttransport.pipe_emzuli_item": "Emzuli Transport Pipe",
   "gui.buildcrafttransport.emzuli": "Extraction Presets",
   "item.buildcrafttransport.pipe_diamond_item": "Diamond Transport Pipe",
-  "gui.buildcrafttransport.diamond_route": "Diamond Pipe Filters"
+  "gui.buildcrafttransport.diamond_route": "Diamond Pipe Filters",
+  "item.buildcrafttransport.pipe_stripes_item": "Stripes Transport Pipe"
 }

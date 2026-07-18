@@ -38,5 +38,6 @@ public final class BCTransport {
         event.accept(BCTransportItems.PIPE_DIAMOND_WOOD_ITEM.get());
         event.accept(BCTransportItems.PIPE_EMZULI_ITEM.get());
         event.accept(BCTransportItems.PIPE_DIAMOND_ITEM.get());
+        event.accept(BCTransportItems.PIPE_STRIPES_ITEM.get());
     }
 }
