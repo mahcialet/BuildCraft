@@ -16,6 +16,8 @@ import buildcraft.api.items.ListLineData;
 import buildcraft.api.lists.ListMatchMode;
 import buildcraft.core.item.ItemList;
 import buildcraft.core.menu.ListMenu;
+import buildcraft.core.marker.VolumeBox;
+import buildcraft.core.marker.VolumeBoxSavedData;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -80,6 +82,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "map_location", BCCoreGameTests::mapLocation);
         registerTest(event, environment, "paintbrush", BCCoreGameTests::paintbrush);
         registerTest(event, environment, "list", BCCoreGameTests::list);
+        registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
     }
 
     private static void registerTest(
@@ -470,6 +473,57 @@ public final class BCCoreGameTests {
         ListData decoded = ListData.CODEC.parse(ops, (com.google.gson.JsonElement) encoded).getOrThrow();
         helper.assertValueEqual(decoded.label(), expected.label(), "persisted list label");
         helper.assertTrue(decoded.lines().getFirst().matches(namedIron), "persisted list entries");
+        helper.succeed();
+    }
+
+    private static void volumeBox(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(4, 8, 4);
+        BlockPos absolute = helper.absolutePos(relative);
+        VolumeBoxSavedData boxes = VolumeBoxSavedData.get(helper.getLevel());
+        net.minecraft.world.entity.player.Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        helper.setBlock(relative.below(), Blocks.STONE);
+        ItemStack volumeBoxItem = new ItemStack(BCCoreItems.VOLUME_BOX.get());
+        helper.assertTrue(BCCoreItems.VOLUME_BOX.get().useOn(
+            useContext(helper, player, volumeBoxItem, relative.below())
+        ).consumesAction(), "Could not place volume box item");
+        helper.assertTrue(!BCCoreItems.VOLUME_BOX.get().useOn(
+            useContext(helper, player, volumeBoxItem, relative.below())
+        ).consumesAction(), "Overlapping volume box was placed");
+        helper.assertValueEqual(boxes.boxAt(absolute).orElseThrow().min(), absolute, "initial volume minimum");
+
+        player.setPos(absolute.getX() + 0.5, absolute.getY() + 0.5 - player.getEyeHeight(), absolute.getZ() - 3.0);
+        player.setYRot(0.0F);
+        player.setXRot(0.0F);
+        ItemMarkerConnector connector = BCCoreItems.MARKER_CONNECTOR.get();
+        helper.assertTrue(connector.use(helper.getLevel(), player, InteractionHand.MAIN_HAND).consumesAction(),
+            "Connector did not begin volume-box editing");
+        VolumeBox editing = boxes.boxAt(absolute).orElseThrow();
+        helper.assertTrue(editing.isEditingBy(player.getUUID()), "Volume box did not record its editor");
+
+        VolumeBox expanded = editing.update(
+            new Vec3(absolute.getX() + 0.5, absolute.getY() + 0.5, absolute.getZ() - 3.0),
+            new Vec3(1.0, 0.0, 1.0).normalize()
+        );
+        helper.assertTrue(!expanded.min().equals(expanded.max()), "Corner edit did not resize volume box");
+        helper.assertValueEqual(expanded.cancelEdit().min(), absolute, "cancelled volume minimum");
+        helper.assertValueEqual(expanded.cancelEdit().max(), absolute, "cancelled volume maximum");
+        helper.assertTrue(expanded.confirmEdit().edit().isEmpty(), "confirmed volume remained in editing state");
+
+        player.setShiftKeyDown(true);
+        helper.assertTrue(connector.use(helper.getLevel(), player, InteractionHand.MAIN_HAND).consumesAction(),
+            "Connector did not cancel volume-box editing");
+        helper.assertTrue(boxes.boxAt(absolute).orElseThrow().edit().isEmpty(), "Cancelled saved volume remained editing");
+        helper.assertTrue(connector.use(helper.getLevel(), player, InteractionHand.MAIN_HAND).consumesAction(),
+            "Connector did not remove volume box");
+        helper.assertTrue(boxes.boxAt(absolute).isEmpty(), "Removed volume box remained saved");
+
+        VolumeBox codecBox = VolumeBox.at(new BlockPos(1, 2, 3)).beginEdit(
+            player.getUUID(), new BlockPos(1, 2, 3), 2.0
+        );
+        Object encoded = VolumeBox.CODEC.encodeStart(JsonOps.INSTANCE, codecBox).getOrThrow();
+        VolumeBox decoded = VolumeBox.CODEC.parse(JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
+        helper.assertValueEqual(decoded.id(), codecBox.id(), "persisted volume-box id");
+        helper.assertValueEqual(decoded.edit(), codecBox.edit(), "persisted volume-box edit state");
         helper.succeed();
     }
 

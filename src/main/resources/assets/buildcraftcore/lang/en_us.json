@@ -18,6 +18,7 @@
   "item.buildcraftcore.map_location": "Map Location",
   "item.buildcraftcore.paintbrush": "Paintbrush",
   "item.buildcraftcore.list": "List",
+  "item.buildcraftcore.volume_box": "Volume Box",
   "gui.buildcraftcore.list.label": "List label",
   "gui.buildcraftcore.list.precise": "Match data components precisely",
   "gui.buildcraftcore.list.type": "Match item type",

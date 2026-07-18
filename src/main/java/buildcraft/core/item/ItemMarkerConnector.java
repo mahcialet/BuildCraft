@@ -2,6 +2,7 @@ package buildcraft.core.item;
 
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeSavedData;
+import buildcraft.core.marker.VolumeBoxSavedData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -40,6 +41,7 @@ public final class ItemMarkerConnector extends Item {
             candidate = findCandidate(paths, eye, look);
             connected = candidate != null && paths.connect(candidate.from(), candidate.to());
         }
+        if (!connected) connected = VolumeBoxSavedData.get(serverLevel).interact(player);
         if (!connected) return InteractionResult.FAIL;
         level.playSound(null, player.blockPosition(), SoundEvents.UI_BUTTON_CLICK.value(), SoundSource.PLAYERS, 0.5F, 1.2F);
         return InteractionResult.SUCCESS;

@@ -32,6 +32,7 @@ public final class BCCreativeTabs {
                     output.accept(buildcraft.core.item.ItemPaintbrush.colored(BCCoreItems.PAINTBRUSH.get(), color));
                 }
                 output.accept(BCCoreItems.LIST.get());
+                output.accept(BCCoreItems.VOLUME_BOX.get());
                 output.accept(BCCoreItems.GEAR_WOOD.get());
                 output.accept(BCCoreItems.GEAR_STONE.get());
                 output.accept(BCCoreItems.GEAR_IRON.get());

@@ -81,6 +81,14 @@ tasks.named('processResources', ProcessResources) {
         include 'list_new.png'
         into 'assets/buildcraftcore/textures/gui'
     }
+    from('buildcraft_resources/assets/buildcraftcore/textures/lasers') {
+        include 'marker_volume_connected.png'
+        into 'assets/buildcraftcore/textures/lasers'
+    }
+    from('buildcraft_resources/assets/buildcraftcore/models/item') {
+        include 'volume_box.json'
+        into 'assets/buildcraftcore/models/item'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks') {
         include 'marker_path.png', 'marker_volume.png'
         into 'assets/buildcraftcore/textures/block'
