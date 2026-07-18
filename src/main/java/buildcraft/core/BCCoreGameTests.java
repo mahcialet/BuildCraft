@@ -8,6 +8,8 @@ import buildcraft.core.item.ItemBlockDecoration;
 import buildcraft.core.item.ItemMarkerConnector;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
+import buildcraft.core.marker.VolumeConnection;
+import buildcraft.core.marker.VolumeSavedData;
 import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.JsonOps;
@@ -58,6 +60,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
         registerTest(event, environment, "path_marker_sync", BCCoreGameTests::pathMarkerSync);
+        registerTest(event, environment, "volume_graph", BCCoreGameTests::volumeGraph);
     }
 
     private static void registerTest(
@@ -197,6 +200,51 @@ public final class BCCoreGameTests {
         helper.destroyBlock(middle);
         helper.assertTrue(paths.connectionAt(absoluteFirst).isEmpty(), "Destroyed middle marker did not split short path");
         helper.assertValueEqual(firstEntity.path(), java.util.List.of(), "surviving marker snapshot was not cleared");
+        helper.succeed();
+    }
+
+    private static void volumeGraph(GameTestHelper helper) {
+        VolumeSavedData volumes = new VolumeSavedData();
+        BlockPos origin = new BlockPos(0, 0, 0);
+        BlockPos x = new BlockPos(4, 0, 0);
+        BlockPos xy = new BlockPos(4, 3, 0);
+        BlockPos xyz = new BlockPos(4, 3, 2);
+        BlockPos opposite = new BlockPos(0, 3, 2);
+        for (BlockPos marker : java.util.List.of(origin, x, xy, xyz, opposite)) volumes.addMarker(marker);
+        helper.assertTrue(volumes.connect(origin, x), "Could not create X volume edge");
+        helper.assertTrue(volumes.connect(x, xy), "Could not add Y volume edge");
+        helper.assertTrue(volumes.connect(xy, xyz), "Could not add Z volume edge");
+        helper.assertTrue(volumes.connect(origin, opposite), "Could not add an existing-box corner");
+        VolumeConnection box = volumes.connectionAt(origin).orElseThrow();
+        helper.assertValueEqual(box.min(), origin, "volume minimum");
+        helper.assertValueEqual(box.max(), xyz, "volume maximum");
+        helper.assertValueEqual(
+            box.connectedAxes(), java.util.EnumSet.allOf(net.minecraft.core.Direction.Axis.class), "volume axes"
+        );
+
+        Object encoded = VolumeSavedData.CODEC.encodeStart(JsonOps.INSTANCE, volumes).getOrThrow();
+        VolumeSavedData decoded = VolumeSavedData.CODEC.parse(
+            JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded
+        ).getOrThrow();
+        helper.assertValueEqual(decoded.connectionAt(origin).orElseThrow().max(), xyz, "persisted volume maximum");
+
+        VolumeSavedData blocked = new VolumeSavedData();
+        BlockPos near = new BlockPos(2, 0, 0);
+        BlockPos far = new BlockPos(4, 0, 0);
+        for (BlockPos marker : java.util.List.of(origin, near, far)) blocked.addMarker(marker);
+        helper.assertValueEqual(blocked.validConnections(origin), java.util.List.of(near), "nearest axial marker");
+        helper.assertTrue(!blocked.canConnect(origin, far), "Connection skipped an intervening marker");
+
+        VolumeSavedData merging = new VolumeSavedData();
+        BlockPos a0 = new BlockPos(0, 0, 0), a1 = new BlockPos(2, 0, 0);
+        BlockPos b0 = new BlockPos(0, 0, 2), b1 = new BlockPos(0, 2, 2);
+        for (BlockPos marker : java.util.List.of(a0, a1, b0, b1)) merging.addMarker(marker);
+        helper.assertTrue(merging.connect(a0, a1), "Could not create merge X edge");
+        helper.assertTrue(merging.connect(b0, b1), "Could not create merge Y edge");
+        helper.assertTrue(merging.connect(a0, b0), "Could not merge edges across Z");
+        helper.assertValueEqual(merging.connections().size(), 1, "merged volume count");
+        merging.removeMarker(a1);
+        helper.assertTrue(merging.connectionAt(a1).isEmpty(), "Removed volume marker remained connected");
         helper.succeed();
     }
 
