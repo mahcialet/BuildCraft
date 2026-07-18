@@ -14,7 +14,9 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
@@ -52,6 +54,7 @@ public final class BCCoreItems {
     public static final DeferredItem<Item> GEAR_IRON = ITEMS.registerSimpleItem("gear_iron");
     public static final DeferredItem<Item> GEAR_GOLD = ITEMS.registerSimpleItem("gear_gold");
     public static final DeferredItem<Item> GEAR_DIAMOND = ITEMS.registerSimpleItem("gear_diamond");
+    public static final DeferredItem<Item> DIAMOND_SHARD = ITEMS.registerSimpleItem("diamond_shard");
 
     private BCCoreItems() {
     }
@@ -59,7 +62,12 @@ public final class BCCoreItems {
     public static void register(IEventBus modBus) {
         ITEMS.register(modBus);
         modBus.addListener(BCCoreItems::registerCapabilities);
+        modBus.addListener(BCCoreItems::addCreativeTabContents);
         FluidItemDrops.register(FRAGILE_FLUID_SHARD::get);
+    }
+
+    private static void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey().equals(CreativeModeTabs.INGREDIENTS)) event.accept(DIAMOND_SHARD.get());
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
