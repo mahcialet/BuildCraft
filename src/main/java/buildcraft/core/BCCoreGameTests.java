@@ -33,9 +33,12 @@ import buildcraft.api.mj.IMjConnector;
 import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.enums.EnumEngineType;
+import buildcraft.api.fuels.BuildcraftFuelRegistry;
+import buildcraft.api.fuels.IFuel;
 import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
+import buildcraft.energy.BCEnergyFluids;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -108,6 +111,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
         registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
         registerTest(event, environment, "creative_engine", BCCoreGameTests::creativeEngine);
+        registerTest(event, environment, "energy_fluids", BCCoreGameTests::energyFluids);
     }
 
     private static void registerTest(
@@ -617,11 +621,17 @@ public final class BCCoreGameTests {
         BlockPos oilPos = helper.absolutePos(new BlockPos(2, 1, 0));
         BlockState oilSpring = waterSpring.setValue(BlockSpring.SPRING_TYPE, EnumSpring.OIL);
         helper.getLevel().setBlock(oilPos, oilSpring, net.minecraft.world.level.block.Block.UPDATE_ALL);
-        helper.assertTrue(!BCCoreBlocks.SPRING.get().tryGenerate(
-            helper.getLevel(), oilPos, oilSpring, net.minecraft.util.RandomSource.create(1L)
-        ), "Unconfigured oil spring generated a block");
-        helper.assertTrue(helper.getLevel().isEmptyBlock(oilPos.above()),
-            "Unconfigured oil spring changed the world");
+        net.minecraft.util.RandomSource oilRandom = net.minecraft.util.RandomSource.create(1L);
+        boolean generatedOil = false;
+        for (int attempt = 0; attempt < 32 && !generatedOil; attempt++) {
+            helper.getLevel().removeBlock(oilPos.above(), false);
+            generatedOil = BCCoreBlocks.SPRING.get().tryGenerate(
+                helper.getLevel(), oilPos, oilSpring, oilRandom
+            );
+        }
+        helper.assertTrue(generatedOil, "Configured oil spring did not pass its one-in-eight chance");
+        helper.assertTrue(helper.getLevel().getBlockState(oilPos.above()).is(BCEnergyFluids.OIL_BLOCK.get()),
+            "Oil spring generated the wrong block");
 
         for (EnumSpring type : EnumSpring.VALUES) {
             ItemStack stack = ItemBlockSpring.createStack(type);
@@ -634,6 +644,43 @@ public final class BCCoreGameTests {
         }
         helper.assertValueEqual(waterSpring.getDestroySpeed(helper.getLevel(), waterPos), -1.0F,
             "spring destroy speed");
+        helper.succeed();
+    }
+
+    private static void energyFluids(GameTestHelper helper) {
+        helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getDensity(), 900,
+            "oil density");
+        helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getViscosity(), 2_000,
+            "oil viscosity");
+        helper.assertValueEqual(BCEnergyFluids.FUEL_LIGHT.get().getFluidType().getDensity(), 400,
+            "light fuel density");
+        helper.assertValueEqual(BCEnergyFluids.FUEL_LIGHT.get().getFluidType().getViscosity(), 600,
+            "light fuel viscosity");
+        helper.assertTrue(BCEnergyFluids.OIL_BLOCK.get().defaultBlockState().getFluidState().isSource(),
+            "oil block is not a source");
+        helper.assertTrue(BCEnergyFluids.FUEL_LIGHT_BLOCK.get().defaultBlockState().getFluidState().isSource(),
+            "light fuel block is not a source");
+        helper.assertTrue(BCEnergyFluids.OIL_BLOCK.get().isFlammable(
+            BCEnergyFluids.OIL_BLOCK.get().defaultBlockState(), helper.getLevel(),
+            helper.absolutePos(BlockPos.ZERO), net.minecraft.core.Direction.UP
+        ), "oil block is not flammable");
+        helper.assertTrue(BCEnergyFluids.OIL_BUCKET.get().getContent() == BCEnergyFluids.OIL.get(),
+            "oil bucket has the wrong fluid");
+        helper.assertTrue(BCEnergyFluids.FUEL_LIGHT_BUCKET.get().getContent() == BCEnergyFluids.FUEL_LIGHT.get(),
+            "light fuel bucket has the wrong fluid");
+
+        IFuel oil = BuildcraftFuelRegistry.fuel.getFuel(
+            new net.neoforged.neoforge.fluids.FluidStack(BCEnergyFluids.OIL.get(), 1)
+        );
+        IFuel fuel = BuildcraftFuelRegistry.fuel.getFuel(
+            new net.neoforged.neoforge.fluids.FluidStack(BCEnergyFluids.FUEL_LIGHT.get(), 1)
+        );
+        helper.assertTrue(oil != null, "oil fuel definition missing");
+        helper.assertValueEqual(oil.getPowerPerCycle(), 3 * MjAPI.MJ, "oil fuel power");
+        helper.assertValueEqual(oil.getTotalBurningTime(), 10_000, "oil burn time");
+        helper.assertTrue(fuel != null, "light fuel definition missing");
+        helper.assertValueEqual(fuel.getPowerPerCycle(), 6 * MjAPI.MJ, "light fuel power");
+        helper.assertValueEqual(fuel.getTotalBurningTime(), 15_000, "light fuel burn time");
         helper.succeed();
     }
 
