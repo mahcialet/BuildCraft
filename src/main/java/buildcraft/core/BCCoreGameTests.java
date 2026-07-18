@@ -42,6 +42,7 @@ import buildcraft.energy.BCEnergyFluids;
 import buildcraft.energy.block.entity.StirlingEngineBlockEntity;
 import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
 import buildcraft.energy.block.entity.RfEngineBlockEntity;
+import buildcraft.energy.menu.EngineMenu;
 import buildcraft.lib.mj.MjRedstoneBatteryReceiver;
 import buildcraft.core.marker.PathConnection;
 import buildcraft.core.marker.PathSavedData;
@@ -118,6 +119,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "stirling_engine", BCCoreGameTests::stirlingEngine);
         registerTest(event, environment, "combustion_engine", BCCoreGameTests::combustionEngine);
         registerTest(event, environment, "rf_engine", BCCoreGameTests::rfEngine);
+        registerTest(event, environment, "engine_menus", BCCoreGameTests::engineMenus);
     }
 
     private static void registerTest(
@@ -817,6 +819,59 @@ public final class BCCoreGameTests {
         helper.assertTrue(energy.getAmountAsInt() < 1_000, "RF engine did not consume external energy");
         helper.assertTrue(receiver.received > 0, "RF engine did not emit MJ");
         helper.assertTrue(engine.heat() > 20, "RF engine did not heat while converting energy");
+        helper.succeed();
+    }
+
+    private static void engineMenus(GameTestHelper helper) {
+        net.minecraft.world.entity.player.Player player =
+            helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+
+        BlockPos stirlingPos = helper.absolutePos(new BlockPos(0, 1, 0));
+        helper.getLevel().setBlock(stirlingPos, BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.STONE),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        player.getInventory().setItem(0, new ItemStack(Items.COAL));
+        EngineMenu stirlingMenu = new EngineMenu(1, player.getInventory(), stirlingPos);
+        helper.assertValueEqual(stirlingMenu.kind(), EngineMenu.EngineKind.STIRLING,
+            "stirling menu kind");
+        helper.assertTrue(!stirlingMenu.quickMoveStack(player, 28).isEmpty(),
+            "stirling menu shift-click rejected coal");
+        StirlingEngineBlockEntity stirling =
+            (StirlingEngineBlockEntity) helper.getLevel().getBlockEntity(stirlingPos);
+        helper.assertValueEqual(stirling.fuelInventory().getAmountAsInt(0), 1,
+            "stirling menu did not update fuel handler");
+
+        BlockPos rfPos = helper.absolutePos(new BlockPos(2, 1, 0));
+        helper.getLevel().setBlock(rfPos, BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.RF),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        player.getInventory().setItem(0, new ItemStack(BCCoreItems.GEAR_IRON.get()));
+        EngineMenu rfMenu = new EngineMenu(2, player.getInventory(), rfPos);
+        helper.assertValueEqual(rfMenu.kind(), EngineMenu.EngineKind.RF, "RF menu kind");
+        helper.assertTrue(!rfMenu.quickMoveStack(player, 31).isEmpty(),
+            "RF menu shift-click rejected upgrade");
+        RfEngineBlockEntity rf = (RfEngineBlockEntity) helper.getLevel().getBlockEntity(rfPos);
+        helper.assertValueEqual(rf.upgrades().getAmountAsInt(0), 1,
+            "RF menu did not update upgrade handler");
+        helper.assertValueEqual(rfMenu.outputMjHundredths(), 600,
+            "RF menu synchronized upgraded output");
+
+        BlockPos combustionPos = helper.absolutePos(new BlockPos(4, 1, 0));
+        helper.getLevel().setBlock(combustionPos, BCCoreBlocks.ENGINE.get().defaultBlockState()
+            .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.IRON),
+            net.minecraft.world.level.block.Block.UPDATE_ALL);
+        CombustionEngineBlockEntity combustion =
+            (CombustionEngineBlockEntity) helper.getLevel().getBlockEntity(combustionPos);
+        combustion.tanks().set(CombustionEngineBlockEntity.FUEL_TANK,
+            net.neoforged.neoforge.transfer.fluid.FluidResource.of(BCEnergyFluids.OIL.get()), 500);
+        combustion.tickCycle(true, new TestMjReceiver());
+        EngineMenu combustionMenu = new EngineMenu(3, player.getInventory(), combustionPos);
+        helper.assertValueEqual(combustionMenu.kind(), EngineMenu.EngineKind.COMBUSTION,
+            "combustion menu kind");
+        helper.assertTrue(combustionMenu.fuelOrEnergy() < 500,
+            "combustion menu fuel amount was not synchronized");
+        helper.assertTrue(combustionMenu.heatHundredths() > 2_000,
+            "combustion menu heat was not synchronized");
         helper.succeed();
     }
 

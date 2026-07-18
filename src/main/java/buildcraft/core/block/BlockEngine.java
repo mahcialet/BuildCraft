@@ -18,6 +18,9 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -135,5 +138,18 @@ public final class BlockEngine extends BaseEntityBlock implements IWrenchable {
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    @Override
+    protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
+        BlockHitResult hitResult) {
+        EnumEngineType type = state.getValue(ENGINE_TYPE);
+        if (type != EnumEngineType.STONE && type != EnumEngineType.IRON && type != EnumEngineType.RF) {
+            return InteractionResult.PASS;
+        }
+        if (player instanceof ServerPlayer serverPlayer) {
+            buildcraft.energy.menu.EngineMenu.open(serverPlayer, pos);
+        }
+        return InteractionResult.SUCCESS;
     }
 }

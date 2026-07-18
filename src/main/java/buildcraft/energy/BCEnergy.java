@@ -20,6 +20,7 @@ public final class BCEnergy {
     public BCEnergy(IEventBus modBus) {
         BCEnergyFluids.register(modBus);
         BCEnergyBlockEntities.register(modBus);
+        BCEnergyMenus.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());
         FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.OIL, 3_000_000L, 10_000);
