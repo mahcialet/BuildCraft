@@ -1,6 +1,7 @@
 package buildcraft.robotics;
 
 import buildcraft.robotics.block.entity.RequesterBlockEntity;
+import buildcraft.robotics.block.entity.ZonePlannerBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -15,6 +16,9 @@ public final class BCRoboticsBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<RequesterBlockEntity>> REQUESTER =
             BLOCK_ENTITIES.register("requester", () -> new BlockEntityType<>(
                     RequesterBlockEntity::new, BCRoboticsBlocks.REQUESTER.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ZonePlannerBlockEntity>> ZONE_PLANNER =
+            BLOCK_ENTITIES.register("zone_planner", () -> new BlockEntityType<>(
+                    ZonePlannerBlockEntity::new, BCRoboticsBlocks.ZONE_PLANNER.get()));
     private BCRoboticsBlockEntities() {}
     public static void register(IEventBus bus) {
         BLOCK_ENTITIES.register(bus);

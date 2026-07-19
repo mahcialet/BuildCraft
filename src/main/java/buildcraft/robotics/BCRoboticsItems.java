@@ -12,6 +12,8 @@ public final class BCRoboticsItems {
             ITEMS.registerItem("redstone_board", RedstoneBoardItem::new);
     public static final DeferredItem<?> REQUESTER =
             ITEMS.registerSimpleBlockItem("requester", BCRoboticsBlocks.REQUESTER);
+    public static final DeferredItem<?> ZONE_PLANNER =
+            ITEMS.registerSimpleBlockItem("zone_planner", BCRoboticsBlocks.ZONE_PLANNER);
 
     private BCRoboticsItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

@@ -154,6 +154,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_redstone_board", BCCoreGameTests::roboticsRedstoneBoard);
         registerTest(event, environment, "robotics_requester", BCCoreGameTests::roboticsRequester);
         registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
+        registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2766,6 +2767,85 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Farm plots", "Zone Map Location name");
         helper.assertValueEqual(buildcraft.robotics.zone.ZoneMapLocation.get(map), zone,
                 "Zone Map Location component");
+        helper.succeed();
+    }
+
+    private static void roboticsZonePlanner(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(3, 2, 3));
+        helper.getLevel().setBlock(pos, buildcraft.robotics.BCRoboticsBlocks.ZONE_PLANNER.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        var planner = (buildcraft.robotics.block.entity.ZonePlannerBlockEntity) helper.getLevel().getBlockEntity(pos);
+        planner.setMapName("Orchard");
+        int red = net.minecraft.world.item.DyeColor.RED.getId();
+        helper.assertTrue(planner.edit(red, -2, -1, 1, 2, true), "Zone Planner rejected rectangle edit");
+        helper.assertValueEqual(planner.layer(red).size(), 16, "Zone Planner rectangle size");
+        ItemStack redBrush = buildcraft.core.item.ItemPaintbrush.colored(
+                buildcraft.core.BCCoreItems.PAINTBRUSH.get(), net.minecraft.world.item.DyeColor.RED);
+        planner.inventory().set(buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_OUTPUT_BRUSH,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(redBrush), 1);
+        planner.inventory().set(buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_OUTPUT_MAP,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(buildcraft.core.BCCoreItems.MAP_LOCATION.get()), 1);
+        for (int tick = 0; tick < 50; tick++) buildcraft.robotics.block.entity.ZonePlannerBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), planner);
+        helper.assertValueEqual(planner.progressOutput(), 50, "Zone Planner output progress");
+
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(pos, planner.getBlockState(),
+                planner.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.robotics.block.entity.ZonePlannerBlockEntity,
+                "Zone Planner block entity did not reload");
+        var restored = (buildcraft.robotics.block.entity.ZonePlannerBlockEntity) loaded;
+        helper.assertValueEqual(restored.progressOutput(), 50, "Zone Planner lost output progress");
+        helper.assertValueEqual(restored.layer(red).size(), 16, "Zone Planner lost layer data");
+        helper.getLevel().setBlockEntity(restored);
+        for (int tick = 50; tick < buildcraft.robotics.block.entity.ZonePlannerBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.robotics.block.entity.ZonePlannerBlockEntity.tick(
+                    helper.getLevel(), pos, helper.getLevel().getBlockState(pos), restored);
+        ItemStack exported = restored.inventory().getResource(
+                buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_OUTPUT_RESULT).toStack(1);
+        var worldZone = buildcraft.robotics.zone.ZoneMapLocation.get(exported);
+        helper.assertTrue(worldZone != null && worldZone.size() == 16
+                        && worldZone.get(pos.getX() - 2, pos.getZ() - 1)
+                        && worldZone.get(pos.getX() + 1, pos.getZ() + 2),
+                "Zone Planner export lost world-coordinate selection");
+        helper.assertValueEqual(buildcraft.core.BCCoreItems.MAP_LOCATION.get().getStoredName(exported),
+                "Orchard", "Zone Planner export name");
+
+        restored.inventory().set(buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_OUTPUT_RESULT,
+                net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        int blue = net.minecraft.world.item.DyeColor.BLUE.getId();
+        ItemStack blueBrush = buildcraft.core.item.ItemPaintbrush.colored(
+                buildcraft.core.BCCoreItems.PAINTBRUSH.get(), net.minecraft.world.item.DyeColor.BLUE);
+        restored.inventory().set(buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_INPUT_BRUSH,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(blueBrush), 1);
+        restored.inventory().set(buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_INPUT_MAP,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(exported), 1);
+        for (int tick = 0; tick < buildcraft.robotics.block.entity.ZonePlannerBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.robotics.block.entity.ZonePlannerBlockEntity.tick(
+                    helper.getLevel(), pos, helper.getLevel().getBlockState(pos), restored);
+        helper.assertValueEqual(restored.layer(blue), restored.layer(red), "Zone Planner import offset/layer");
+        ItemStack cleanResult = restored.inventory().getResource(
+                buildcraft.robotics.block.entity.ZonePlannerBlockEntity.SLOT_INPUT_RESULT).toStack(1);
+        helper.assertTrue(cleanResult.is(buildcraft.core.BCCoreItems.MAP_LOCATION.get())
+                        && buildcraft.core.BCCoreItems.MAP_LOCATION.get().getType(cleanResult)
+                        == buildcraft.api.items.MapLocationType.CLEAN,
+                "Zone Planner import did not return a clean map");
+        helper.assertTrue(java.util.Arrays.stream(restored.preview()).anyMatch(color -> color != 0),
+                "Zone Planner did not synchronize terrain preview");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE), new ItemStack(Items.IRON_INGOT),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.MAP),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(Items.IRON_INGOT)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.ZONE_PLANNER.get()),
+                "Zone Planner recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos, restored,
+                null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.robotics.BCRoboticsItems.ZONE_PLANNER.get()),
+                "Zone Planner block loot");
         helper.succeed();
     }
 

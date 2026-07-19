@@ -42,6 +42,18 @@ public final class ZonePlan {
     public boolean contains(BlockPos pos) { return get(pos.getX(), pos.getZ()); }
     public int size() { return chunks.values().stream().mapToInt(BitSet::cardinality).sum(); }
     public boolean isEmpty() { return chunks.isEmpty(); }
+    public ZonePlan translated(int offsetX, int offsetZ) {
+        ZonePlan translated = new ZonePlan();
+        chunks.forEach((key, bits) -> {
+            int chunkX = ChunkPos.getX(key);
+            int chunkZ = ChunkPos.getZ(key);
+            for (int bit = bits.nextSetBit(0); bit >= 0; bit = bits.nextSetBit(bit + 1)) {
+                translated.set((chunkX << 4) + bit % 16 + offsetX,
+                        (chunkZ << 4) + bit / 16 + offsetZ, true);
+            }
+        });
+        return translated;
+    }
     public BlockPos random(Random random, int y) {
         int size = size();
         if (size == 0) return null;

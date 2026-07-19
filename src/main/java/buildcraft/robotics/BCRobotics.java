@@ -18,6 +18,7 @@ public final class BCRobotics {
         BCRoboticsDataComponents.register(modBus);
         BCRoboticsItems.register(modBus);
         BCRoboticsMenus.register(modBus);
+        BCRoboticsNetwork.register(modBus);
         if (FMLEnvironment.getDist() == Dist.CLIENT) BCRoboticsClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
     }
@@ -25,6 +26,7 @@ public final class BCRobotics {
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
         if (!event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) return;
         event.accept(BCRoboticsItems.REQUESTER.get());
+        event.accept(BCRoboticsItems.ZONE_PLANNER.get());
         event.accept(BCRoboticsItems.REDSTONE_BOARD.get());
         for (RobotBoardType type : RobotBoardType.values()) {
             if (type != RobotBoardType.EMPTY) event.accept(BCRoboticsItems.board(type));
