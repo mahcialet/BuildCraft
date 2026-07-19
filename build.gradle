@@ -260,6 +260,10 @@ tasks.named('processResources', ProcessResources) {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/block/table/assembly'
     }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/table/advanced_crafting') {
+        include '*.png'
+        into 'assets/buildcraftsilicon/textures/block/table/advanced_crafting'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'

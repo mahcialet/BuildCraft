@@ -27,6 +27,7 @@ public final class BCSilicon {
         if (!event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) return;
         event.accept(BCSiliconItems.LASER.get());
         event.accept(BCSiliconItems.ASSEMBLY_TABLE.get());
+        event.accept(BCSiliconItems.ADVANCED_CRAFTING_TABLE.get());
         for (ChipsetType type : ChipsetType.values()) event.accept(BCSiliconItems.chipset(type));
     }
 }

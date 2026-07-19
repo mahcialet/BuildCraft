@@ -3,6 +3,7 @@ package buildcraft.silicon;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.silicon.block.entity.AssemblyTableBlockEntity;
 import buildcraft.silicon.block.entity.LaserBlockEntity;
+import buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -19,6 +20,9 @@ public final class BCSiliconBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AssemblyTableBlockEntity>> ASSEMBLY_TABLE =
         BLOCK_ENTITIES.register("assembly_table", () -> new BlockEntityType<>(
             AssemblyTableBlockEntity::new, BCSiliconBlocks.ASSEMBLY_TABLE.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AdvancedCraftingTableBlockEntity>>
+        ADVANCED_CRAFTING_TABLE = BLOCK_ENTITIES.register("advanced_crafting_table", () -> new BlockEntityType<>(
+            AdvancedCraftingTableBlockEntity::new, BCSiliconBlocks.ADVANCED_CRAFTING_TABLE.get()));
 
     private BCSiliconBlockEntities() {}
     public static void register(IEventBus bus) {
@@ -31,5 +35,7 @@ public final class BCSiliconBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_READABLE, LASER.get(), (laser, side) -> laser.mjReceiver());
         event.registerBlockEntity(Capabilities.Item.BLOCK, ASSEMBLY_TABLE.get(),
             (table, side) -> table.inventory());
+        event.registerBlockEntity(Capabilities.Item.BLOCK, ADVANCED_CRAFTING_TABLE.get(),
+            (table, side) -> table.itemHandler());
     }
 }

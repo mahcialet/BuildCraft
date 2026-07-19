@@ -144,6 +144,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
+        registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -2087,6 +2088,111 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(tableDrops.size() == 1
             && tableDrops.getFirst().is(buildcraft.silicon.BCSiliconItems.ASSEMBLY_TABLE.get()),
             "assembly table returned wrong loot");
+        helper.succeed();
+    }
+
+    private static void siliconAdvancedCraftingTable(GameTestHelper helper) {
+        BlockPos tablePos = helper.absolutePos(new BlockPos(4, 2, 2));
+        BlockPos laserPos = helper.absolutePos(new BlockPos(1, 2, 2));
+        helper.getLevel().setBlock(tablePos,
+                buildcraft.silicon.BCSiliconBlocks.ADVANCED_CRAFTING_TABLE.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        helper.getLevel().setBlock(laserPos, buildcraft.silicon.BCSiliconBlocks.LASER.get().defaultBlockState()
+                .setValue(buildcraft.silicon.block.LaserBlock.FACING, Direction.EAST), Block.UPDATE_ALL);
+        var table = (buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity)
+                helper.getLevel().getBlockEntity(tablePos);
+        var laser = (buildcraft.silicon.block.entity.LaserBlockEntity)
+                helper.getLevel().getBlockEntity(laserPos);
+        var planks = net.neoforged.neoforge.transfer.item.ItemResource.of(Items.OAK_PLANKS);
+        table.blueprint().set(0, planks, 1);
+        table.blueprint().set(3, planks, 1);
+
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, tablePos, Direction.NORTH);
+        helper.assertTrue(handler != null, "advanced crafting table item capability missing");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(2, handler.insert(0, planks, 2, transaction),
+                    "advanced crafting table rejected blueprint material");
+            helper.assertValueEqual(0, handler.insert(1,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(Items.COBBLESTONE), 1, transaction),
+                    "advanced crafting table accepted unrelated material");
+            transaction.commit();
+        }
+        helper.assertValueEqual(500L * MjAPI.MJ, table.getRequiredLaserPower(),
+                "advanced crafting table requested wrong laser power");
+        helper.assertValueEqual(0L, laser.mjReceiver().receivePower(516L * MjAPI.MJ, false),
+                "laser rejected advanced crafting table test power");
+        buildcraft.silicon.block.entity.LaserBlockEntity.tick(
+                helper.getLevel(), laserPos, helper.getLevel().getBlockState(laserPos), laser);
+        helper.assertValueEqual(4L * MjAPI.MJ, table.storedLaserPower(),
+                "laser did not transfer 4 MJ to advanced crafting table");
+        helper.assertValueEqual(tablePos, laser.targetPos(),
+                "laser did not target advanced crafting table");
+        helper.assertValueEqual(0L, table.receiveLaserPower(table.getRequiredLaserPower()),
+                "advanced crafting table rejected remaining laser power");
+        buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        helper.assertTrue(table.results().getResource(0).value() == Items.STICK,
+                "advanced crafting table produced wrong recipe output");
+        helper.assertValueEqual(4, table.results().getAmountAsInt(0),
+                "advanced crafting table produced wrong output count");
+        helper.assertValueEqual(0L, table.storedLaserPower(),
+                "advanced crafting table did not debit 500 MJ");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, handler.extract(0, planks, 1, transaction),
+                    "advanced crafting table allowed material extraction");
+            helper.assertValueEqual(4, handler.extract(15,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(Items.STICK), 4, transaction),
+                    "advanced crafting table rejected output extraction");
+            transaction.commit();
+        }
+
+        for (int slot = 0; slot < 9; slot++)
+            table.blueprint().set(slot, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        var honey = net.neoforged.neoforge.transfer.item.ItemResource.of(Items.HONEY_BOTTLE);
+        for (int slot : new int[] {0, 1, 3, 4}) table.blueprint().set(slot, honey, 1);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            for (int slot = 0; slot < 4; slot++) {
+                helper.assertValueEqual(1, handler.insert(slot, honey, 1, transaction),
+                        "advanced crafting table rejected container recipe material");
+            }
+            transaction.commit();
+        }
+        table.receiveLaserPower(table.getRequiredLaserPower());
+        buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        helper.assertTrue(table.results().getResource(0).value() == Items.HONEY_BLOCK,
+                "advanced crafting table produced wrong container recipe output");
+        int bottles = 0;
+        for (int slot = 0; slot < table.materials().size(); slot++) {
+            if (table.materials().getResource(slot).value() == Items.GLASS_BOTTLE) {
+                bottles += table.materials().getAmountAsInt(slot);
+            }
+        }
+        helper.assertValueEqual(4, bottles,
+                "advanced crafting table did not retain crafting remainders");
+
+        ItemStack redChipset = buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.RED);
+        ItemStack diamondChipset = buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.DIAMOND);
+        java.util.function.Function<ItemStack, net.minecraft.world.item.crafting.CraftingInput> recipeInput = chipset ->
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                        new ItemStack(Items.OBSIDIAN), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.OBSIDIAN),
+                        new ItemStack(Items.OBSIDIAN), new ItemStack(Items.CHEST), new ItemStack(Items.OBSIDIAN),
+                        new ItemStack(Items.OBSIDIAN), chipset, new ItemStack(Items.OBSIDIAN)));
+        var redInput = recipeInput.apply(redChipset);
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, redInput, helper.getLevel())
+                .orElseThrow().value().assemble(redInput);
+        helper.assertTrue(crafted.is(buildcraft.silicon.BCSiliconItems.ADVANCED_CRAFTING_TABLE.get()),
+                "advanced crafting table recipe returned wrong item");
+        helper.assertTrue(helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING,
+                recipeInput.apply(diamondChipset), helper.getLevel()).isEmpty(),
+                "advanced crafting table recipe accepted a non-red chipset");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(tablePos), helper.getLevel(), tablePos, table);
+        helper.assertValueEqual(1, drops.size(), "advanced crafting table returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.silicon.BCSiliconItems.ADVANCED_CRAFTING_TABLE.get()),
+                "advanced crafting table returned wrong drop");
         helper.succeed();
     }
 
