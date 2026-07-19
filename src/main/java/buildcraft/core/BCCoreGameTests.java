@@ -2170,6 +2170,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.getLevel().setBlock(min, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
         helper.getLevel().setBlock(min.offset(1, 0, 0), Blocks.OAK_STAIRS.defaultBlockState()
                 .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.SOUTH), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(min.offset(2, 0, 0), Blocks.COMMAND_BLOCK.defaultBlockState(), Block.UPDATE_ALL);
         helper.getLevel().setBlock(max, Blocks.GLASS.defaultBlockState(), Block.UPDATE_ALL);
         table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
                 buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), 1);
@@ -2204,8 +2205,10 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(blueprint.size(), new BlockPos(3, 2, 2), "Architect Blueprint size");
         helper.assertValueEqual(blueprint.facing(), Direction.WEST, "Architect Blueprint facing");
         helper.assertTrue(blueprint.name().equals("West Wing") && !blueprint.rotate() && !blueprint.excavate()
-                        && blueprint.allowCreative(),
+                        && blueprint.allowCreative() && blueprint.creativeOnly(),
                 "Architect did not write Blueprint metadata");
+        helper.assertTrue(blueprint.stateAt(new BlockPos(2, 0, 0)).is(Blocks.COMMAND_BLOCK),
+                "Allow Creative Architect omitted a creative-only block");
         helper.assertTrue(blueprint.stateAt(new BlockPos(1, 0, 0)).is(Blocks.OAK_STAIRS)
                         && blueprint.stateAt(new BlockPos(1, 0, 0))
                         .getValue(net.minecraft.world.level.block.StairBlock.FACING) == Direction.SOUTH,
@@ -2221,6 +2224,18 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(template != null && template.kind() == buildcraft.builders.snapshot.SnapshotKind.TEMPLATE
                         && template.palette().stream().allMatch(state -> state.isAir() || state.is(Blocks.STONE)),
                 "Architect Template did not reduce capture to occupancy");
+
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.toggleAllowCreative();
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), 1);
+        for (int tick = 0; tick < 2; tick++) buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), restored);
+        var restricted = restored.inventory().getResource(1).toStack(1)
+                .get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+        helper.assertTrue(restricted != null && !restricted.creativeOnly()
+                        && restricted.stateAt(new BlockPos(2, 0, 0)).isAir(),
+                "Architect captured a creative-only block while Allow Creative was disabled");
 
         var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
                 new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()), new ItemStack(Items.BLACK_DYE),
@@ -2706,11 +2721,12 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         var composite = architect.inventory().getResource(1).toStack(1)
                 .get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
         helper.assertTrue(composite != null && composite.valid(), "Architect did not emit compound Blueprint");
-        helper.assertValueEqual(composite.size(), new BlockPos(6, 1, 1), "compound Blueprint union size");
-        helper.assertValueEqual(composite.offset(), new BlockPos(1, 0, 0), "compound Blueprint union offset");
+        helper.assertValueEqual(composite.size(), new BlockPos(1, 1, 6), "compound Blueprint union size");
+        helper.assertValueEqual(composite.offset(), new BlockPos(0, 0, 1), "compound Blueprint union offset");
         helper.assertTrue(composite.stateAt(BlockPos.ZERO).is(Blocks.STONE)
-                        && composite.stateAt(new BlockPos(4, 0, 0)).equals(stairs)
-                        && composite.stateAt(new BlockPos(5, 0, 0)).is(Blocks.GLASS),
+                        && composite.stateAt(new BlockPos(0, 0, 4)).equals(
+                                stairs.rotate(net.minecraft.world.level.block.Rotation.CLOCKWISE_90))
+                        && composite.stateAt(new BlockPos(0, 0, 5)).is(Blocks.GLASS),
                 "compound Blueprint lost primary or linked exact states");
 
         var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, java.util.List.of(

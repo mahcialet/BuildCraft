@@ -69,6 +69,7 @@ public final class BuilderBlockEntity extends BlockEntity implements IHasWork, I
         if (mode == ControlMode.OFF) return;
         SnapshotData snapshot = snapshot();
         if (snapshot == null || !snapshot.valid()) { reset(false); return; }
+        if (snapshot.creativeOnly() && level.getServer().getDefaultGameType() != GameType.CREATIVE) return;
         int hash = snapshot.hashCode();
         if (activeHash != hash) {
             activeHash = hash;

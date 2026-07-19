@@ -18,6 +18,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
@@ -48,6 +49,7 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
     private boolean rotate = true;
     private boolean excavate = true;
     private boolean allowCreative;
+    private boolean scanningCreativeOnly;
 
     public ArchitectTableBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.ARCHITECT_TABLE.get(), pos, state);
@@ -145,6 +147,10 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         for (int scanned = 0; scanned < perTick && cursor < volume; scanned++, cursor++) {
             BlockPos target = position(cursor);
             BlockState captured = level.getBlockState(target);
+            if (kind == SnapshotKind.BLUEPRINT && isCreativeOnly(captured)) {
+                if (allowCreative) scanningCreativeOnly = true;
+                else captured = Blocks.AIR.defaultBlockState();
+            }
             if (kind == SnapshotKind.TEMPLATE) captured = captured.isAir()
                     ? Blocks.AIR.defaultBlockState() : Blocks.STONE.defaultBlockState();
             int paletteIndex = palette.indexOf(captured);
@@ -160,8 +166,9 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
                 ? machineState.getValue(ArchitectTableBlock.FACING) : Direction.NORTH;
         String name = blueprintName.isBlank() ? (kind == SnapshotKind.BLUEPRINT ? "Blueprint" : "Template") : blueprintName;
         SnapshotData snapshot = new SnapshotData(kind, size(), facing, areaMin.subtract(worldPosition),
-                palette, blocks, name, rotate, excavate, allowCreative);
+                palette, blocks, name, rotate, excavate, allowCreative, scanningCreativeOnly);
         snapshot = composeLinked(snapshot);
+        if (rotate) snapshot = snapshot.normalized(captureRotation(facing));
         ItemStack output = BCBuildersItems.snapshotStack(snapshot);
         inventory.set(1, ItemResource.of(output), 1);
         long remaining = inventory.getAmountAsLong(0) - 1;
@@ -216,7 +223,7 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
             }
         return new SnapshotData(primary.kind(), compositeSize, primary.facing(), unionMin.subtract(worldPosition),
                 compositePalette, compositeBlocks, primary.name(), primary.rotate(), primary.excavate(),
-                primary.allowCreative());
+                primary.allowCreative(), primary.creativeOnly());
     }
     private int volume() { BlockPos size = size(); return size.getX() * size.getY() * size.getZ(); }
     private BlockPos size() { return areaMax.subtract(areaMin).offset(1, 1, 1); }
@@ -232,6 +239,21 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         cursor = 0;
         palette = new ArrayList<>();
         blocks = new ArrayList<>();
+        scanningCreativeOnly = false;
+    }
+    private static boolean isCreativeOnly(BlockState state) {
+        return state.is(Blocks.BEDROCK) || state.is(Blocks.COMMAND_BLOCK)
+                || state.is(Blocks.CHAIN_COMMAND_BLOCK) || state.is(Blocks.REPEATING_COMMAND_BLOCK)
+                || state.is(Blocks.SPAWNER);
+    }
+    private static Rotation captureRotation(Direction facing) {
+        return switch (facing) {
+            case WEST -> Rotation.NONE;
+            case NORTH -> Rotation.CLOCKWISE_90;
+            case EAST -> Rotation.CLOCKWISE_180;
+            case SOUTH -> Rotation.COUNTERCLOCKWISE_90;
+            default -> Rotation.NONE;
+        };
     }
     private void sync() {
         setChanged();
@@ -247,6 +269,7 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         cursor = Math.max(0, input.getIntOr("cursor", 0));
         palette = new ArrayList<>(input.read("palette", BlockState.CODEC.listOf()).orElse(List.of()));
         blocks = new ArrayList<>(input.read("blocks", Codec.INT.listOf()).orElse(List.of()));
+        scanningCreativeOnly = input.getBooleanOr("scanning_creative_only", false);
         linkedMarkers = new ArrayList<>(input.read("linked_markers", BlockPos.CODEC.listOf()).orElse(List.of()));
         blueprintName = input.getStringOr("blueprint_name", "Blueprint");
         rotate = input.getBooleanOr("rotate", true);
@@ -267,6 +290,7 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
             output.putInt("cursor", cursor);
             output.store("palette", BlockState.CODEC.listOf(), palette);
             output.store("blocks", Codec.INT.listOf(), blocks);
+            if (scanningCreativeOnly) output.putBoolean("scanning_creative_only", true);
         }
         if (!linkedMarkers.isEmpty()) output.store("linked_markers", BlockPos.CODEC.listOf(), linkedMarkers);
         if (!blueprintName.equals("Blueprint")) output.putString("blueprint_name", blueprintName);
