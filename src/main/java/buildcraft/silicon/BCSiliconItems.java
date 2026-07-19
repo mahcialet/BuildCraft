@@ -12,6 +12,9 @@ public final class BCSiliconItems {
     public static final DeferredItem<RedstoneChipsetItem> REDSTONE_CHIPSET = ITEMS.registerItem("redstone_chipset",
         properties -> new RedstoneChipsetItem(properties.component(
             BCSiliconDataComponents.CHIPSET_TYPE.get(), ChipsetType.RED)));
+    public static final DeferredItem<?> LASER = ITEMS.registerSimpleBlockItem("laser", BCSiliconBlocks.LASER);
+    public static final DeferredItem<?> ASSEMBLY_TABLE =
+        ITEMS.registerSimpleBlockItem("assembly_table", BCSiliconBlocks.ASSEMBLY_TABLE);
 
     private BCSiliconItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

@@ -143,6 +143,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
+        registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1640,9 +1641,14 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(0L, receiver.receivePower(buildcraft.factory.block.entity.ChuteBlockEntity.PICKUP_COST,
                 false), "chute rejected pickup power");
         var entity = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
-                chutePos.getX() + 0.5, chutePos.getY() + 1.05, chutePos.getZ() + 0.5,
-                new ItemStack(Items.COBBLESTONE, 5));
+            chutePos.getX() + 0.5, chutePos.getY() + 1.05, chutePos.getZ() + 0.5,
+            new ItemStack(Items.COBBLESTONE, 5));
+        entity.setNoGravity(true);
         helper.getLevel().addFreshEntity(entity);
+        var chuteNow = (buildcraft.factory.block.entity.ChuteBlockEntity)
+            helper.getLevel().getBlockEntity(chutePos);
+        buildcraft.factory.block.entity.ChuteBlockEntity.tick(
+            helper.getLevel(), chutePos, helper.getLevel().getBlockState(chutePos), chuteNow);
         helper.runAfterDelay(2, () -> {
             var chute = (buildcraft.factory.block.entity.ChuteBlockEntity)
                     helper.getLevel().getBlockEntity(chutePos);
@@ -2004,6 +2010,63 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.assertTrue(!stack.getHoverName().getString().isBlank(), "chipset localized name missing");
         }
         helper.assertValueEqual(5, found.size(), "wrong chipset subtype count");
+        helper.succeed();
+    }
+
+    private static void siliconLaserAssembly(GameTestHelper helper) {
+        BlockPos laserPos = helper.absolutePos(new BlockPos(1, 2, 2));
+        BlockPos tablePos = helper.absolutePos(new BlockPos(4, 2, 2));
+        helper.getLevel().setBlock(laserPos, buildcraft.silicon.BCSiliconBlocks.LASER.get()
+            .defaultBlockState().setValue(buildcraft.silicon.block.LaserBlock.FACING, Direction.EAST), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(tablePos, buildcraft.silicon.BCSiliconBlocks.ASSEMBLY_TABLE.get()
+            .defaultBlockState(), Block.UPDATE_ALL);
+        var laser = (buildcraft.silicon.block.entity.LaserBlockEntity) helper.getLevel().getBlockEntity(laserPos);
+        var table = (buildcraft.silicon.block.entity.AssemblyTableBlockEntity)
+            helper.getLevel().getBlockEntity(tablePos);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.REDSTONE), 1);
+        helper.assertValueEqual(10_000L * MjAPI.MJ, table.getRequiredLaserPower(),
+            "assembly table requested wrong red chipset power");
+        helper.assertValueEqual(0L, laser.mjReceiver().receivePower(516L * MjAPI.MJ, false),
+            "laser rejected valid MJ input");
+        buildcraft.silicon.block.entity.LaserBlockEntity.tick(
+            helper.getLevel(), laserPos, helper.getLevel().getBlockState(laserPos), laser);
+        helper.assertValueEqual(4L * MjAPI.MJ, table.storedLaserPower(),
+            "laser did not transfer historical 4 MJ/t");
+        helper.assertValueEqual(tablePos, laser.targetPos(), "laser selected wrong aligned target");
+        helper.assertValueEqual(0L, table.receiveLaserPower(table.getRequiredLaserPower()),
+            "assembly table rejected required laser power");
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+            helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        ItemStack chipset = ItemStack.EMPTY;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.REDSTONE_CHIPSET.get()) {
+                chipset = table.inventory().getResource(slot).toStack(table.inventory().getAmountAsInt(slot));
+                break;
+            }
+        }
+        helper.assertTrue(!chipset.isEmpty(), "assembly table did not produce chipset");
+        helper.assertValueEqual(buildcraft.silicon.ChipsetType.RED,
+            chipset.get(buildcraft.silicon.BCSiliconDataComponents.CHIPSET_TYPE.get()),
+            "assembly table produced wrong chipset subtype");
+        helper.assertValueEqual(0L, table.storedLaserPower(), "assembly table did not debit completed recipe power");
+
+        var laserRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+            new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN),
+            new ItemStack(Items.REDSTONE), new ItemStack(Items.DIAMOND), new ItemStack(Items.DIAMOND),
+            new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN)
+        ));
+        ItemStack craftedLaser = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, laserRecipe, helper.getLevel()
+        ).orElseThrow().value().assemble(laserRecipe);
+        helper.assertTrue(craftedLaser.is(buildcraft.silicon.BCSiliconItems.LASER.get()),
+            "laser recipe returned wrong item");
+        var laserDrops = Block.getDrops(helper.getLevel().getBlockState(laserPos), helper.getLevel(), laserPos, laser);
+        var tableDrops = Block.getDrops(helper.getLevel().getBlockState(tablePos), helper.getLevel(), tablePos, table);
+        helper.assertTrue(laserDrops.size() == 1 && laserDrops.getFirst().is(buildcraft.silicon.BCSiliconItems.LASER.get()),
+            "laser returned wrong loot");
+        helper.assertTrue(tableDrops.size() == 1
+            && tableDrops.getFirst().is(buildcraft.silicon.BCSiliconItems.ASSEMBLY_TABLE.get()),
+            "assembly table returned wrong loot");
         helper.succeed();
     }
 
