@@ -151,6 +151,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_quarry", BCCoreGameTests::buildersQuarry);
         registerTest(event, environment, "builders_blueprint_library", BCCoreGameTests::buildersBlueprintLibrary);
         registerTest(event, environment, "builders_construction_marker", BCCoreGameTests::buildersConstructionMarker);
+        registerTest(event, environment, "robotics_redstone_board", BCCoreGameTests::roboticsRedstoneBoard);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2649,6 +2650,31 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 restored, null, ItemStack.EMPTY);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.BLUEPRINT_LIBRARY.get()),
                 "Blueprint Library loot output");
+        helper.succeed();
+    }
+
+    private static void roboticsRedstoneBoard(GameTestHelper helper) {
+        for (buildcraft.robotics.RobotBoardType type : buildcraft.robotics.RobotBoardType.values()) {
+            ItemStack stack = buildcraft.robotics.BCRoboticsItems.board(type);
+            helper.assertValueEqual(stack.get(buildcraft.robotics.BCRoboticsDataComponents.BOARD_TYPE.get()), type,
+                    "Redstone Board lost its type");
+            helper.assertTrue(stack.has(net.minecraft.core.component.DataComponents.ITEM_MODEL),
+                    "Redstone Board did not select its colour model");
+            var encoded = buildcraft.robotics.RobotBoardType.CODEC.encodeStart(
+                    com.mojang.serialization.JsonOps.INSTANCE, type).getOrThrow();
+            helper.assertValueEqual(buildcraft.robotics.RobotBoardType.CODEC.parse(
+                    com.mojang.serialization.JsonOps.INSTANCE, encoded).getOrThrow(), type,
+                    "Redstone Board type codec round-trip");
+        }
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.REDSTONE), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel())
+                .orElseThrow().value().assemble(input);
+        helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.REDSTONE_BOARD.get()),
+                "Redstone Board recipe output");
         helper.succeed();
     }
 
