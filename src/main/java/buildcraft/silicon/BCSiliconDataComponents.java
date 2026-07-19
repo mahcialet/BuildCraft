@@ -3,6 +3,7 @@ package buildcraft.silicon;
 import buildcraft.silicon.gate.GateLogic;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
+import buildcraft.silicon.gate.GateProgram;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
@@ -24,6 +25,9 @@ public final class BCSiliconDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GateModifier>> GATE_MODIFIER =
             COMPONENTS.register("gate_modifier", () -> DataComponentType.<GateModifier>builder()
                     .persistent(GateModifier.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GateProgram>> GATE_PROGRAM =
+            COMPONENTS.register("gate_program", () -> DataComponentType.<GateProgram>builder()
+                    .persistent(GateProgram.CODEC).build());
 
     private BCSiliconDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

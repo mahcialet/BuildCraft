@@ -3,6 +3,7 @@ package buildcraft.silicon;
 import buildcraft.silicon.gate.GateLogic;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
+import buildcraft.silicon.gate.GateProgram;
 import buildcraft.silicon.item.GateItem;
 import buildcraft.silicon.item.PipePlugItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
@@ -21,7 +22,8 @@ public final class BCSiliconItems {
             properties -> new GateItem(properties
                     .component(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK)
                     .component(BCSiliconDataComponents.GATE_LOGIC.get(), GateLogic.AND)
-                    .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)));
+                    .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)
+                    .component(BCSiliconDataComponents.GATE_PROGRAM.get(), GateProgram.EMPTY)));
     public static final DeferredItem<PipePlugItem> PLUG_PULSAR =
             ITEMS.registerItem("plug_pulsar", PipePlugItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =

@@ -7,6 +7,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
+import buildcraft.transport.item.PipeAttachment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
@@ -53,6 +54,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public static final double INITIAL_SPEED = 0.05;
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
     private final List<ItemStack> attachments = new ArrayList<>();
+    private boolean gateRedstoneOutput;
     private final FluidBuffer fluidBuffer = new FluidBuffer();
     private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
     private @Nullable Direction fluidReceivedFrom;
@@ -116,6 +118,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     private void serverTick(ServerLevel level) {
+        evaluateAttachments();
         if (pipeType().carriesPower()) {
             transferPower(level);
             return;
@@ -165,6 +168,25 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.addAll(next);
         sync();
     }
+
+    private void evaluateAttachments() {
+        boolean previous = gateRedstoneOutput;
+        gateRedstoneOutput = false;
+        for (Direction side : Direction.values()) {
+            ItemStack stack = attachment(side);
+            if (!stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment) {
+                attachment.tickAttachment(this, side, stack);
+            }
+        }
+        if (previous != gateRedstoneOutput) {
+            setChanged();
+            if (level != null) level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
+        }
+    }
+    public void activateGateRedstoneOutput() { gateRedstoneOutput = true; }
+    public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
+    public boolean hasTravellingItems() { return !travelling.isEmpty(); }
+    public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
 
     private void transferPower(ServerLevel level) {
         if (powerStored <= 0) return;

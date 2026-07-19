@@ -1,11 +1,12 @@
 package buildcraft.silicon.item;
 
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
+import buildcraft.transport.item.PipeAttachment;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.UseOnContext;
 
-public class PipePlugItem extends Item {
+public class PipePlugItem extends Item implements PipeAttachment {
     public PipePlugItem(Properties properties) { super(properties); }
     @Override public InteractionResult useOn(UseOnContext context) {
         if (!(context.getLevel().getBlockEntity(context.getClickedPos()) instanceof PipeHolderBlockEntity holder)) {

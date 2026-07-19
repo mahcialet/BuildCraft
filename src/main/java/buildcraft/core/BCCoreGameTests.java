@@ -2328,6 +2328,14 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.silicon.gate.GateMaterial.NETHER_BRICK,
                 buildcraft.silicon.gate.GateLogic.OR,
                 buildcraft.silicon.gate.GateModifier.DIAMOND);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.REDSTONE_ACTIVE,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT),
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
         helper.assertTrue(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()
                         .useOn(useContext(helper, player, gate, relative)).consumesAction(),
                 "gate item did not install on pipe side");
@@ -2339,6 +2347,10 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.DIAMOND,
                 installed.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
                 "pipe attachment lost gate modifier");
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+        helper.assertValueEqual(15, helper.getLevel().getSignal(pos, Direction.NORTH),
+                "OR gate did not activate redstone output from true rule");
         ItemStack timer = new ItemStack(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get());
         helper.assertTrue(!buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()
                         .useOn(useContext(helper, player, timer, relative)).consumesAction(),

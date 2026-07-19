@@ -135,6 +135,12 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
         return RenderShape.MODEL;
     }
 
+    @Override protected boolean isSignalSource(BlockState state) { return true; }
+    @Override protected int getSignal(BlockState state, BlockGetter level, BlockPos pos, Direction direction) {
+        return level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder && holder.gateRedstoneOutput()
+                ? 15 : 0;
+    }
+
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
         BlockHitResult hitResult) {
