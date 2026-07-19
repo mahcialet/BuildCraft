@@ -1,1 +1,1 @@
-{"type":"buildcraftsilicon:assembly","chipset_type":"iron","ingredients":["minecraft:redstone","minecraft:iron_ingot"],"result":{"id":"buildcraftsilicon:redstone_chipset","components":{"buildcraftsilicon:chipset_type":"iron"}},"mj":20000}
+{"type":"buildcraftsilicon:assembly","selection":"iron","ingredients":["minecraft:redstone","minecraft:iron_ingot"],"result":{"id":"buildcraftsilicon:redstone_chipset","components":{"buildcraftsilicon:chipset_type":"iron"}},"mj":20000}

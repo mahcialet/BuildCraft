@@ -2175,6 +2175,30 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 goldUpgrade.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
                 "gold gate modifier assembly returned wrong modifier");
 
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            table.inventory().set(slot, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        }
+        table.setSelection(buildcraft.silicon.recipe.AssemblySelection.GATE_OR);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.GOLD)), 1);
+        helper.assertValueEqual(80_000L * MjAPI.MJ, table.getRequiredLaserPower(),
+                "gold OR gate requested wrong assembly power");
+        table.receiveLaserPower(table.getRequiredLaserPower());
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        ItemStack assembledGate = ItemStack.EMPTY;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()) {
+                assembledGate = table.inventory().getResource(slot).toStack(table.inventory().getAmountAsInt(slot));
+            }
+        }
+        helper.assertValueEqual(buildcraft.silicon.gate.GateMaterial.GOLD,
+                assembledGate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MATERIAL.get()),
+                "gold gate assembly returned wrong material");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR,
+                assembledGate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                "gold gate assembly ignored OR selection");
+
         var laserRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
             new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN),
             new ItemStack(Items.REDSTONE), new ItemStack(Items.DIAMOND), new ItemStack(Items.DIAMOND),

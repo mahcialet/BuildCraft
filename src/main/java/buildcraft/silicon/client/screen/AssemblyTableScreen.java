@@ -1,7 +1,7 @@
 package buildcraft.silicon.client.screen;
 
-import buildcraft.silicon.ChipsetType;
 import buildcraft.silicon.menu.AssemblyTableMenu;
+import buildcraft.silicon.recipe.AssemblySelection;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 
 public final class AssemblyTableScreen extends AbstractContainerScreen<AssemblyTableMenu> {
-    private final Button[] recipeButtons = new Button[ChipsetType.values().length];
+    private final Button[] recipeButtons = new Button[AssemblySelection.values().length];
 
     public AssemblyTableScreen(AssemblyTableMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 180);
@@ -18,21 +18,26 @@ public final class AssemblyTableScreen extends AbstractContainerScreen<AssemblyT
 
     @Override protected void init() {
         super.init();
-        for (ChipsetType type : ChipsetType.values()) {
-            int id = type.ordinal();
+        for (AssemblySelection selection : AssemblySelection.values()) {
+            int id = selection.ordinal();
+            String label = switch (selection) {
+                case GATE_AND -> "&";
+                case GATE_OR -> "∨";
+                default -> selection.getSerializedName().substring(0, 1).toUpperCase();
+            };
             recipeButtons[id] = addRenderableWidget(Button.builder(
-                Component.literal(type.getSerializedName().substring(0, 1).toUpperCase()), button -> {
+                Component.literal(label), button -> {
                     if (minecraft != null && minecraft.gameMode != null) {
                         minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
                     }
-                }).bounds(leftPos + 84 + id % 3 * 28, topPos + 20 + id / 3 * 22, 26, 20).build());
+                }).bounds(leftPos + 84 + id % 4 * 22, topPos + 20 + id / 4 * 22, 20, 20).build());
         }
     }
 
     @Override protected void containerTick() {
         super.containerTick();
-        for (ChipsetType type : ChipsetType.values()) {
-            recipeButtons[type.ordinal()].active = menu.selectedType() != type;
+        for (AssemblySelection selection : AssemblySelection.values()) {
+            recipeButtons[selection.ordinal()].active = menu.selection() != selection;
         }
     }
 

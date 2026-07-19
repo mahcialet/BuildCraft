@@ -4,6 +4,7 @@ import buildcraft.silicon.BCSiliconBlocks;
 import buildcraft.silicon.BCSiliconMenus;
 import buildcraft.silicon.ChipsetType;
 import buildcraft.silicon.block.entity.AssemblyTableBlockEntity;
+import buildcraft.silicon.recipe.AssemblySelection;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -41,7 +42,7 @@ public final class AssemblyTableMenu extends AbstractContainerMenu {
             }
             data = new ContainerData() {
                 @Override public int get(int index) {
-                    if (index == 0) return table.selectedType().ordinal();
+                    if (index == 0) return table.selection().ordinal();
                     long required = table.selectedRequiredPower();
                     return required <= 0 ? 0 : (int) Math.min(1_000, table.storedLaserPower() * 1_000 / required);
                 }
@@ -69,8 +70,8 @@ public final class AssemblyTableMenu extends AbstractContainerMenu {
     }
 
     @Override public boolean clickMenuButton(Player player, int id) {
-        if (table == null || id < 0 || id >= ChipsetType.values().length) return false;
-        table.setSelectedType(ChipsetType.values()[id]);
+        if (table == null || id < 0 || id >= AssemblySelection.values().length) return false;
+        table.setSelection(AssemblySelection.values()[id]);
         return true;
     }
 
@@ -98,6 +99,9 @@ public final class AssemblyTableMenu extends AbstractContainerMenu {
         return player.level().getBlockState(pos).is(BCSiliconBlocks.ASSEMBLY_TABLE.get())
             && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64;
     }
-    public ChipsetType selectedType() { return ChipsetType.values()[Math.clamp(data.get(0), 0, 4)]; }
+    public AssemblySelection selection() {
+        return AssemblySelection.values()[Math.clamp(data.get(0), 0, AssemblySelection.values().length - 1)];
+    }
+    public ChipsetType selectedType() { return selection().chipset().orElse(ChipsetType.RED); }
     public int progressThousandths() { return data.get(1); }
 }

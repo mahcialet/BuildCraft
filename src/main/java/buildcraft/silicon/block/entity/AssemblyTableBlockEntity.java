@@ -4,6 +4,7 @@ import buildcraft.api.mj.ILaserTarget;
 import buildcraft.silicon.BCSiliconBlockEntities;
 import buildcraft.silicon.recipe.AssemblyRecipe;
 import buildcraft.silicon.recipe.AssemblyRecipeInput;
+import buildcraft.silicon.recipe.AssemblySelection;
 import buildcraft.silicon.ChipsetType;
 import buildcraft.silicon.BCSiliconRecipes;
 import java.util.ArrayList;
@@ -21,17 +22,21 @@ import net.neoforged.neoforge.transfer.transaction.Transaction;
 public final class AssemblyTableBlockEntity extends BlockEntity implements ILaserTarget {
     private final ItemStacksResourceHandler inventory = new ItemStacksResourceHandler(12);
     private long storedLaserPower;
-    private ChipsetType selectedType = ChipsetType.RED;
+    private AssemblySelection selection = AssemblySelection.RED;
 
     public AssemblyTableBlockEntity(BlockPos pos, BlockState state) {
         super(BCSiliconBlockEntities.ASSEMBLY_TABLE.get(), pos, state);
     }
     public ItemStacksResourceHandler inventory() { return inventory; }
     public long storedLaserPower() { return storedLaserPower; }
-    public ChipsetType selectedType() { return selectedType; }
+    public ChipsetType selectedType() { return selection.chipset().orElse(ChipsetType.RED); }
+    public AssemblySelection selection() { return selection; }
     public void setSelectedType(ChipsetType type) {
-        if (type != selectedType) {
-            selectedType = type;
+        setSelection(AssemblySelection.chipset(type));
+    }
+    public void setSelection(AssemblySelection selection) {
+        if (selection != this.selection) {
+            this.selection = selection;
             storedLaserPower = 0;
             setChanged();
         }
@@ -68,7 +73,7 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         if (level == null || level.isClientSide()) return null;
         var stacks = new ArrayList<ItemStack>(inventory.size());
         for (int slot = 0; slot < inventory.size(); slot++) stacks.add(stack(slot));
-        AssemblyRecipeInput input = new AssemblyRecipeInput(stacks, selectedType);
+        AssemblyRecipeInput input = new AssemblyRecipeInput(stacks, selection);
         return level.getServer().getRecipeManager().getRecipeFor(
             BCSiliconRecipes.ASSEMBLY_TYPE.get(), input, level).map(holder -> holder.value())
             .filter(recipe -> canAccept(recipe.result())).orElse(null);
@@ -121,12 +126,14 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         super.loadAdditional(input);
         inventory.deserialize(input.childOrEmpty("inventory"));
         storedLaserPower = Math.max(0, input.getLongOr("laser_power", 0));
-        selectedType = input.read("selected_type", ChipsetType.CODEC).orElse(ChipsetType.RED);
+        selection = input.read("selection", AssemblySelection.CODEC)
+                .orElseGet(() -> AssemblySelection.chipset(
+                        input.read("selected_type", ChipsetType.CODEC).orElse(ChipsetType.RED)));
     }
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
         inventory.serialize(output.child("inventory"));
         if (storedLaserPower > 0) output.putLong("laser_power", storedLaserPower);
-        output.store("selected_type", ChipsetType.CODEC, selectedType);
+        output.store("selection", AssemblySelection.CODEC, selection);
     }
 }
