@@ -2190,7 +2190,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         var blueprint = usedBlueprint.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
         helper.assertTrue(usedBlueprint.is(buildcraft.builders.BCBuildersItems.BLUEPRINT.get())
                         && blueprint != null && blueprint.valid()
-                        && blueprint.kind() == buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT,
+                        && blueprint.kind() == buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT
+                        && usedBlueprint.getMaxStackSize() == 1
+                        && usedBlueprint.has(net.minecraft.core.component.DataComponents.ITEM_MODEL),
                 "Architect did not emit a used Blueprint");
         helper.assertValueEqual(blueprint.size(), new BlockPos(3, 2, 2), "Architect Blueprint size");
         helper.assertValueEqual(blueprint.facing(), Direction.WEST, "Architect Blueprint facing");
@@ -2321,7 +2323,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
 
         var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
                 new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()), new ItemStack(Items.BLACK_DYE),
-                new ItemStack(Items.BLUE_DYE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.BLUE_DYE),
+                new ItemStack(Items.YELLOW_DYE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.YELLOW_DYE),
                 new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(Items.CHEST),
                 new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get())));
         ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
@@ -2609,10 +2611,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Library did not round-trip a written book through a writable book");
         helper.assertTrue(restored.deleteSelected(), "Library did not remove test book entry");
 
-        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
-                new ItemStack(Items.IRON_INGOT), new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.IRON_INGOT),
-                new ItemStack(Items.BOOKSHELF), new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), new ItemStack(Items.BOOKSHELF),
-                new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE), new ItemStack(Items.IRON_INGOT)));
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get()),
+                new ItemStack(Items.BOOKSHELF), new ItemStack(Items.REDSTONE)));
         ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
                 .orElseThrow().value().assemble(recipeInput);
@@ -2797,10 +2798,10 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
 
         net.minecraft.world.item.crafting.CraftingInput recipeInput =
                 net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
-                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
-                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
-                        new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.IRON_INGOT),
-                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()),
+                        new ItemStack(Items.BLACK_DYE), new ItemStack(Items.YELLOW_DYE),
+                        new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.YELLOW_DYE),
+                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.CHEST),
                         new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get())));
         ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())

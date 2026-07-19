@@ -1,1 +1,1 @@
-{"type":"minecraft:crafting_shaped","category":"misc","pattern":["GIG","ICI","GIG"],"key":{"G":"buildcraftcore:gear_gold","I":"minecraft:iron_ingot","C":"minecraft:crafting_table"},"result":{"id":"buildcraftbuilders:filler"}}
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["BMB","YCY","GHG"],"key":{"B":"minecraft:black_dye","M":"buildcraftcore:marker_volume","Y":"minecraft:yellow_dye","C":"minecraft:crafting_table","G":"buildcraftcore:gear_gold","H":"minecraft:chest"},"result":{"id":"buildcraftbuilders:filler"}}

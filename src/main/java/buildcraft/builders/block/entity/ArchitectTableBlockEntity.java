@@ -145,8 +145,7 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         SnapshotData snapshot = new SnapshotData(kind, size(), facing, areaMin.subtract(worldPosition),
                 palette, blocks, kind == SnapshotKind.BLUEPRINT ? "Blueprint" : "Template");
         snapshot = composeLinked(snapshot);
-        ItemStack output = new ItemStack(input.getItem());
-        output.set(BCBuildersDataComponents.SNAPSHOT.get(), snapshot);
+        ItemStack output = BCBuildersItems.snapshotStack(snapshot);
         inventory.set(1, ItemResource.of(output), 1);
         long remaining = inventory.getAmountAsLong(0) - 1;
         inventory.set(0, remaining > 0 ? input : ItemResource.EMPTY, (int) Math.max(0, remaining));
