@@ -63,6 +63,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private boolean finished;
     private ControlMode mode = ControlMode.ON;
     private FillerPattern pattern = FillerPattern.FILL;
+    private Direction verticalDirection = Direction.UP;
+    private Direction horizontalDirection = Direction.EAST;
 
     public FillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.FILLER.get(), pos, state);
@@ -76,6 +78,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public int cursor() { return cursor; }
     public boolean finished() { return finished; }
     public FillerPattern pattern() { return pattern; }
+    public Direction verticalDirection() { return verticalDirection; }
+    public Direction horizontalDirection() { return horizontalDirection; }
 
     public static void tick(Level level, BlockPos pos, BlockState state, FillerBlockEntity filler) {
         if (!(level instanceof ServerLevel serverLevel)) return;
@@ -139,7 +143,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
                 cursor++;
                 continue;
             }
-            if (!pattern.includes(target, areaMin, areaMax)) {
+            if (!includesTarget(target)) {
                 cursor++;
                 continue;
             }
@@ -179,6 +183,27 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         }
         finished = cursor >= volume;
         sync();
+    }
+
+    private boolean includesTarget(BlockPos target) {
+        if (pattern != FillerPattern.PYRAMID && pattern != FillerPattern.STAIRS) {
+            return pattern.includes(target, areaMin, areaMax);
+        }
+        int layer = verticalDirection == Direction.UP
+                ? target.getY() - areaMin.getY() : areaMax.getY() - target.getY();
+        if (pattern == FillerPattern.PYRAMID) {
+            return target.getX() >= areaMin.getX() + layer
+                    && target.getX() <= areaMax.getX() - layer
+                    && target.getZ() >= areaMin.getZ() + layer
+                    && target.getZ() <= areaMax.getZ() - layer;
+        }
+        return switch (horizontalDirection) {
+            case EAST -> target.getX() >= areaMin.getX() + layer;
+            case WEST -> target.getX() <= areaMax.getX() - layer;
+            case SOUTH -> target.getZ() >= areaMin.getZ() + layer;
+            case NORTH -> target.getZ() <= areaMax.getZ() - layer;
+            default -> false;
+        };
     }
 
     private boolean place(ServerLevel level, BlockPos target, ItemResource resource) {
@@ -272,6 +297,22 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         sync();
     }
 
+    public void setVerticalDirection(Direction direction) {
+        if (direction.getAxis() != Direction.Axis.Y || verticalDirection == direction) return;
+        verticalDirection = direction;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
+    public void setHorizontalDirection(Direction direction) {
+        if (direction.getAxis().isVertical() || horizontalDirection == direction) return;
+        horizontalDirection = direction;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
     private void sync() {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -289,6 +330,10 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         finished = input.getBooleanOr("finished", false);
         mode = input.read("mode", ControlMode.CODEC).orElse(ControlMode.ON);
         pattern = input.read("pattern", FillerPattern.CODEC).orElse(FillerPattern.FILL);
+        verticalDirection = input.read("vertical_direction", Direction.CODEC).orElse(Direction.UP);
+        if (verticalDirection.getAxis() != Direction.Axis.Y) verticalDirection = Direction.UP;
+        horizontalDirection = input.read("horizontal_direction", Direction.CODEC).orElse(Direction.EAST);
+        if (horizontalDirection.getAxis().isVertical()) horizontalDirection = Direction.EAST;
     }
 
     @Override protected void saveAdditional(ValueOutput output) {
@@ -301,6 +346,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (finished) output.putBoolean("finished", true);
         output.store("mode", ControlMode.CODEC, mode);
         output.store("pattern", FillerPattern.CODEC, pattern);
+        output.store("vertical_direction", Direction.CODEC, verticalDirection);
+        output.store("horizontal_direction", Direction.CODEC, horizontalDirection);
     }
 
     @Override public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {

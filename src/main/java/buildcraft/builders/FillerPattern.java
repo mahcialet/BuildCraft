@@ -7,12 +7,12 @@ import net.minecraft.util.StringRepresentable;
 import java.util.Locale;
 
 public enum FillerPattern implements StringRepresentable {
-    NONE, CLEAR, FILL, BOX, FRAME;
+    NONE, CLEAR, FILL, BOX, FRAME, PYRAMID, STAIRS;
 
     public static final Codec<FillerPattern> CODEC = StringRepresentable.fromEnum(FillerPattern::values);
 
     public boolean includes(BlockPos pos, BlockPos min, BlockPos max) {
-        if (this == NONE) return false;
+        if (this == NONE || this == PYRAMID || this == STAIRS) return false;
         if (this == CLEAR || this == FILL) return true;
         int boundaries = (pos.getX() == min.getX() || pos.getX() == max.getX() ? 1 : 0)
                 + (pos.getY() == min.getY() || pos.getY() == max.getY() ? 1 : 0)

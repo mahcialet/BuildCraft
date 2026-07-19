@@ -70,6 +70,12 @@ public final class FillerMenu extends AbstractContainerMenu {
     public FillerBlockEntity filler() { return filler; }
     public ControlMode mode() { return filler == null ? ControlMode.ON : filler.controlMode(); }
     public FillerPattern pattern() { return filler == null ? FillerPattern.FILL : filler.pattern(); }
+    public net.minecraft.core.Direction verticalDirection() {
+        return filler == null ? net.minecraft.core.Direction.UP : filler.verticalDirection();
+    }
+    public net.minecraft.core.Direction horizontalDirection() {
+        return filler == null ? net.minecraft.core.Direction.EAST : filler.horizontalDirection();
+    }
 
     @Override public boolean clickMenuButton(Player player, int id) {
         if (filler == null) return false;
@@ -78,9 +84,20 @@ public final class FillerMenu extends AbstractContainerMenu {
             return true;
         }
         int pattern = id - 10;
-        if (pattern < 0 || pattern >= FillerPattern.values().length) return false;
-        filler.setPattern(FillerPattern.values()[pattern]);
-        return true;
+        if (pattern >= 0 && pattern < FillerPattern.values().length) {
+            filler.setPattern(FillerPattern.values()[pattern]);
+            return true;
+        }
+        if (id == 20) {
+            filler.setVerticalDirection(filler.verticalDirection() == net.minecraft.core.Direction.UP
+                    ? net.minecraft.core.Direction.DOWN : net.minecraft.core.Direction.UP);
+            return true;
+        }
+        if (id == 21) {
+            filler.setHorizontalDirection(filler.horizontalDirection().getClockWise());
+            return true;
+        }
+        return false;
     }
 
     @Override public ItemStack quickMoveStack(Player player, int slotId) {

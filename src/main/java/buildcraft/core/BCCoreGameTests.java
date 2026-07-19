@@ -145,6 +145,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
+        registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
@@ -2257,6 +2258,90 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "reloaded Filler lost its selected pattern");
         helper.assertTrue(min.equals(restored.areaMin()) && max.equals(restored.areaMax()),
                 "Filler lost its copied area bounds");
+        helper.succeed();
+    }
+
+    private static void buildersFillerAdvancedPatterns(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(1, 2, 2));
+        BlockPos min = fillerPos.east();
+        BlockPos max = min.offset(4, 2, 4);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        helper.assertTrue(filler.configureArea(min, max), "Pyramid Filler rejected valid bounds");
+        filler.setVerticalDirection(Direction.UP);
+        filler.setPattern(buildcraft.builders.FillerPattern.PYRAMID);
+        insertPipeItem(filler.resources(), Items.STONE, 35);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(140 * MjAPI.MJ, false),
+                "Pyramid pattern rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 36);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.STONE), 35,
+                "Pyramid pattern placed the wrong total");
+        helper.assertValueEqual(countBlocks(helper, min,
+                new BlockPos(max.getX(), min.getY(), max.getZ()), Blocks.STONE), 25,
+                "Pyramid base layer was not 5x5");
+        helper.assertValueEqual(countBlocks(helper, min.offset(1, 1, 1),
+                max.offset(-1, -1, -1), Blocks.STONE), 9,
+                "Pyramid middle layer was not 3x3");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(2, 2, 2)).is(Blocks.STONE),
+                "Pyramid apex was missing");
+        helper.assertValueEqual(0L, filler.storedMj(), "Pyramid pattern used the wrong MJ total");
+
+        for (BlockPos target : BlockPos.betweenClosed(min, max)) {
+            helper.getLevel().setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        filler.setHorizontalDirection(Direction.EAST);
+        filler.setVerticalDirection(Direction.UP);
+        filler.setPattern(buildcraft.builders.FillerPattern.STAIRS);
+        insertPipeItem(filler.resources(), Items.GLASS, 60);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(240 * MjAPI.MJ, false),
+                "Stairs pattern rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 61);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.GLASS), 60,
+                "east/up Stairs pattern placed the wrong total");
+        helper.assertValueEqual(countBlocks(helper, min,
+                new BlockPos(max.getX(), min.getY(), max.getZ()), Blocks.GLASS), 25,
+                "east/up Stairs base was not a full plane");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(0, 1, 2)).isAir()
+                        && helper.getLevel().getBlockState(min.offset(1, 1, 2)).is(Blocks.GLASS),
+                "east/up Stairs did not advance one column per layer");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(1, 2, 2)).isAir()
+                        && helper.getLevel().getBlockState(min.offset(2, 2, 2)).is(Blocks.GLASS),
+                "east/up Stairs did not advance two columns at the top");
+
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(43, menuPlayer.getInventory(), fillerPos);
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 20), "Filler menu rejected downward direction");
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 21), "Filler menu rejected horizontal rotation");
+        helper.assertTrue(filler.verticalDirection() == Direction.DOWN
+                        && filler.horizontalDirection() == Direction.SOUTH,
+                "Filler menu selected the wrong Stairs directions");
+
+        BlockPos smallMax = min.offset(2, 1, 2);
+        for (BlockPos target : BlockPos.betweenClosed(min, max)) {
+            helper.getLevel().setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        helper.assertTrue(filler.configureArea(min, smallMax), "Stairs Filler rejected reduced bounds");
+        insertPipeItem(filler.resources(), Items.BRICKS, 15);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(60 * MjAPI.MJ, false),
+                "down/south Stairs rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 16);
+        helper.assertValueEqual(countBlocks(helper, min, smallMax, Blocks.BRICKS), 15,
+                "down/south Stairs pattern placed the wrong total");
+        helper.assertValueEqual(countBlocks(helper,
+                new BlockPos(min.getX(), smallMax.getY(), min.getZ()), smallMax, Blocks.BRICKS), 9,
+                "down/south Stairs top was not a full plane");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(1, 0, 0)).isAir()
+                        && helper.getLevel().getBlockState(min.offset(1, 0, 1)).is(Blocks.BRICKS),
+                "down/south Stairs did not advance south on its lower layer");
+
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.pattern() == buildcraft.builders.FillerPattern.STAIRS,
+                "reloaded Filler lost its Stairs pattern");
+        helper.assertTrue(restored.verticalDirection() == Direction.DOWN
+                        && restored.horizontalDirection() == Direction.SOUTH,
+                "reloaded Filler lost its Stairs directions");
         helper.succeed();
     }
 

@@ -12,12 +12,14 @@ import net.minecraft.world.entity.player.Inventory;
 public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
     private final Button[] modeButtons = new Button[ControlMode.values().length];
     private final Button[] patternButtons = new Button[FillerPattern.values().length];
+    private Button verticalButton;
+    private Button horizontalButton;
     public FillerScreen(FillerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 168);
         titleLabelX = 8;
         titleLabelY = -100;
         inventoryLabelX = 8;
-        inventoryLabelY = 75;
+        inventoryLabelY = -100;
     }
 
     @Override protected void init() {
@@ -29,7 +31,7 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                         if (minecraft != null && minecraft.gameMode != null) {
                             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, id);
                         }
-                    }).bounds(leftPos + 116 + mode * 18, topPos + 2, 16, 14).build());
+                    }).bounds(leftPos + 116 + mode * 18, topPos + 70, 16, 14).build());
         }
         for (int pattern = 0; pattern < FillerPattern.values().length; pattern++) {
             int id = pattern;
@@ -40,6 +42,16 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                         }
                     }).bounds(leftPos + 8 + pattern * 22, topPos + 2, 20, 14).build());
         }
+        verticalButton = addRenderableWidget(Button.builder(Component.literal("U"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 20);
+            }
+        }).bounds(leftPos + 8, topPos + 70, 20, 14).build());
+        horizontalButton = addRenderableWidget(Button.builder(Component.literal("E"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 21);
+            }
+        }).bounds(leftPos + 30, topPos + 70, 20, 14).build());
     }
 
     private static String patternLabel(FillerPattern pattern) {
@@ -49,6 +61,8 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
             case FILL -> "F";
             case BOX -> "B";
             case FRAME -> "R";
+            case PYRAMID -> "P";
+            case STAIRS -> "S";
         };
     }
 
@@ -60,6 +74,13 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
         for (int pattern = 0; pattern < patternButtons.length; pattern++) {
             patternButtons[pattern].active = menu.pattern().ordinal() != pattern;
         }
+        boolean advanced = menu.pattern() == FillerPattern.PYRAMID || menu.pattern() == FillerPattern.STAIRS;
+        verticalButton.visible = advanced;
+        verticalButton.setMessage(Component.literal(menu.verticalDirection() == net.minecraft.core.Direction.UP
+                ? "U" : "D"));
+        horizontalButton.visible = menu.pattern() == FillerPattern.STAIRS;
+        horizontalButton.setMessage(Component.literal(
+                menu.horizontalDirection().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
