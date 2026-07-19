@@ -62,6 +62,9 @@ neoForge {
         buildcraftfactory {
             sourceSet sourceSets.main
         }
+        buildcraftsilicon {
+            sourceSet sourceSets.main
+        }
     }
 }
 
@@ -244,6 +247,10 @@ tasks.named('processResources', ProcessResources) {
         include 'chute.json'
         filter { line -> line.replace('buildcraftfactory:blocks/chute/', 'buildcraftfactory:block/chute/') }
         into 'assets/buildcraftfactory/models/block'
+    }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/items/redstone_chipset') {
+        include '*.png'
+        into 'assets/buildcraftsilicon/textures/item/redstone_chipset'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'

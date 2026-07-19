@@ -142,6 +142,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_heat_exchanger", BCCoreGameTests::factoryHeatExchanger);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
+        registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1987,6 +1988,22 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(1, drops.size(), "auto workbench returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.AUTO_WORKBENCH.get()),
             "auto workbench returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void siliconChipsets(GameTestHelper helper) {
+        java.util.Set<buildcraft.silicon.ChipsetType> found = java.util.EnumSet.noneOf(
+            buildcraft.silicon.ChipsetType.class);
+        for (buildcraft.silicon.ChipsetType type : buildcraft.silicon.ChipsetType.values()) {
+            ItemStack stack = buildcraft.silicon.BCSiliconItems.chipset(type);
+            helper.assertTrue(stack.is(buildcraft.silicon.BCSiliconItems.REDSTONE_CHIPSET.get()),
+                "chipset subtype changed historical item registry id");
+            var decoded = stack.get(buildcraft.silicon.BCSiliconDataComponents.CHIPSET_TYPE.get());
+            helper.assertValueEqual(type, decoded, "chipset component subtype");
+            helper.assertTrue(found.add(decoded), "duplicate chipset subtype");
+            helper.assertTrue(!stack.getHoverName().getString().isBlank(), "chipset localized name missing");
+        }
+        helper.assertValueEqual(5, found.size(), "wrong chipset subtype count");
         helper.succeed();
     }
 
