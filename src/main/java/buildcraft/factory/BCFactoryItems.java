@@ -10,6 +10,8 @@ public final class BCFactoryItems {
     public static final DeferredItem<?> FLOOD_GATE =
         ITEMS.registerSimpleBlockItem("flood_gate", BCFactoryBlocks.FLOOD_GATE);
     public static final DeferredItem<?> PUMP = ITEMS.registerSimpleBlockItem("pump", BCFactoryBlocks.PUMP);
+    public static final DeferredItem<?> MINING_WELL =
+            ITEMS.registerSimpleBlockItem("mining_well", BCFactoryBlocks.MINING_WELL);
 
     private BCFactoryItems() {}
 

@@ -21,6 +21,7 @@ public final class BCFactory {
             event.accept(BCFactoryItems.TANK.get());
             event.accept(BCFactoryItems.FLOOD_GATE.get());
             event.accept(BCFactoryItems.PUMP.get());
+            event.accept(BCFactoryItems.MINING_WELL.get());
         }
     }
 }

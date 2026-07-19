@@ -3,6 +3,7 @@ package buildcraft.factory;
 import buildcraft.factory.block.entity.TankBlockEntity;
 import buildcraft.factory.block.entity.FloodGateBlockEntity;
 import buildcraft.factory.block.entity.PumpBlockEntity;
+import buildcraft.factory.block.entity.MiningWellBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -26,7 +27,11 @@ public final class BCFactoryBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PumpBlockEntity>> PUMP =
         BLOCK_ENTITIES.register("pump", () -> new BlockEntityType<>(
             PumpBlockEntity::new, BCFactoryBlocks.PUMP.get()
-        ));
+            ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MiningWellBlockEntity>> MINING_WELL =
+            BLOCK_ENTITIES.register("mining_well", () -> new BlockEntityType<>(
+                    MiningWellBlockEntity::new, BCFactoryBlocks.MINING_WELL.get()
+            ));
 
     private BCFactoryBlockEntities() {}
 
@@ -45,5 +50,10 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, PUMP.get(), (pump, side) -> pump.mjReceiver());
+        event.registerBlockEntity(Capabilities.Item.BLOCK, MINING_WELL.get(),
+                (well, side) -> well.outputHandler());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, MINING_WELL.get(), (well, side) -> well.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MINING_WELL.get(), (well, side) -> well.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_READABLE, MINING_WELL.get(), (well, side) -> well.mjReceiver());
     }
 }

@@ -135,6 +135,7 @@ registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTest
 registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
         registerTest(event, environment, "factory_pump", BCCoreGameTests::factoryPump);
+        registerTest(event, environment, "factory_mining_well", BCCoreGameTests::factoryMiningWell);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1484,6 +1485,68 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.assertValueEqual(1, drops.size(), "pump returned wrong drop count");
             helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.PUMP.get()),
                     "pump returned wrong drop");
+            helper.succeed();
+        });
+    }
+
+    private static void factoryMiningWell(GameTestHelper helper) {
+        BlockPos targetPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos upperTubePos = helper.absolutePos(new BlockPos(1, 3, 1));
+        BlockPos wellPos = helper.absolutePos(new BlockPos(1, 4, 1));
+        helper.getLevel().setBlock(targetPos, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(upperTubePos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(wellPos,
+                buildcraft.factory.BCFactoryBlocks.MINING_WELL.get().defaultBlockState(), Block.UPDATE_ALL);
+        var receiver = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, wellPos, Direction.UP);
+        helper.assertTrue(receiver != null, "mining well MJ receiver missing");
+        helper.assertValueEqual(0L, receiver.receivePower(80 * MjAPI.MJ, false),
+                "mining well rejected MJ");
+        var output = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, wellPos, Direction.WEST);
+        helper.assertTrue(output != null, "mining well item capability missing");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, output.insert(
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(new ItemStack(Items.COBBLESTONE)),
+                    1, transaction), "mining well accepted an input item");
+        }
+        helper.runAfterDelay(10, () -> {
+            helper.assertTrue(helper.getLevel().getBlockState(targetPos).is(
+                    buildcraft.factory.BCFactoryBlocks.TUBE.get()),
+                    "mining well did not replace mined block with tube");
+            helper.assertTrue(helper.getLevel().getBlockState(upperTubePos).is(
+                    buildcraft.factory.BCFactoryBlocks.TUBE.get()),
+                    "mining well did not extend its upper tube");
+            var well = (buildcraft.factory.block.entity.MiningWellBlockEntity)
+                    helper.getLevel().getBlockEntity(wellPos);
+            int cobblestone = 0;
+            for (int slot = 0; slot < well.internalDrops().size(); slot++) {
+                if (well.internalDrops().getResource(slot).is(Items.COBBLESTONE)) {
+                    cobblestone += well.internalDrops().getAmountAsInt(slot);
+                }
+            }
+            helper.assertValueEqual(1, cobblestone, "mining well did not retain the mined drop");
+            helper.assertValueEqual(0L, well.storedMj(), "mining well consumed wrong MJ amount");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_IRON.get()),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(Items.IRON_PICKAXE),
+                    new ItemStack(Items.IRON_INGOT)
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                    .orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.MINING_WELL.get()),
+                    "mining well recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(wellPos), helper.getLevel(), wellPos, well);
+            helper.assertValueEqual(1, drops.size(), "mining well returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.MINING_WELL.get()),
+                    "mining well returned wrong drop");
+            helper.getLevel().removeBlock(wellPos, false);
+            helper.assertTrue(helper.getLevel().getBlockState(targetPos).isAir()
+                            && helper.getLevel().getBlockState(upperTubePos).isAir(),
+                    "mining well removal did not clear its tube column");
             helper.succeed();
         });
     }
