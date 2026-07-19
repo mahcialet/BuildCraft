@@ -5,7 +5,7 @@ import java.util.Locale;
 import net.minecraft.util.StringRepresentable;
 
 public enum GateAction implements StringRepresentable {
-    REDSTONE_OUTPUT;
+    REDSTONE_OUTPUT, PULSAR_CONSTANT;
     public static final Codec<GateAction> CODEC = StringRepresentable.fromEnum(GateAction::values);
     @Override public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
 }

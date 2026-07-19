@@ -42,8 +42,10 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
         }
         if (resolved) {
             for (int index = 0; index < limit; index++) {
-                if (program.rules().get(index).action() == buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT) {
-                    pipe.activateGateRedstoneOutput();
+                GateRule rule = program.rules().get(index);
+                switch (rule.action()) {
+                    case REDSTONE_OUTPUT -> pipe.activateGateRedstoneOutput();
+                    case PULSAR_CONSTANT -> pipe.activatePulsar(rule.actionSide().orElse(null));
                 }
             }
         }

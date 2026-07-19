@@ -86,7 +86,7 @@ public final class GateMenu extends AbstractContainerMenu {
             while (rules.size() <= row) rules.add(new GateRule(GateTrigger.TRUE, GateAction.REDSTONE_OUTPUT));
             GateRule old = rules.get(row);
             GateTrigger next = GateTrigger.values()[(old.trigger().ordinal() + 1) % GateTrigger.values().length];
-            rules.set(row, new GateRule(next, old.action()));
+            rules.set(row, new GateRule(next, old.action(), old.actionSide()));
         }
         ItemStack updated = gate.copy();
         updated.set(BCSiliconDataComponents.GATE_PROGRAM.get(), new GateProgram(rules));

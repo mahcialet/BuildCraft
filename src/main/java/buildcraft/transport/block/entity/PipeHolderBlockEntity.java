@@ -8,6 +8,7 @@ import buildcraft.transport.BCTransportBlockEntities;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
 import buildcraft.transport.item.PipeAttachment;
+import buildcraft.transport.item.PulsarAttachment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
@@ -55,6 +56,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
     private final List<ItemStack> attachments = new ArrayList<>();
     private boolean gateRedstoneOutput;
+    private final java.util.EnumSet<Direction> pulsarRequests = java.util.EnumSet.noneOf(Direction.class);
+    private int pulsarStage;
     private final FluidBuffer fluidBuffer = new FluidBuffer();
     private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
     private @Nullable Direction fluidReceivedFrom;
@@ -186,11 +189,33 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             setChanged();
             if (level != null) level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
         }
+        tickPulsars();
     }
     public void activateGateRedstoneOutput() { gateRedstoneOutput = true; }
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
     public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
+    public void activatePulsar(@Nullable Direction side) {
+        if (side != null) {
+            pulsarRequests.add(side);
+        } else {
+            for (Direction candidate : Direction.values()) {
+                if (attachment(candidate).getItem() instanceof PulsarAttachment) pulsarRequests.add(candidate);
+            }
+        }
+    }
+    private void tickPulsars() {
+        boolean active = false;
+        for (Direction side : pulsarRequests) {
+            if (attachment(side).getItem() instanceof PulsarAttachment) { active = true; break; }
+        }
+        pulsarRequests.clear();
+        if (!active) { pulsarStage = 0; return; }
+        if (++pulsarStage < 20) return;
+        pulsarStage = 0;
+        IMjRedstoneReceiver receiver = mjReceiver();
+        if (receiver != null) receiver.receivePower(MjAPI.MJ, false);
+    }
 
     private void transferPower(ServerLevel level) {
         if (powerStored <= 0) return;

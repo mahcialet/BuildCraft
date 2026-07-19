@@ -7,6 +7,7 @@ import buildcraft.silicon.gate.GateProgram;
 import buildcraft.silicon.item.GateItem;
 import buildcraft.silicon.item.PipePlugItem;
 import buildcraft.silicon.item.GateCopierItem;
+import buildcraft.silicon.item.PulsarItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -25,8 +26,8 @@ public final class BCSiliconItems {
                     .component(BCSiliconDataComponents.GATE_LOGIC.get(), GateLogic.AND)
                     .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)
                     .component(BCSiliconDataComponents.GATE_PROGRAM.get(), GateProgram.EMPTY)));
-    public static final DeferredItem<PipePlugItem> PLUG_PULSAR =
-            ITEMS.registerItem("plug_pulsar", PipePlugItem::new);
+    public static final DeferredItem<PulsarItem> PLUG_PULSAR =
+            ITEMS.registerItem("plug_pulsar", PulsarItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =
             ITEMS.registerItem("plug_light_sensor", PipePlugItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_TIMER =

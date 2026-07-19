@@ -148,6 +148,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
+        registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -2398,6 +2399,51 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "timer item did not install after side was cleared");
         helper.assertTrue(holder.attachment(Direction.UP).is(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()),
                 "pipe stored wrong utility attachment");
+        helper.succeed();
+    }
+
+    private static void siliconPulsarGate(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState wood = block.defaultBlockState().setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_ITEM);
+        BlockState cobble = block.defaultBlockState().setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(1, 1, 2));
+        BlockPos woodPos = sourcePos.east();
+        BlockPos cobblePos = woodPos.east();
+        BlockPos targetPos = cobblePos.east();
+        helper.getLevel().setBlock(sourcePos, Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(woodPos, wood, Block.UPDATE_ALL);
+        helper.getLevel().setBlock(cobblePos, cobble, Block.UPDATE_ALL);
+        helper.getLevel().setBlock(targetPos, Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        var source = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(sourcePos);
+        source.setItem(0, new ItemStack(Items.COAL));
+        tickPipes(helper, 1, woodPos);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(woodPos);
+        helper.assertValueEqual(Direction.WEST, holder.extractionDirection(),
+                "pulsar test wood pipe did not face source");
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PULSAR_CONSTANT,
+                                java.util.Optional.of(Direction.DOWN)))));
+        helper.assertTrue(holder.installAttachment(Direction.UP, gate), "pulsar test rejected gate");
+        helper.assertTrue(holder.installAttachment(Direction.DOWN,
+                new ItemStack(buildcraft.silicon.BCSiliconItems.PLUG_PULSAR.get())),
+                "pulsar test rejected pulsar");
+        tickPipes(helper, 19, woodPos);
+        helper.assertValueEqual(1, containerCount(source, Items.COAL),
+                "pulsar emitted before its 20 tick period");
+        tickPipes(helper, 1, woodPos);
+        helper.assertValueEqual(0, containerCount(source, Items.COAL),
+                "pulsar did not feed 1 MJ into wood pipe");
+        helper.assertValueEqual(1, holder.travellingCount(), "pulsar extraction did not enter pipe flow");
         helper.succeed();
     }
 
