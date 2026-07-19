@@ -220,6 +220,10 @@ tasks.named('processResources', ProcessResources) {
         include '*.png'
         into 'assets/buildcraftfactory/textures/block/gel'
     }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/auto_workbench_item') {
+        include 'top.png', 'bottom.png', 'side.png', 'side_alt.png'
+        into 'assets/buildcraftfactory/textures/block/auto_workbench_item'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/textures/items') {
         include 'water_gel.png', 'gel.png'
         into 'assets/buildcraftfactory/textures/item'

@@ -9,6 +9,7 @@ import buildcraft.factory.block.ChuteBlock;
 import buildcraft.factory.block.DistillerBlock;
 import buildcraft.factory.block.HeatExchangerBlock;
 import buildcraft.factory.block.WaterGelBlock;
+import buildcraft.factory.block.AutoWorkbenchBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -29,6 +30,8 @@ public final class BCFactoryBlocks {
         BLOCKS.registerBlock("heat_exchange", HeatExchangerBlock::new);
     public static final DeferredBlock<WaterGelBlock> WATER_GEL =
         BLOCKS.registerBlock("water_gel", WaterGelBlock::new);
+    public static final DeferredBlock<AutoWorkbenchBlock> AUTO_WORKBENCH =
+        BLOCKS.registerBlock("autoworkbench_item", AutoWorkbenchBlock::new);
 
     private BCFactoryBlocks() {}
 

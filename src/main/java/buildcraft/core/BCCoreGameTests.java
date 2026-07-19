@@ -141,6 +141,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_distiller", BCCoreGameTests::factoryDistiller);
         registerTest(event, environment, "factory_heat_exchanger", BCCoreGameTests::factoryHeatExchanger);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
+        registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1899,6 +1900,93 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel()
         ).orElseThrow().value().assemble(input);
         helper.assertTrue(crafted.is(Items.WATER_BUCKET), "gel recipe returned wrong item");
+        helper.succeed();
+    }
+
+    private static void factoryAutoWorkbench(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(2, 2, 2));
+        helper.getLevel().setBlock(pos, buildcraft.factory.BCFactoryBlocks.AUTO_WORKBENCH.get()
+            .defaultBlockState(), Block.UPDATE_ALL);
+        var workbench = (buildcraft.factory.block.entity.AutoWorkbenchBlockEntity)
+            helper.getLevel().getBlockEntity(pos);
+        var planks = net.neoforged.neoforge.transfer.item.ItemResource.of(Items.OAK_PLANKS);
+        workbench.blueprint().set(0, planks, 1);
+        workbench.blueprint().set(3, planks, 1);
+
+        var handler = helper.getLevel().getCapability(
+            net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, pos, Direction.NORTH
+        );
+        helper.assertTrue(handler != null, "auto workbench item capability missing");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(2, handler.insert(0, planks, 2, transaction),
+                "auto workbench rejected blueprint material");
+            helper.assertValueEqual(0, handler.insert(1,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(Items.COBBLESTONE), 1, transaction),
+                "auto workbench accepted unrelated material");
+            transaction.commit();
+        }
+        for (int tick = 0; tick < 199; tick++) {
+            buildcraft.factory.block.entity.AutoWorkbenchBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), workbench
+            );
+        }
+        helper.assertValueEqual(0, workbench.result().getAmountAsInt(0),
+            "auto workbench crafted before 40 MJ cycle");
+        buildcraft.factory.block.entity.AutoWorkbenchBlockEntity.tick(
+            helper.getLevel(), pos, helper.getLevel().getBlockState(pos), workbench
+        );
+        helper.assertTrue(workbench.result().getResource(0).value() == Items.STICK,
+            "auto workbench produced wrong recipe output");
+        helper.assertValueEqual(4, workbench.result().getAmountAsInt(0),
+            "auto workbench produced wrong output count");
+        helper.assertValueEqual(0L, workbench.storedPower(), "auto workbench did not debit 40 MJ");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, handler.extract(0, planks, 1, transaction),
+                "auto workbench allowed material extraction");
+            helper.assertValueEqual(4, handler.extract(9,
+                net.neoforged.neoforge.transfer.item.ItemResource.of(Items.STICK), 4, transaction),
+                "auto workbench rejected output extraction");
+            transaction.commit();
+        }
+        for (int slot = 0; slot < 9; slot++) workbench.blueprint().set(slot,
+            net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        var honey = net.neoforged.neoforge.transfer.item.ItemResource.of(Items.HONEY_BOTTLE);
+        for (int slot : new int[] {0, 1, 3, 4}) workbench.blueprint().set(slot, honey, 1);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            for (int slot = 0; slot < 4; slot++) {
+                helper.assertValueEqual(1, handler.insert(slot, honey, 1, transaction),
+                    "auto workbench rejected container recipe material");
+            }
+            transaction.commit();
+        }
+        for (int tick = 0; tick < 200; tick++) {
+            buildcraft.factory.block.entity.AutoWorkbenchBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), workbench
+            );
+        }
+        helper.assertTrue(workbench.result().getResource(0).value() == Items.HONEY_BLOCK,
+            "auto workbench produced wrong container recipe output");
+        int bottles = 0;
+        for (int slot = 0; slot < workbench.materials().size(); slot++) {
+            if (workbench.materials().getResource(slot).value() == Items.GLASS_BOTTLE) {
+                bottles += workbench.materials().getAmountAsInt(slot);
+            }
+        }
+        helper.assertValueEqual(4, bottles, "auto workbench did not retain crafting remainders");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+            new ItemStack(BCCoreItems.GEAR_STONE.get()), new ItemStack(Items.CRAFTING_TABLE),
+            new ItemStack(BCCoreItems.GEAR_STONE.get())
+        ));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+        ).orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.AUTO_WORKBENCH.get()),
+            "auto workbench recipe returned wrong item");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos, workbench);
+        helper.assertValueEqual(1, drops.size(), "auto workbench returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.AUTO_WORKBENCH.get()),
+            "auto workbench returned wrong drop");
         helper.succeed();
     }
 

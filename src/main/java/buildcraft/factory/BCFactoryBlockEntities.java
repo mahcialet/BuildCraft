@@ -7,6 +7,7 @@ import buildcraft.factory.block.entity.MiningWellBlockEntity;
 import buildcraft.factory.block.entity.ChuteBlockEntity;
 import buildcraft.factory.block.entity.DistillerBlockEntity;
 import buildcraft.factory.block.entity.HeatExchangerBlockEntity;
+import buildcraft.factory.block.entity.AutoWorkbenchBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -44,9 +45,13 @@ public final class BCFactoryBlockEntities {
                     DistillerBlockEntity::new, BCFactoryBlocks.DISTILLER.get()
             ));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HeatExchangerBlockEntity>> HEAT_EXCHANGER =
-            BLOCK_ENTITIES.register("heat_exchange", () -> new BlockEntityType<>(
-                    HeatExchangerBlockEntity::new, BCFactoryBlocks.HEAT_EXCHANGER.get()
-            ));
+        BLOCK_ENTITIES.register("heat_exchange", () -> new BlockEntityType<>(
+            HeatExchangerBlockEntity::new, BCFactoryBlocks.HEAT_EXCHANGER.get()
+        ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<AutoWorkbenchBlockEntity>> AUTO_WORKBENCH =
+        BLOCK_ENTITIES.register("autoworkbench_item", () -> new BlockEntityType<>(
+            AutoWorkbenchBlockEntity::new, BCFactoryBlocks.AUTO_WORKBENCH.get()
+        ));
 
     private BCFactoryBlockEntities() {}
 
@@ -83,6 +88,14 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_READABLE, DISTILLER.get(),
                 (distiller, side) -> distiller.mjReceiver());
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, HEAT_EXCHANGER.get(),
-                (exchanger, side) -> exchanger.fluidHandler(side));
+            (exchanger, side) -> exchanger.fluidHandler(side));
+        event.registerBlockEntity(Capabilities.Item.BLOCK, AUTO_WORKBENCH.get(),
+            (workbench, side) -> workbench.itemHandler());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, AUTO_WORKBENCH.get(),
+            (workbench, side) -> workbench.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, AUTO_WORKBENCH.get(),
+            (workbench, side) -> workbench.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_READABLE, AUTO_WORKBENCH.get(),
+            (workbench, side) -> workbench.mjReceiver());
     }
 }

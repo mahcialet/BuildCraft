@@ -3,6 +3,9 @@ package buildcraft.factory;
 import buildcraft.core.BCCreativeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+import buildcraft.factory.client.BCFactoryClient;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
 @Mod(BCFactory.MOD_ID)
@@ -13,6 +16,8 @@ public final class BCFactory {
         BCFactoryBlocks.register(modBus);
         BCFactoryBlockEntities.register(modBus);
         BCFactoryItems.register(modBus);
+        BCFactoryMenus.register(modBus);
+        if (FMLEnvironment.getDist() == Dist.CLIENT) BCFactoryClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
     }
 
@@ -27,6 +32,7 @@ public final class BCFactory {
             event.accept(BCFactoryItems.HEAT_EXCHANGER.get());
             event.accept(BCFactoryItems.WATER_GEL.get());
             event.accept(BCFactoryItems.GEL.get());
+            event.accept(BCFactoryItems.AUTO_WORKBENCH.get());
         }
     }
 }
