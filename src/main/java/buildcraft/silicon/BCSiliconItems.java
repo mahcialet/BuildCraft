@@ -25,6 +25,8 @@ public final class BCSiliconItems {
         ITEMS.registerSimpleBlockItem("assembly_table", BCSiliconBlocks.ASSEMBLY_TABLE);
     public static final DeferredItem<?> ADVANCED_CRAFTING_TABLE =
         ITEMS.registerSimpleBlockItem("advanced_crafting_table", BCSiliconBlocks.ADVANCED_CRAFTING_TABLE);
+    public static final DeferredItem<?> INTEGRATION_TABLE =
+        ITEMS.registerSimpleBlockItem("integration_table", BCSiliconBlocks.INTEGRATION_TABLE);
 
     private BCSiliconItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

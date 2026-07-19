@@ -2,6 +2,7 @@ package buildcraft.silicon;
 
 import buildcraft.silicon.menu.AssemblyTableMenu;
 import buildcraft.silicon.menu.AdvancedCraftingTableMenu;
+import buildcraft.silicon.menu.IntegrationTableMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -15,6 +16,8 @@ public final class BCSiliconMenus {
         MENUS.register("assembly_table", () -> IMenuTypeExtension.create(AssemblyTableMenu::new));
     public static final DeferredHolder<MenuType<?>, MenuType<AdvancedCraftingTableMenu>> ADVANCED_CRAFTING_TABLE =
         MENUS.register("advanced_crafting_table", () -> IMenuTypeExtension.create(AdvancedCraftingTableMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<IntegrationTableMenu>> INTEGRATION_TABLE =
+        MENUS.register("integration_table", () -> IMenuTypeExtension.create(IntegrationTableMenu::new));
     private BCSiliconMenus() {}
     public static void register(IEventBus bus) { MENUS.register(bus); }
 }

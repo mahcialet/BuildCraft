@@ -268,6 +268,17 @@ tasks.named('processResources', ProcessResources) {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/block/table/advanced_crafting'
     }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/table/integration') {
+        include '*.png'
+        into 'assets/buildcraftsilicon/textures/block/table/integration'
+    }
+    from('buildcraft_resources/assets/buildcraftsilicon/models/block/table') {
+        include 'integration.json'
+        rename { 'integration_table.json' }
+        filter { line -> line.replace('"block/block"', '"minecraft:block/block"')
+                .replace('buildcraftsilicon:blocks/', 'buildcraftsilicon:block/') }
+        into 'assets/buildcraftsilicon/models/block'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'

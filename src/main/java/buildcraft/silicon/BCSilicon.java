@@ -28,6 +28,7 @@ public final class BCSilicon {
         event.accept(BCSiliconItems.LASER.get());
         event.accept(BCSiliconItems.ASSEMBLY_TABLE.get());
         event.accept(BCSiliconItems.ADVANCED_CRAFTING_TABLE.get());
+        event.accept(BCSiliconItems.INTEGRATION_TABLE.get());
         for (ChipsetType type : ChipsetType.values()) event.accept(BCSiliconItems.chipset(type));
         for (var material : buildcraft.silicon.gate.GateMaterial.values()) {
             if (material == buildcraft.silicon.gate.GateMaterial.CLAY_BRICK) {

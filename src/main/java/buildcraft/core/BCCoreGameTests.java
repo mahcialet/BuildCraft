@@ -146,6 +146,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
+        registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -2216,6 +2217,84 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(tableDrops.size() == 1
             && tableDrops.getFirst().is(buildcraft.silicon.BCSiliconItems.ASSEMBLY_TABLE.get()),
             "assembly table returned wrong loot");
+        helper.succeed();
+    }
+
+    private static void siliconIntegrationTable(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(3, 2, 3));
+        helper.getLevel().setBlock(pos,
+                buildcraft.silicon.BCSiliconBlocks.INTEGRATION_TABLE.get().defaultBlockState(), Block.UPDATE_ALL);
+        var table = (buildcraft.silicon.block.entity.IntegrationTableBlockEntity)
+                helper.getLevel().getBlockEntity(pos);
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, pos, Direction.NORTH);
+        helper.assertTrue(handler != null, "integration table item capability missing");
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.GOLD,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.QUARTZ);
+        var gateResource = net.neoforged.neoforge.transfer.item.ItemResource.of(gate);
+        var redChipset = net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.RED));
+        var diamondChipset = net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.DIAMOND));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(1, handler.insert(0, gateResource, 1, transaction),
+                    "integration table rejected gate target");
+            helper.assertValueEqual(1, handler.insert(1, redChipset, 1, transaction),
+                    "integration table rejected red chipset integration");
+            helper.assertValueEqual(0, handler.insert(2, diamondChipset, 1, transaction),
+                    "integration table accepted unrelated chipset");
+            helper.assertValueEqual(0, handler.extract(0, gateResource, 1, transaction),
+                    "integration table allowed target extraction");
+            transaction.commit();
+        }
+        ItemStack preview = table.preview();
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR,
+                preview.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                "integration preview did not toggle gate logic");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.QUARTZ,
+                preview.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
+                "integration preview lost gate modifier");
+        helper.assertValueEqual(25_000L * MjAPI.MJ, table.getRequiredLaserPower(),
+                "integration table requested wrong power");
+        helper.assertValueEqual(0L, table.receiveLaserPower(table.getRequiredLaserPower()),
+                "integration table rejected laser power");
+        buildcraft.silicon.block.entity.IntegrationTableBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), table);
+        helper.assertValueEqual(0L, table.storedLaserPower(), "integration table did not debit power");
+        helper.assertValueEqual(0, table.target().getAmountAsInt(0), "integration table did not consume gate");
+        helper.assertValueEqual(0, table.integrations().getAmountAsInt(0),
+                "integration table did not consume red chipset");
+        ItemStack output = table.result().getResource(0).toStack(table.result().getAmountAsInt(0));
+        helper.assertValueEqual(buildcraft.silicon.gate.GateMaterial.GOLD,
+                output.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MATERIAL.get()),
+                "integration output lost gate material");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR,
+                output.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                "integration output returned wrong logic");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(1, handler.extract(9,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(output), 1, transaction),
+                    "integration table rejected output extraction");
+            transaction.commit();
+        }
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.OBSIDIAN), new ItemStack(Items.GOLD_INGOT), new ItemStack(Items.OBSIDIAN),
+                new ItemStack(Items.OBSIDIAN),
+                buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.IRON),
+                new ItemStack(Items.OBSIDIAN), new ItemStack(Items.OBSIDIAN),
+                new ItemStack(BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(Items.OBSIDIAN)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.silicon.BCSiliconItems.INTEGRATION_TABLE.get()),
+                "integration table recipe returned wrong item");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos, table);
+        helper.assertValueEqual(1, drops.size(), "integration table returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.silicon.BCSiliconItems.INTEGRATION_TABLE.get()),
+                "integration table returned wrong drop");
         helper.succeed();
     }
 
