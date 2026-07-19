@@ -2,6 +2,8 @@ package buildcraft.factory;
 
 import buildcraft.factory.block.entity.TankBlockEntity;
 import buildcraft.factory.block.entity.FloodGateBlockEntity;
+import buildcraft.factory.block.entity.PumpBlockEntity;
+import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -21,6 +23,10 @@ public final class BCFactoryBlockEntities {
         BLOCK_ENTITIES.register("flood_gate", () -> new BlockEntityType<>(
             FloodGateBlockEntity::new, BCFactoryBlocks.FLOOD_GATE.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PumpBlockEntity>> PUMP =
+        BLOCK_ENTITIES.register("pump", () -> new BlockEntityType<>(
+            PumpBlockEntity::new, BCFactoryBlocks.PUMP.get()
+        ));
 
     private BCFactoryBlockEntities() {}
 
@@ -34,5 +40,10 @@ public final class BCFactoryBlockEntities {
             (tank, side) -> tank.stackedFluidHandler());
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, FLOOD_GATE.get(),
             (gate, side) -> gate.fluidBuffer());
+        event.registerBlockEntity(Capabilities.Fluid.BLOCK, PUMP.get(),
+            (pump, side) -> pump.outputFluidHandler());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, PUMP.get(), (pump, side) -> pump.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PUMP.get(), (pump, side) -> pump.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_READABLE, PUMP.get(), (pump, side) -> pump.mjReceiver());
     }
 }

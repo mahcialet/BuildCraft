@@ -1,0 +1,1 @@
+{"textures":{"particle":"buildcraftfactory:block/tube/side","end":"buildcraftfactory:block/tube/end","side":"buildcraftfactory:block/tube/side"},"elements":[{"from":[4,0,4],"to":[12,16,12],"faces":{"down":{"texture":"#end"},"up":{"texture":"#end"},"north":{"texture":"#side"},"south":{"texture":"#side"},"west":{"texture":"#side"},"east":{"texture":"#side"}}}]}

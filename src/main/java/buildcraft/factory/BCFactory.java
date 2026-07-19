@@ -20,6 +20,7 @@ public final class BCFactory {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
             event.accept(BCFactoryItems.TANK.get());
             event.accept(BCFactoryItems.FLOOD_GATE.get());
+            event.accept(BCFactoryItems.PUMP.get());
         }
     }
 }

@@ -53,6 +53,7 @@ import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
@@ -132,7 +133,8 @@ registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::t
 registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
 registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTests::transportDiamondPowerPipes);
 registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
-registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
+        registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
+        registerTest(event, environment, "factory_pump", BCCoreGameTests::factoryPump);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1422,6 +1424,66 @@ registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryF
             helper.assertValueEqual(1, drops.size(), "flood gate returned wrong drop count");
             helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.FLOOD_GATE.get()),
                     "flood gate returned wrong drop");
+            helper.succeed();
+        });
+    }
+
+    private static void factoryPump(GameTestHelper helper) {
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos lowerTubePos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos upperTubePos = helper.absolutePos(new BlockPos(1, 3, 1));
+        BlockPos pumpPos = helper.absolutePos(new BlockPos(1, 4, 1));
+        BlockPos tankPos = pumpPos.east();
+        for (BlockPos pos : java.util.List.of(sourcePos.north(), sourcePos.south(), sourcePos.east(),
+                sourcePos.west(), lowerTubePos, upperTubePos)) {
+            helper.getLevel().setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        helper.getLevel().setBlock(sourcePos, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(tankPos, buildcraft.factory.BCFactoryBlocks.TANK.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        helper.getLevel().setBlock(pumpPos, buildcraft.factory.BCFactoryBlocks.PUMP.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        var receiver = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, pumpPos, Direction.UP);
+        helper.assertTrue(receiver != null, "pump MJ receiver missing");
+        helper.assertValueEqual(0L, receiver.receivePower(10 * MjAPI.MJ, false), "pump rejected MJ");
+        var fluid = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, pumpPos, Direction.WEST);
+        helper.assertTrue(fluid != null, "pump fluid capability missing");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, fluid.insert(water, 1_000, transaction),
+                    "pump accepted fluid through output capability");
+        }
+        helper.runAfterDelay(3, () -> {
+            helper.assertTrue(helper.getLevel().getBlockState(sourcePos).isAir(),
+                    "pump did not consume finite water source");
+            helper.assertTrue(helper.getLevel().getBlockState(lowerTubePos).is(
+                    buildcraft.factory.BCFactoryBlocks.TUBE.get()), "pump did not create lower tube");
+            helper.assertTrue(helper.getLevel().getBlockState(upperTubePos).is(
+                    buildcraft.factory.BCFactoryBlocks.TUBE.get()), "pump did not create upper tube");
+            var tank = (buildcraft.factory.block.entity.TankBlockEntity)
+                    helper.getLevel().getBlockEntity(tankPos);
+            helper.assertValueEqual(1_000, tank.localStorage().getAmountAsInt(0),
+                    "pump did not push water to adjacent tank");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_IRON.get()),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get()), new ItemStack(Items.BUCKET),
+                    new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get())
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                    .orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.PUMP.get()),
+                    "pump recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(pumpPos), helper.getLevel(), pumpPos,
+                    helper.getLevel().getBlockEntity(pumpPos));
+            helper.assertValueEqual(1, drops.size(), "pump returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.PUMP.get()),
+                    "pump returned wrong drop");
             helper.succeed();
         });
     }

@@ -189,6 +189,14 @@ tasks.named('processResources', ProcessResources) {
         include 'top.png', 'open.png', 'closed.png'
         into 'assets/buildcraftfactory/textures/block/flood_gate'
     }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/pump') {
+        include 'bottom.png', 'top.png', 'side.png'
+        into 'assets/buildcraftfactory/textures/block/pump'
+    }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tube') {
+        include 'end.png', 'side.png'
+        into 'assets/buildcraftfactory/textures/block/tube'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {
         include 'leather.png', 'paper.png', 'texture_red_dark.png'
         into 'assets/buildcraftcore/textures/block/misc'

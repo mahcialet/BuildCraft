@@ -2,6 +2,8 @@ package buildcraft.factory;
 
 import buildcraft.factory.block.TankBlock;
 import buildcraft.factory.block.FloodGateBlock;
+import buildcraft.factory.block.PumpBlock;
+import buildcraft.factory.block.TubeBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -11,6 +13,8 @@ public final class BCFactoryBlocks {
     public static final DeferredBlock<TankBlock> TANK = BLOCKS.registerBlock("tank", TankBlock::new);
     public static final DeferredBlock<FloodGateBlock> FLOOD_GATE =
         BLOCKS.registerBlock("flood_gate", FloodGateBlock::new);
+    public static final DeferredBlock<PumpBlock> PUMP = BLOCKS.registerBlock("pump", PumpBlock::new);
+    public static final DeferredBlock<TubeBlock> TUBE = BLOCKS.registerBlock("tube", TubeBlock::new);
 
     private BCFactoryBlocks() {}
 
