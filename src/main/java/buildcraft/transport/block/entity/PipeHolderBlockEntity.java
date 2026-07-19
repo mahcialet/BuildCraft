@@ -1166,6 +1166,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
     }
+    public void attachmentChanged() { sync(); }
 
     @Override
     protected void loadAdditional(ValueInput input) {

@@ -4,6 +4,7 @@ import buildcraft.silicon.gate.GateLogic;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.gate.GateProgram;
+import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
@@ -31,6 +32,9 @@ public final class BCSiliconDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GateProgram>> COPIED_GATE_PROGRAM =
             COMPONENTS.register("copied_gate_program", () -> DataComponentType.<GateProgram>builder()
                     .persistent(GateProgram.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> PULSAR_MANUALLY_ENABLED =
+            COMPONENTS.register("pulsar_manually_enabled", () -> DataComponentType.<Boolean>builder()
+                    .persistent(Codec.BOOL).build());
 
     private BCSiliconDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

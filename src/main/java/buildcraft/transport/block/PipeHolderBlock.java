@@ -5,6 +5,7 @@ import buildcraft.transport.PipeType;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeItem;
 import buildcraft.transport.item.PipeAttachmentMenu;
+import buildcraft.transport.item.PipeAttachment;
 import buildcraft.api.tools.IWrenchable;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
@@ -144,7 +145,15 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
 
     @Override
     protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player,
-        BlockHitResult hitResult) {
+                                               BlockHitResult hitResult) {
+        if (!player.isShiftKeyDown() && level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder) {
+            var attachment = holder.attachment(hitResult.getDirection());
+            if (!attachment.isEmpty() && attachment.getItem() instanceof PipeAttachment pipeAttachment) {
+                InteractionResult result = pipeAttachment.useAttachment(
+                        holder, hitResult.getDirection(), attachment, player);
+                if (result != InteractionResult.PASS) return result;
+            }
+        }
         if (player.isShiftKeyDown() && level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder
                 && !holder.attachment(hitResult.getDirection()).isEmpty()) {
             if (!level.isClientSide()) {

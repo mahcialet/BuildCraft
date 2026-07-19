@@ -2462,6 +2462,31 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         tickPipes(helper, 40, woodPos);
         helper.assertValueEqual(1, containerCount(source, Items.COAL),
                 "single pulsar repeated while its trigger stayed active");
+
+        ItemStack pulsarStack = holder.attachment(Direction.DOWN);
+        var pulsarItem = (buildcraft.silicon.item.PulsarItem) pulsarStack.getItem();
+        pulsarItem.toggleManual(holder, pulsarStack);
+        helper.assertTrue(pulsarStack.getOrDefault(
+                        buildcraft.silicon.BCSiliconDataComponents.PULSAR_MANUALLY_ENABLED.get(), false),
+                "manual pulsar toggle did not persist its enabled component");
+        ItemStack removedPulsar = holder.takeAttachment(Direction.DOWN);
+        helper.assertTrue(removedPulsar.getOrDefault(
+                        buildcraft.silicon.BCSiliconDataComponents.PULSAR_MANUALLY_ENABLED.get(), false),
+                "removing the pulsar lost its manual state component");
+        helper.assertTrue(holder.installAttachment(Direction.DOWN, removedPulsar),
+                "manually enabled pulsar could not be reinstalled");
+        pulsarStack = holder.attachment(Direction.DOWN);
+        tickPipes(helper, 20, woodPos);
+        helper.assertValueEqual(0, containerCount(source, Items.COAL),
+                "manually enabled pulsar did not feed the wood pipe");
+        pulsarItem.toggleManual(holder, pulsarStack);
+        helper.assertFalse(pulsarStack.getOrDefault(
+                        buildcraft.silicon.BCSiliconDataComponents.PULSAR_MANUALLY_ENABLED.get(), false),
+                "manual pulsar toggle did not persist its disabled component");
+        source.setItem(0, new ItemStack(Items.COAL));
+        tickPipes(helper, 40, woodPos);
+        helper.assertValueEqual(1, containerCount(source, Items.COAL),
+                "manually disabled pulsar continued feeding the wood pipe");
         helper.succeed();
     }
 
