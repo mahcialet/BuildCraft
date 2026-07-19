@@ -65,6 +65,10 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case TIMER_LONG -> timer(pipe, 15);
             case LIGHT_LOW -> light(pipe, false);
             case LIGHT_HIGH -> light(pipe, true);
+            case INVENTORY_EMPTY -> pipe.adjacentInventory(gateSide).empty();
+            case INVENTORY_CONTAINS -> pipe.adjacentInventory(gateSide).contains();
+            case INVENTORY_SPACE -> pipe.adjacentInventory(gateSide).space();
+            case INVENTORY_FULL -> pipe.adjacentInventory(gateSide).full();
         };
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {

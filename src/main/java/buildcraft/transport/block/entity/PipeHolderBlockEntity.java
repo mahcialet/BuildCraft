@@ -203,6 +203,20 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
     public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
+    public InventoryStatus adjacentInventory(Direction side) {
+        if (!(level instanceof ServerLevel serverLevel)) return InventoryStatus.UNAVAILABLE;
+        var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
+                worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return InventoryStatus.UNAVAILABLE;
+        boolean contains = false;
+        boolean space = false;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            long amount = handler.getAmountAsLong(slot);
+            contains |= amount > 0;
+            space |= amount == 0 || amount < handler.getCapacityAsLong(slot, handler.getResource(slot));
+        }
+        return new InventoryStatus(true, !contains, contains, space, !space);
+    }
     public void activatePulsar(@Nullable Direction side) {
         if (side != null) {
             pulsarRequests.add(side);
@@ -1466,5 +1480,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         private Transit withColor(Optional<DyeColor> newColor) {
             return new Transit(stack, from, to, toCenter, ticks, speed, blocked, newColor);
         }
+    }
+
+    public record InventoryStatus(boolean available, boolean empty, boolean contains, boolean space, boolean full) {
+        public static final InventoryStatus UNAVAILABLE = new InventoryStatus(false, false, false, false, false);
     }
 }

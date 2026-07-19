@@ -162,6 +162,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
         registerTest(event, environment, "silicon_lens_routing", BCCoreGameTests::siliconLensRouting);
         registerTest(event, environment, "silicon_facade", BCCoreGameTests::siliconFacade);
+        registerTest(event, environment, "silicon_inventory_triggers", BCCoreGameTests::siliconInventoryTriggers);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3488,6 +3489,73 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
+    }
+
+    private static void siliconInventoryTriggers(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos chestPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(chestPos, Blocks.CHEST.defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "inventory trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        var chest = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(chestPos);
+
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_EMPTY, true, "empty inventory did not trigger EMPTY");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_CONTAINS, false, "empty inventory triggered CONTAINS");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_SPACE, true, "empty inventory did not trigger SPACE");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, false, "empty inventory triggered FULL");
+
+        chest.setItem(0, new ItemStack(Items.COAL));
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_EMPTY, false, "partial inventory triggered EMPTY");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_CONTAINS, true, "partial inventory did not trigger CONTAINS");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_SPACE, true, "partial inventory did not trigger SPACE");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, false, "partial inventory triggered FULL");
+
+        for (int slot = 0; slot < chest.getContainerSize(); slot++) {
+            chest.setItem(slot, new ItemStack(Items.COAL, 64));
+        }
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_EMPTY, false, "full inventory triggered EMPTY");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_CONTAINS, true, "full inventory did not trigger CONTAINS");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_SPACE, false, "full inventory triggered SPACE");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, true, "full inventory did not trigger FULL");
+
+        helper.getLevel().removeBlock(chestPos, false);
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_EMPTY, false, "missing inventory triggered EMPTY");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, false, "missing inventory triggered FULL");
+        helper.succeed();
+    }
+
+    private static void assertInventoryTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(trigger,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
 
     private static void siliconFacade(GameTestHelper helper) {
