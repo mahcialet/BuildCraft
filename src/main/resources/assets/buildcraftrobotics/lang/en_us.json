@@ -3,6 +3,8 @@
   "block.buildcraftrobotics.zone_planner": "Zone Planner",
   "gui.buildcraftrobotics.zone_planner.name": "Zone name",
   "item.buildcraftrobotics.robot_station": "Robot Station",
+  "item.buildcraftrobotics.robot": "Robot",
+  "entity.buildcraftrobotics.robot": "Robot",
   "item.buildcraftrobotics.redstone_board": "Redstone Board",
   "item.buildcraftrobotics.redstone_board.empty": "Blank",
   "item.buildcraftrobotics.redstone_board.picker": "Picker",

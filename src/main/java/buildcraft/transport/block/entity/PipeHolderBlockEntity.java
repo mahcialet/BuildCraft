@@ -110,6 +110,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public ItemStack attachment(Direction side) { return attachments.get(side.ordinal()); }
+    public buildcraft.api.mj.IMjReceiver attachmentMjReceiver(Direction side) {
+        if (side == null) return null;
+        ItemStack stack = attachment(side);
+        return !stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment
+                ? attachment.mjReceiver(this, side, stack) : null;
+    }
     public boolean installAttachment(Direction side, ItemStack stack) {
         if (stack.isEmpty() || !attachments.get(side.ordinal()).isEmpty()) return false;
         attachments.set(side.ordinal(), stack.copyWithCount(1));

@@ -1,0 +1,11 @@
+{
+  "texture_size":[64,32],
+  "textures":{"robot":"buildcraftrobotics:item/robot/base","particle":"buildcraftrobotics:item/robot/base"},
+  "elements":[
+    {"from":[3,4,3],"to":[13,12,13],"faces":{"down":{"uv":[16,0,26,10],"texture":"#robot"},"up":{"uv":[6,0,16,10],"texture":"#robot"},"north":{"uv":[6,10,16,18],"texture":"#robot"},"south":{"uv":[26,10,36,18],"texture":"#robot"},"west":{"uv":[0,10,6,18],"texture":"#robot"},"east":{"uv":[16,10,22,18],"texture":"#robot"}}},
+    {"from":[6,1,6],"to":[10,4,10],"faces":{"down":{"texture":"#robot"},"up":{"texture":"#robot"},"north":{"texture":"#robot"},"south":{"texture":"#robot"},"west":{"texture":"#robot"},"east":{"texture":"#robot"}}},
+    {"from":[4,12,7],"to":[6,15,9],"faces":{"down":{"texture":"#robot"},"up":{"texture":"#robot"},"north":{"texture":"#robot"},"south":{"texture":"#robot"},"west":{"texture":"#robot"},"east":{"texture":"#robot"}}},
+    {"from":[10,12,7],"to":[12,15,9],"faces":{"down":{"texture":"#robot"},"up":{"texture":"#robot"},"north":{"texture":"#robot"},"south":{"texture":"#robot"},"west":{"texture":"#robot"},"east":{"texture":"#robot"}}}
+  ],
+  "display":{"gui":{"rotation":[30,225,0],"translation":[0,0,0],"scale":[0.9,0.9,0.9]},"ground":{"translation":[0,3,0],"scale":[0.5,0.5,0.5]},"fixed":{"scale":[0.75,0.75,0.75]}}
+}

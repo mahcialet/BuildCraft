@@ -15,6 +15,7 @@ public final class BCRobotics {
     public BCRobotics(IEventBus modBus) {
         BCRoboticsBlocks.register(modBus);
         BCRoboticsBlockEntities.register(modBus);
+        BCRoboticsEntities.register(modBus);
         BCRoboticsDataComponents.register(modBus);
         BCRoboticsItems.register(modBus);
         BCRoboticsMenus.register(modBus);
@@ -28,6 +29,14 @@ public final class BCRobotics {
         event.accept(BCRoboticsItems.REQUESTER.get());
         event.accept(BCRoboticsItems.ZONE_PLANNER.get());
         event.accept(BCRoboticsItems.ROBOT_STATION.get());
+        event.accept(BCRoboticsItems.ROBOT.get());
+        for (RobotBoardType type : RobotBoardType.values()) {
+            if (type != RobotBoardType.EMPTY) {
+                event.accept(buildcraft.robotics.item.RobotItem.create(type, 0));
+                event.accept(buildcraft.robotics.item.RobotItem.create(type,
+                        RobotItemData.MAX_ENERGY));
+            }
+        }
         event.accept(BCRoboticsItems.REDSTONE_BOARD.get());
         for (RobotBoardType type : RobotBoardType.values()) {
             if (type != RobotBoardType.EMPTY) event.accept(BCRoboticsItems.board(type));

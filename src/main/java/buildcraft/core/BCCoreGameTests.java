@@ -6628,6 +6628,62 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         station.release(robot);
         helper.assertValueEqual(buildcraft.robotics.RobotStationState.AVAILABLE, station.state(),
                 "released station did not become available");
+        ItemStack robotStack = buildcraft.robotics.item.RobotItem.create(
+                buildcraft.robotics.RobotBoardType.CARRIER, 5_000_000L);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        helper.assertTrue(buildcraft.robotics.BCRoboticsItems.ROBOT.get()
+                        .useOn(useContext(helper, player, robotStack, relative)).consumesAction(),
+                "integrated robot item could not be placed on an available station");
+        helper.assertTrue(robotStack.isEmpty(), "placed robot item was not consumed");
+        var robots = helper.getLevel().getEntitiesOfClass(
+                buildcraft.robotics.entity.RobotEntity.class,
+                new net.minecraft.world.phys.AABB(holder.getBlockPos()).inflate(3));
+        helper.assertValueEqual(1, robots.size(), "Robot Station did not spawn exactly one robot");
+        buildcraft.robotics.entity.RobotEntity placedRobot = robots.getFirst();
+        helper.assertValueEqual(buildcraft.robotics.RobotBoardType.CARRIER, placedRobot.board(),
+                "spawned robot lost its integrated board");
+        helper.assertValueEqual(5_000_000L, placedRobot.energy(),
+                "spawned robot lost its stored energy");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, placedRobot.taskState(),
+                "spawned robot did not dock");
+        buildcraft.api.mj.IMjReceiver chargingReceiver =
+                buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                        .mjReceiver(holder, Direction.UP, holder.attachment(Direction.UP));
+        helper.assertValueEqual(buildcraft.robotics.RobotItemData.MAX_ENERGY - 5_000_000L,
+                chargingReceiver.getPowerRequested(), "station exposed the wrong robot power request");
+        helper.assertValueEqual(0L, chargingReceiver.receivePower(1_000_000L, false),
+                "station rejected power for its linked robot");
+        helper.assertValueEqual(6_000_000L, placedRobot.energy(),
+                "station did not charge its linked robot");
+        placedRobot.setItem(0, new ItemStack(Items.COBBLESTONE, 12));
+        helper.assertValueEqual(12, placedRobot.getItem(0).getCount(),
+                "robot four-slot inventory rejected its contents");
+        placedRobot.leaveStation();
+        for (int i = 0; i < 15; i++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), holder.getBlockPos(), Direction.UP);
+            placedRobot.tick();
+        }
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.IDLE, placedRobot.taskState(),
+                "robot did not complete its station departure");
+        placedRobot.returnToStation();
+        for (int i = 0; i < 20 && placedRobot.taskState() != buildcraft.robotics.RobotTaskState.DOCKED; i++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), holder.getBlockPos(), Direction.UP);
+            placedRobot.tick();
+        }
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, placedRobot.taskState(),
+                "robot did not return and re-dock");
+        player.setShiftKeyDown(true);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                new ItemStack(buildcraft.core.BCCoreItems.WRENCH.get()));
+        helper.assertTrue(placedRobot.interact(player, net.minecraft.world.InteractionHand.MAIN_HAND,
+                        placedRobot.position()).consumesAction(),
+                "wrench did not dismantle the robot");
+        helper.assertTrue(placedRobot.isRemoved(), "dismantled robot entity remained in the world");
+        helper.assertTrue(player.getInventory().hasAnyMatching(
+                        stack -> stack.is(buildcraft.robotics.BCRoboticsItems.ROBOT.get())),
+                "dismantled robot did not return its configured item");
+        helper.assertValueEqual(buildcraft.robotics.RobotStationState.AVAILABLE, station.state(),
+                "dismantling did not release the Robot Station");
         ItemStack goldChipset = buildcraft.silicon.BCSiliconItems.chipset(
                 buildcraft.silicon.ChipsetType.GOLD);
         var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
