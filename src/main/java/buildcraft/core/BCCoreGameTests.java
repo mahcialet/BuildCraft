@@ -147,6 +147,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
+        registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -2312,6 +2313,45 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(1, drops.size(), "integration table returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.silicon.BCSiliconItems.INTEGRATION_TABLE.get()),
                 "integration table returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void siliconPipeAttachments(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(3, 2, 3);
+        BlockPos pos = helper.absolutePos(relative);
+        helper.getLevel().setBlock(pos, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get()
+                .defaultBlockState().setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_ITEM), Block.UPDATE_ALL);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(pos);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.NETHER_BRICK,
+                buildcraft.silicon.gate.GateLogic.OR,
+                buildcraft.silicon.gate.GateModifier.DIAMOND);
+        helper.assertTrue(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()
+                        .useOn(useContext(helper, player, gate, relative)).consumesAction(),
+                "gate item did not install on pipe side");
+        helper.assertTrue(gate.isEmpty(), "gate installation did not consume survival stack");
+        ItemStack installed = holder.attachment(Direction.UP);
+        helper.assertValueEqual(buildcraft.silicon.gate.GateMaterial.NETHER_BRICK,
+                installed.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MATERIAL.get()),
+                "pipe attachment lost gate material");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.DIAMOND,
+                installed.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
+                "pipe attachment lost gate modifier");
+        ItemStack timer = new ItemStack(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get());
+        helper.assertTrue(!buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()
+                        .useOn(useContext(helper, player, timer, relative)).consumesAction(),
+                "pipe accepted a second attachment on one side");
+        helper.assertValueEqual(1, timer.getCount(), "rejected attachment consumed item");
+        ItemStack removed = holder.takeAttachment(Direction.UP);
+        helper.assertTrue(removed.is(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()),
+                "pipe returned wrong attachment");
+        helper.assertTrue(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()
+                        .useOn(useContext(helper, player, timer, relative)).consumesAction(),
+                "timer item did not install after side was cleared");
+        helper.assertTrue(holder.attachment(Direction.UP).is(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()),
+                "pipe stored wrong utility attachment");
         helper.succeed();
     }
 

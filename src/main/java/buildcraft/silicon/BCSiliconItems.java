@@ -4,6 +4,7 @@ import buildcraft.silicon.gate.GateLogic;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.item.GateItem;
+import buildcraft.silicon.item.PipePlugItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -21,9 +22,12 @@ public final class BCSiliconItems {
                     .component(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK)
                     .component(BCSiliconDataComponents.GATE_LOGIC.get(), GateLogic.AND)
                     .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)));
-    public static final DeferredItem<Item> PLUG_PULSAR = ITEMS.registerSimpleItem("plug_pulsar");
-    public static final DeferredItem<Item> PLUG_LIGHT_SENSOR = ITEMS.registerSimpleItem("plug_light_sensor");
-    public static final DeferredItem<Item> PLUG_TIMER = ITEMS.registerSimpleItem("plug_timer");
+    public static final DeferredItem<PipePlugItem> PLUG_PULSAR =
+            ITEMS.registerItem("plug_pulsar", PipePlugItem::new);
+    public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =
+            ITEMS.registerItem("plug_light_sensor", PipePlugItem::new);
+    public static final DeferredItem<PipePlugItem> PLUG_TIMER =
+            ITEMS.registerItem("plug_timer", PipePlugItem::new);
     public static final DeferredItem<?> LASER = ITEMS.registerSimpleBlockItem("laser", BCSiliconBlocks.LASER);
     public static final DeferredItem<?> ASSEMBLY_TABLE =
         ITEMS.registerSimpleBlockItem("assembly_table", BCSiliconBlocks.ASSEMBLY_TABLE);

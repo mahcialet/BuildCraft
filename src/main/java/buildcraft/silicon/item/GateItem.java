@@ -5,10 +5,9 @@ import buildcraft.silicon.gate.GateLogic;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 
-public final class GateItem extends Item {
+public final class GateItem extends PipePlugItem {
     public GateItem(Properties properties) { super(properties); }
     @Override public Component getName(ItemStack stack) {
         GateMaterial material = stack.getOrDefault(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK);

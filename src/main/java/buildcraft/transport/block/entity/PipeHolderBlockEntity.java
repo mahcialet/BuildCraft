@@ -52,6 +52,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public static final int TRAVEL_TICKS = 10;
     public static final double INITIAL_SPEED = 0.05;
     private final InputHandler[] inputs = new InputHandler[Direction.values().length];
+    private final List<ItemStack> attachments = new ArrayList<>();
     private final FluidBuffer fluidBuffer = new FluidBuffer();
     private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
     private @Nullable Direction fluidReceivedFrom;
@@ -85,6 +86,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public PipeHolderBlockEntity(BlockPos pos, BlockState state) {
         super(BCTransportBlockEntities.PIPE_HOLDER.get(), pos, state);
         for (Direction direction : Direction.values()) inputs[direction.ordinal()] = new InputHandler();
+        for (Direction ignored : Direction.values()) attachments.add(ItemStack.EMPTY);
         for (Direction direction : Direction.values()) fluidSides[direction.ordinal()] = new SideFluidHandler(direction);
         for (int index = 0; index < 9; index++) diamondFilters.add(ItemStack.EMPTY);
         for (int index = 0; index < 4; index++) {
@@ -92,6 +94,21 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             emzuliColors.add(Optional.empty());
         }
         for (int index = 0; index < 54; index++) diamondRouteFilters.add(ItemStack.EMPTY);
+    }
+
+    public ItemStack attachment(Direction side) { return attachments.get(side.ordinal()); }
+    public boolean installAttachment(Direction side, ItemStack stack) {
+        if (stack.isEmpty() || !attachments.get(side.ordinal()).isEmpty()) return false;
+        attachments.set(side.ordinal(), stack.copyWithCount(1));
+        sync();
+        return true;
+    }
+    public ItemStack takeAttachment(Direction side) {
+        ItemStack stack = attachments.get(side.ordinal());
+        if (stack.isEmpty()) return ItemStack.EMPTY;
+        attachments.set(side.ordinal(), ItemStack.EMPTY);
+        sync();
+        return stack;
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
@@ -1085,6 +1102,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
         pipeColor = input.read("pipe_color", DyeColor.CODEC).orElse(DyeColor.WHITE);
         obsidianWaitTicks = pipeType() == PipeType.OBSIDIAN_ITEM ? 20 : 0;
+        List<ItemStack> savedAttachments = input.read("attachments", ItemStack.OPTIONAL_CODEC.listOf()).orElse(List.of());
+        for (int index = 0; index < attachments.size(); index++) {
+            attachments.set(index, index < savedAttachments.size() ? savedAttachments.get(index) : ItemStack.EMPTY);
+        }
         List<ItemStack> savedFilters = input.read("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf()).orElse(List.of());
         for (int index = 0; index < diamondFilters.size(); index++) {
             diamondFilters.set(index, index < savedFilters.size() ? savedFilters.get(index) : ItemStack.EMPTY);
@@ -1131,6 +1152,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
         output.store("pipe_color", DyeColor.CODEC, pipeColor);
+        output.store("attachments", ItemStack.OPTIONAL_CODEC.listOf(), attachments);
         output.store("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondFilters);
         output.store("diamond_filter_mode", DiamondFilterMode.CODEC, diamondFilterMode);
         output.putInt("diamond_filter_cursor", diamondFilterCursor);
