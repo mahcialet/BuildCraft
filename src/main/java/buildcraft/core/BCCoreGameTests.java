@@ -101,6 +101,11 @@ public final class BCCoreGameTests {
 
     private static void registerTests(RegisterGameTestsEvent event) {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(id("core"));
+        Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
+            event.registerEnvironment(id("robotics_picker"));
+        Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
+            event.registerEnvironment(id("robotics_fluid_carrier"));
+        registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -158,7 +163,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
         registerTest(event, environment, "robotics_carrier_robot", BCCoreGameTests::roboticsCarrierRobot);
-        registerTest(event, environment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
+        registerTest(event, fluidCarrierEnvironment, "robotics_fluid_carrier_robot",
+            BCCoreGameTests::roboticsFluidCarrierRobot);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -6711,8 +6717,11 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
                 (buildcraft.transport.block.entity.PipeHolderBlockEntity)
                         helper.getLevel().getBlockEntity(helper.absolutePos(pipeRelative));
-        helper.assertTrue(holder.installAttachment(Direction.UP,
-                        new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+        ItemStack deliverySourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        deliverySourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        helper.assertTrue(holder.installAttachment(Direction.UP, deliverySourceStation),
                 "delivery test rejected Robot Station attachment");
         net.minecraft.world.Container chest = (net.minecraft.world.Container)
                 helper.getLevel().getBlockEntity(helper.absolutePos(chestRelative));
@@ -6764,7 +6773,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
     private static void roboticsCarrierRobot(GameTestHelper helper) {
         BlockPos homeRelative = new BlockPos(1, 2, 1);
         BlockPos providerRelative = new BlockPos(4, 2, 1);
-        BlockPos receiverRelative = new BlockPos(8, 2, 1);
+        BlockPos receiverRelative = new BlockPos(2, 2, 1);
         helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
         helper.setBlock(providerRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
         helper.setBlock(receiverRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
@@ -6837,8 +6846,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         var cycled = home.attachment(Direction.UP).getOrDefault(
                 buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
                 buildcraft.robotics.RobotStationConfig.DEFAULT);
-        helper.assertValueEqual(buildcraft.robotics.RobotStationMode.PROVIDE, cycled.mode(),
-                "station mode did not cycle from both to provide");
+        helper.assertValueEqual(buildcraft.robotics.RobotStationMode.BOTH, cycled.mode(),
+                "station mode did not cycle from disabled to both");
         player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
                 new ItemStack(Items.DIAMOND));
         buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
@@ -6876,7 +6885,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
                 helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
 
-        Vec3 dropPosition = Vec3.atCenterOf(helper.absolutePos(new BlockPos(4, 2, 1)));
+        Vec3 dropPosition = Vec3.atCenterOf(helper.absolutePos(new BlockPos(1, 3, 1)));
         var cobblestoneDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
                 dropPosition.x, dropPosition.y, dropPosition.z, new ItemStack(Items.COBBLESTONE, 20));
         var dirtDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
@@ -6913,7 +6922,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Picker ignored its home station item filter");
         helper.assertTrue(receiverChest.getItem(0).is(Items.COBBLESTONE)
                         && receiverChest.getItem(0).getCount() == 20,
-                "Picker did not unload collected items");
+            "Picker did not unload collected items");
         helper.assertTrue(robot.isEmpty(), "Picker retained unloaded items");
         helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
                 "Picker did not return home");
@@ -6921,6 +6930,109 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Picker scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Picker flight consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsFluidCarrierRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 2, 1);
+        BlockPos waterProviderRelative = new BlockPos(3, 2, 1);
+        BlockPos lavaProviderRelative = new BlockPos(1, 2, 3);
+        BlockPos receiverRelative = new BlockPos(3, 2, 3);
+        for (BlockPos relative : java.util.List.of(homeRelative, waterProviderRelative,
+                lavaProviderRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(waterProviderRelative.above(), buildcraft.factory.BCFactoryBlocks.TANK.get());
+        helper.setBlock(lavaProviderRelative.above(), buildcraft.factory.BCFactoryBlocks.TANK.get());
+        helper.setBlock(receiverRelative.above(), buildcraft.factory.BCFactoryBlocks.TANK.get());
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var waterProvider = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(waterProviderRelative));
+        var lavaProvider = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(lavaProviderRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        home.installAttachment(Direction.UP,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()));
+        net.neoforged.neoforge.transfer.fluid.FluidResource water =
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                        net.minecraft.world.level.material.Fluids.WATER);
+        net.neoforged.neoforge.transfer.fluid.FluidResource lava =
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                        net.minecraft.world.level.material.Fluids.LAVA);
+        ItemStack waterProviderStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        waterProviderStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(), java.util.List.of(water)));
+        waterProvider.installAttachment(Direction.UP, waterProviderStation);
+        ItemStack lavaProviderStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        lavaProviderStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(), java.util.List.of(water)));
+        lavaProvider.installAttachment(Direction.UP, lavaProviderStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of(), java.util.List.of(water)));
+        receiver.installAttachment(Direction.UP, receiverStation);
+
+        var waterTank = ((buildcraft.factory.block.entity.TankBlockEntity) helper.getLevel()
+                .getBlockEntity(helper.absolutePos(waterProviderRelative.above()))).localStorage();
+        var lavaTank = ((buildcraft.factory.block.entity.TankBlockEntity) helper.getLevel()
+                .getBlockEntity(helper.absolutePos(lavaProviderRelative.above()))).localStorage();
+        var receiverTank = ((buildcraft.factory.block.entity.TankBlockEntity) helper.getLevel()
+                .getBlockEntity(helper.absolutePos(receiverRelative.above()))).localStorage();
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+                     net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            waterTank.insert(water, 6_000, transaction);
+            lavaTank.insert(lava, 1_000, transaction);
+            transaction.commit();
+        }
+        var homeStation = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        for (var pipe : java.util.List.of(waterProvider, lavaProvider, receiver)) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+        }
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.FLUID_CARRIER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeStation.reserve(robot.getUUID()) && robot.dock(homeStation),
+                "Fluid Carrier could not dock at home");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 600 && (receiverTank.getAmountAsInt(0) != 4_000
+                || robot.fluidCarrierPhase() != buildcraft.robotics.FluidCarrierPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, waterProvider, lavaProvider, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertValueEqual(2_000, waterTank.getAmountAsInt(0),
+                "Fluid Carrier ignored its 4,000 mB tank capacity");
+        helper.assertValueEqual(1_000, lavaTank.getAmountAsInt(0),
+                "Fluid Carrier ignored station fluid filter");
+        helper.assertTrue(receiverTank.getResource(0).equals(water)
+                        && receiverTank.getAmountAsInt(0) == 4_000,
+                "Fluid Carrier unloaded the wrong fluid or amount");
+        helper.assertValueEqual(0, robot.fluidTank().getAmountAsInt(0),
+                "Fluid Carrier retained unloaded fluid");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Fluid Carrier did not return home");
+        helper.assertValueEqual(buildcraft.robotics.FluidCarrierPhase.NONE, robot.fluidCarrierPhase(),
+                "Fluid Carrier scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Fluid Carrier flight consumed no battery energy");
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                new ItemStack(Items.WATER_BUCKET));
+        buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                .useAttachment(home, Direction.UP, home.attachment(Direction.UP), player);
+        var editedConfig = home.attachment(Direction.UP).getOrDefault(
+                buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                buildcraft.robotics.RobotStationConfig.DEFAULT);
+        helper.assertTrue(editedConfig.fluidFilters().contains(water),
+                "filled-container interaction did not add station fluid filter");
         helper.succeed();
     }
 

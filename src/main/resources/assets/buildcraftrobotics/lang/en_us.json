@@ -5,7 +5,7 @@
   "item.buildcraftrobotics.robot_station": "Robot Station",
   "item.buildcraftrobotics.robot": "Robot",
   "entity.buildcraftrobotics.robot": "Robot",
-  "message.buildcraftrobotics.robot_station.config": "Robot Station: %s, %s filter(s)",
+  "message.buildcraftrobotics.robot_station.config": "Robot Station: %s, %s item filter(s), %s fluid filter(s)",
   "item.buildcraftrobotics.redstone_board": "Redstone Board",
   "item.buildcraftrobotics.redstone_board.empty": "Blank",
   "item.buildcraftrobotics.redstone_board.picker": "Picker",

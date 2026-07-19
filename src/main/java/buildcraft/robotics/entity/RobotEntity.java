@@ -12,6 +12,7 @@ import buildcraft.robotics.RobotStationConfig;
 import buildcraft.robotics.BCRoboticsDataComponents;
 import buildcraft.robotics.DroppedItemRegistry;
 import buildcraft.robotics.PickerPhase;
+import buildcraft.robotics.FluidCarrierPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -39,9 +40,12 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.transfer.fluid.FluidResource;
+import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 
 public final class RobotEntity extends Entity implements Container, ItemSupplier {
     public static final int INVENTORY_SIZE = 4;
+    public static final int FLUID_CAPACITY = 4_000;
     private static final EntityDataAccessor<Integer> BOARD =
             SynchedEntityData.defineId(RobotEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Long> ENERGY =
@@ -61,6 +65,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private UUID pickerTarget;
     private RobotStationRegistry.Address pickerUnloadTarget;
     private PickerPhase pickerPhase = PickerPhase.NONE;
+    private final FluidStacksResourceHandler fluidTank = new FluidStacksResourceHandler(1, FLUID_CAPACITY);
+    private RobotStationRegistry.Address fluidCarrierTarget;
+    private FluidCarrierPhase fluidCarrierPhase = FluidCarrierPhase.NONE;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -106,6 +113,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
     public CarrierPhase carrierPhase() { return carrierPhase; }
     public PickerPhase pickerPhase() { return pickerPhase; }
+    public FluidCarrierPhase fluidCarrierPhase() { return fluidCarrierPhase; }
+    public ResourceHandler<FluidResource> fluidTank() { return fluidTank; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -153,6 +162,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.PICKER && pickerPhase == PickerPhase.NONE
                     && tickCount % 20 == 0) {
                 beginPicker(serverLevel);
+            } else if (board() == RobotBoardType.FLUID_CARRIER
+                    && fluidCarrierPhase == FluidCarrierPhase.NONE && tickCount % 20 == 0) {
+                beginFluidCarrier(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -174,6 +186,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (deliveryPhase != DeliveryPhase.NONE) tickDelivery(serverLevel);
         if (carrierPhase != CarrierPhase.NONE) tickCarrier(serverLevel);
         if (pickerPhase != PickerPhase.NONE) tickPicker(serverLevel);
+        if (fluidCarrierPhase != FluidCarrierPhase.NONE) tickFluidCarrier(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -448,6 +461,140 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         pickerTarget = null;
     }
 
+    private ResourceHandler<FluidResource> fluidSourceHandler(
+            ServerLevel level, RobotStationRegistry.Address address) {
+        Direction side = address.side();
+        return level.getCapability(Capabilities.Fluid.BLOCK,
+                address.pipePos().relative(side), side.getOpposite());
+    }
+
+    private void beginFluidCarrier(ServerLevel level) {
+        Optional<RobotStationRegistry.Address> target = fluidTank.getAmountAsLong(0) <= 0
+                ? findFluidLoadStation(level) : findFluidUnloadStation(level, null);
+        if (target.isEmpty()) return;
+        fluidCarrierTarget = target.get();
+        fluidCarrierPhase = fluidTank.getAmountAsLong(0) <= 0
+                ? FluidCarrierPhase.TO_LOAD : FluidCarrierPhase.TO_UNLOAD;
+        leaveStation();
+    }
+
+    private Optional<RobotStationRegistry.Address> findFluidLoadStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<FluidResource> handler = fluidSourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        FluidResource fluid = handler.getResource(slot);
+                        if (!fluid.isEmpty() && handler.getAmountAsLong(slot) > 0
+                                && config.matches(fluid)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private Optional<RobotStationRegistry.Address> findFluidUnloadStation(
+            ServerLevel level, RobotStationRegistry.Address excluded) {
+        if (fluidTank.getAmountAsLong(0) <= 0) return Optional.empty();
+        FluidResource carried = fluidTank.getResource(0);
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().receives() || !config.matches(carried)) return false;
+                    ResourceHandler<FluidResource> handler = fluidSourceHandler(level, address);
+                    if (handler == null) return false;
+                    try (Transaction transaction = Transaction.openRoot()) {
+                        return handler.insert(carried, fluidTank.getAmountAsInt(0), transaction) > 0;
+                    }
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void tickFluidCarrier(ServerLevel level) {
+        if (fluidCarrierTarget == null) fluidCarrierPhase = FluidCarrierPhase.RETURN_HOME;
+        if (fluidCarrierPhase == FluidCarrierPhase.TO_LOAD) {
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(fluidCarrierTarget))) {
+                loadFluidCarrier(level, fluidCarrierTarget);
+                Optional<RobotStationRegistry.Address> unload = findFluidUnloadStation(level, fluidCarrierTarget);
+                if (unload.isPresent()) {
+                    fluidCarrierTarget = unload.get();
+                    fluidCarrierPhase = FluidCarrierPhase.TO_UNLOAD;
+                } else {
+                    returnFluidCarrier(level, fluidCarrierTarget);
+                    fluidCarrierPhase = FluidCarrierPhase.RETURN_HOME;
+                }
+            }
+        } else if (fluidCarrierPhase == FluidCarrierPhase.TO_UNLOAD) {
+            if (flyToward(sourcePosition(fluidCarrierTarget))) {
+                RobotStationRegistry.Address attempted = fluidCarrierTarget;
+                unloadFluidCarrier(level, attempted);
+                if (fluidTank.getAmountAsLong(0) <= 0) {
+                    fluidCarrierPhase = FluidCarrierPhase.RETURN_HOME;
+                } else {
+                    Optional<RobotStationRegistry.Address> next = findFluidUnloadStation(level, attempted);
+                    if (next.isPresent()) fluidCarrierTarget = next.get();
+                    else fluidCarrierPhase = FluidCarrierPhase.RETURN_HOME;
+                }
+            }
+        } else if (fluidCarrierPhase == FluidCarrierPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                fluidCarrierTarget = null;
+                fluidCarrierPhase = FluidCarrierPhase.NONE;
+            }
+        }
+    }
+
+    private void loadFluidCarrier(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<FluidResource> handler = fluidSourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size() && fluidTank.getAmountAsLong(0) < FLUID_CAPACITY; slot++) {
+            FluidResource fluid = handler.getResource(slot);
+            if (fluid.isEmpty() || !config.matches(fluid)) continue;
+            int capacity = FLUID_CAPACITY - fluidTank.getAmountAsInt(0);
+            try (Transaction transaction = Transaction.openRoot()) {
+                int extracted = handler.extract(slot, fluid,
+                        Math.min(capacity, handler.getAmountAsInt(slot)), transaction);
+                int inserted = fluidTank.insert(fluid, extracted, transaction);
+                if (extracted > 0 && inserted == extracted) transaction.commit();
+            }
+        }
+    }
+
+    private void unloadFluidCarrier(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (fluidTank.getAmountAsLong(0) <= 0) return;
+        ResourceHandler<FluidResource> handler = fluidSourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        FluidResource fluid = fluidTank.getResource(0);
+        if (handler == null || !config.mode().receives() || !config.matches(fluid)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            int inserted = handler.insert(fluid, fluidTank.getAmountAsInt(0), transaction);
+            int extracted = fluidTank.extract(0, fluid, inserted, transaction);
+            if (inserted > 0 && extracted == inserted) transaction.commit();
+        }
+    }
+
+    private void returnFluidCarrier(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<FluidResource> handler = fluidSourceHandler(level, source);
+        if (handler == null || fluidTank.getAmountAsLong(0) <= 0) return;
+        FluidResource fluid = fluidTank.getResource(0);
+        try (Transaction transaction = Transaction.openRoot()) {
+            int inserted = handler.insert(fluid, fluidTank.getAmountAsInt(0), transaction);
+            int extracted = fluidTank.extract(0, fluid, inserted, transaction);
+            if (inserted > 0 && extracted == inserted) transaction.commit();
+        }
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -667,6 +814,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             output.putLong("PickerUnloadPos", pickerUnloadTarget.pipePos().asLong());
             output.putInt("PickerUnloadSide", pickerUnloadTarget.side().get3DDataValue());
         }
+        fluidTank.serialize(output.child("FluidTank"));
+        output.putInt("FluidCarrierPhase", fluidCarrierPhase.ordinal());
+        if (fluidCarrierTarget != null) {
+            output.putLong("FluidCarrierTargetPos", fluidCarrierTarget.pipePos().asLong());
+            output.putInt("FluidCarrierTargetSide", fluidCarrierTarget.side().get3DDataValue());
+        }
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -728,6 +881,20 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (pickerPhase == PickerPhase.TO_ITEM && pickerTarget == null) pickerPhase = PickerPhase.RETURN_HOME;
         if (pickerPhase == PickerPhase.TO_UNLOAD && pickerUnloadTarget == null) pickerPhase = PickerPhase.RETURN_HOME;
+        fluidTank.deserialize(input.childOrEmpty("FluidTank"));
+        int fluidCarrierOrdinal = input.getIntOr("FluidCarrierPhase", FluidCarrierPhase.NONE.ordinal());
+        FluidCarrierPhase[] fluidCarrierPhases = FluidCarrierPhase.values();
+        fluidCarrierPhase = fluidCarrierOrdinal >= 0 && fluidCarrierOrdinal < fluidCarrierPhases.length
+                ? fluidCarrierPhases[fluidCarrierOrdinal] : FluidCarrierPhase.NONE;
+        if (input.getLong("FluidCarrierTargetPos").isPresent()) {
+            fluidCarrierTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("FluidCarrierTargetPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "FluidCarrierTargetSide", Direction.UP.get3DDataValue())));
+        }
+        if (fluidCarrierPhase != FluidCarrierPhase.NONE && fluidCarrierTarget == null) {
+            fluidCarrierPhase = FluidCarrierPhase.NONE;
+        }
         ContainerHelper.loadAllItems(input, inventory);
     }
 

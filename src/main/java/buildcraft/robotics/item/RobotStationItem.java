@@ -28,13 +28,25 @@ public final class RobotStationItem extends Item implements PipeAttachment {
         if (held.is(buildcraft.core.BCCoreItems.WRENCH.get())) return net.minecraft.world.InteractionResult.PASS;
         RobotStationConfig config = stack.getOrDefault(
                 BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), RobotStationConfig.DEFAULT);
-        RobotStationConfig updated = held.isEmpty() ? config.cycleMode() : config.toggle(held);
+        RobotStationConfig updated;
+        if (held.isEmpty()) {
+            updated = config.cycleMode();
+        } else {
+            net.neoforged.neoforge.transfer.ResourceHandler<
+                    net.neoforged.neoforge.transfer.fluid.FluidResource> fluidHandler =
+                    net.neoforged.neoforge.transfer.access.ItemAccess.forStack(held)
+                            .getCapability(net.neoforged.neoforge.capabilities.Capabilities.Fluid.ITEM);
+            net.neoforged.neoforge.transfer.fluid.FluidResource fluid =
+                    fluidHandler != null && fluidHandler.size() > 0 ? fluidHandler.getResource(0)
+                            : net.neoforged.neoforge.transfer.fluid.FluidResource.EMPTY;
+            updated = fluid.isEmpty() ? config.toggle(held) : config.toggle(fluid);
+        }
         if (!player.level().isClientSide()) {
             stack.set(BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), updated);
             pipe.setAttachment(side, stack);
             player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
                     "message.buildcraftrobotics.robot_station.config",
-                    updated.mode().getSerializedName(), updated.filters().size()));
+                    updated.mode().getSerializedName(), updated.filters().size(), updated.fluidFilters().size()));
         }
         return net.minecraft.world.InteractionResult.SUCCESS;
     }
