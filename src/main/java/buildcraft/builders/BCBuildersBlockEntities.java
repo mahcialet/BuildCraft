@@ -3,6 +3,7 @@ package buildcraft.builders;
 import buildcraft.api.core.MachineAPI;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.builders.block.entity.FillerBlockEntity;
+import buildcraft.builders.block.entity.ArchitectTableBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -17,6 +18,9 @@ public final class BCBuildersBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FillerBlockEntity>> FILLER =
             BLOCK_ENTITIES.register("filler", () -> new BlockEntityType<>(
                     FillerBlockEntity::new, BCBuildersBlocks.FILLER.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ArchitectTableBlockEntity>> ARCHITECT_TABLE =
+            BLOCK_ENTITIES.register("architect_table", () -> new BlockEntityType<>(
+                    ArchitectTableBlockEntity::new, BCBuildersBlocks.ARCHITECT_TABLE.get()));
 
     private BCBuildersBlockEntities() {}
 
@@ -28,6 +32,8 @@ public final class BCBuildersBlockEntities {
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Item.BLOCK, FILLER.get(),
                 (filler, side) -> filler.resources());
+        event.registerBlockEntity(Capabilities.Item.BLOCK, ARCHITECT_TABLE.get(),
+                (table, side) -> table.inventory());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, FILLER.get(),
                 (filler, side) -> filler.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, FILLER.get(),

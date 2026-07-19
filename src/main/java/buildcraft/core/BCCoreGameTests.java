@@ -145,6 +145,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
+        registerTest(event, environment, "builders_architect_table", BCCoreGameTests::buildersArchitectTable);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2143,6 +2144,81 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 .orElseThrow().value().assemble(templateRecipe);
         helper.assertTrue(craftedTemplate.is(buildcraft.builders.BCBuildersItems.TEMPLATE.get()),
                 "Template recipe output");
+        helper.succeed();
+    }
+
+    private static void buildersArchitectTable(GameTestHelper helper) {
+        BlockPos tablePos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos min = tablePos.east();
+        BlockPos max = min.offset(2, 1, 1);
+        helper.getLevel().setBlock(tablePos,
+                buildcraft.builders.BCBuildersBlocks.ARCHITECT_TABLE.get().defaultBlockState()
+                        .setValue(buildcraft.builders.block.ArchitectTableBlock.FACING, Direction.WEST),
+                Block.UPDATE_ALL);
+        var table = (buildcraft.builders.block.entity.ArchitectTableBlockEntity)
+                helper.getLevel().getBlockEntity(tablePos);
+        helper.assertTrue(table.configureArea(min, max), "Architect rejected valid bounds");
+        helper.getLevel().setBlock(min, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(min.offset(1, 0, 0), Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.SOUTH), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(max, Blocks.GLASS.defaultBlockState(), Block.UPDATE_ALL);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), 1);
+
+        buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(helper.getLevel(), tablePos,
+                helper.getLevel().getBlockState(tablePos), table);
+        helper.assertValueEqual(table.cursor(), 10, "Architect Blueprint scan rate");
+        helper.assertValueEqual(table.inventory().getAmountAsLong(1), 0L,
+                "Architect emitted Blueprint before scanning complete volume");
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(tablePos, table.getBlockState(),
+                table.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.ArchitectTableBlockEntity,
+                "Architect block entity did not reload");
+        var restored = (buildcraft.builders.block.entity.ArchitectTableBlockEntity) loaded;
+        helper.assertValueEqual(restored.cursor(), 10, "reloaded Architect lost scan cursor");
+        helper.getLevel().setBlockEntity(restored);
+        buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(helper.getLevel(), tablePos,
+                helper.getLevel().getBlockState(tablePos), restored);
+        helper.assertValueEqual(restored.inventory().getAmountAsLong(0), 0L,
+                "Architect did not consume one blank Blueprint");
+        ItemStack usedBlueprint = restored.inventory().getResource(1).toStack(1);
+        var blueprint = usedBlueprint.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+        helper.assertTrue(usedBlueprint.is(buildcraft.builders.BCBuildersItems.BLUEPRINT.get())
+                        && blueprint != null && blueprint.valid()
+                        && blueprint.kind() == buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT,
+                "Architect did not emit a used Blueprint");
+        helper.assertValueEqual(blueprint.size(), new BlockPos(3, 2, 2), "Architect Blueprint size");
+        helper.assertValueEqual(blueprint.facing(), Direction.WEST, "Architect Blueprint facing");
+        helper.assertTrue(blueprint.stateAt(new BlockPos(1, 0, 0)).is(Blocks.OAK_STAIRS)
+                        && blueprint.stateAt(new BlockPos(1, 0, 0))
+                        .getValue(net.minecraft.world.level.block.StairBlock.FACING) == Direction.SOUTH,
+                "Architect Blueprint lost directional block state");
+
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.builders.BCBuildersItems.TEMPLATE.get()), 1);
+        buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(helper.getLevel(), tablePos,
+                helper.getLevel().getBlockState(tablePos), restored);
+        ItemStack usedTemplate = restored.inventory().getResource(1).toStack(1);
+        var template = usedTemplate.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+        helper.assertTrue(template != null && template.kind() == buildcraft.builders.snapshot.SnapshotKind.TEMPLATE
+                        && template.palette().stream().allMatch(state -> state.isAir() || state.is(Blocks.STONE)),
+                "Architect Template did not reduce capture to occupancy");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()), new ItemStack(Items.BLACK_DYE),
+                new ItemStack(Items.YELLOW_DYE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.YELLOW_DYE),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get()),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get())));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.ARCHITECT_TABLE.get()),
+                "Architect recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(tablePos), helper.getLevel(), tablePos,
+                restored, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.ARCHITECT_TABLE.get()),
+                "Architect loot output");
         helper.succeed();
     }
 
