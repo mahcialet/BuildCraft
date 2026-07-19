@@ -19,6 +19,7 @@ public final class BCFactory {
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
             event.accept(BCFactoryItems.TANK.get());
+            event.accept(BCFactoryItems.FLOOD_GATE.get());
         }
     }
 }

@@ -132,6 +132,7 @@ registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::t
 registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
 registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTests::transportDiamondPowerPipes);
 registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
+registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1364,6 +1365,65 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.TANK.get()),
                 "tank returned wrong drop");
         helper.succeed();
+    }
+
+    private static void factoryFloodGate(GameTestHelper helper) {
+        BlockPos gatePos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos outputPos = gatePos.below();
+        helper.getLevel().setBlock(outputPos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        BlockState state = buildcraft.factory.BCFactoryBlocks.FLOOD_GATE.get().defaultBlockState();
+        helper.getLevel().setBlock(gatePos, state, Block.UPDATE_ALL);
+        var gate = (buildcraft.factory.block.entity.FloodGateBlockEntity)
+                helper.getLevel().getBlockEntity(gatePos);
+        helper.assertTrue(gate != null, "flood gate block entity missing");
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                gatePos, net.minecraft.core.Direction.UP);
+        helper.assertTrue(handler != null, "flood gate fluid capability missing");
+        helper.assertValueEqual(2_000L, handler.getCapacityAsLong(0,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                    net.minecraft.world.level.material.Fluids.WATER)), "flood gate capacity");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(2_000, handler.insert(water, 2_000, transaction),
+                    "flood gate rejected water");
+            transaction.commit();
+        }
+        helper.assertTrue(helper.getLevel().getBlockState(outputPos).isAir(),
+                "flood gate output position was not air");
+        helper.assertValueEqual(outputPos, gate.nextTarget(), "flood gate chose wrong initial target");
+        helper.assertTrue(gate.toggleSide(net.minecraft.core.Direction.NORTH),
+                "flood gate did not toggle a horizontal side");
+        helper.assertTrue(!helper.getLevel().getBlockState(gatePos).getValue(
+                buildcraft.factory.block.FloodGateBlock.NORTH), "flood gate side remained open");
+        helper.assertTrue(!gate.toggleSide(net.minecraft.core.Direction.UP),
+                "flood gate toggled its fixed top side");
+        helper.runAfterDelay(17, () -> {
+            helper.assertTrue(helper.getLevel().getFluidState(outputPos).isSource(),
+                    "flood gate did not place source below itself; remaining=" +
+                        gate.fluidBuffer().getAmountAsInt(0));
+            helper.assertValueEqual(1_000, gate.fluidBuffer().getAmountAsInt(0),
+                    "flood gate consumed wrong amount");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_IRON.get()),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.IRON_BARS), new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get()),
+                    new ItemStack(Items.IRON_BARS),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(Items.IRON_BARS),
+                    new ItemStack(Items.IRON_INGOT)
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel()
+            ).orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.FLOOD_GATE.get()),
+                    "flood gate recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(gatePos), helper.getLevel(), gatePos, gate);
+            helper.assertValueEqual(1, drops.size(), "flood gate returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.FLOOD_GATE.get()),
+                    "flood gate returned wrong drop");
+            helper.succeed();
+        });
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {

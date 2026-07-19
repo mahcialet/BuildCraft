@@ -1,6 +1,7 @@
 package buildcraft.factory;
 
 import buildcraft.factory.block.entity.TankBlockEntity;
+import buildcraft.factory.block.entity.FloodGateBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,10 @@ public final class BCFactoryBlockEntities {
         BLOCK_ENTITIES.register("tank", () -> new BlockEntityType<>(
             TankBlockEntity::new, BCFactoryBlocks.TANK.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FloodGateBlockEntity>> FLOOD_GATE =
+        BLOCK_ENTITIES.register("flood_gate", () -> new BlockEntityType<>(
+            FloodGateBlockEntity::new, BCFactoryBlocks.FLOOD_GATE.get()
+        ));
 
     private BCFactoryBlockEntities() {}
 
@@ -27,5 +32,7 @@ public final class BCFactoryBlockEntities {
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, TANK.get(),
             (tank, side) -> tank.stackedFluidHandler());
+        event.registerBlockEntity(Capabilities.Fluid.BLOCK, FLOOD_GATE.get(),
+            (gate, side) -> gate.fluidBuffer());
     }
 }
