@@ -147,6 +147,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
         registerTest(event, environment, "builders_architect_table", BCCoreGameTests::buildersArchitectTable);
         registerTest(event, environment, "builders_builder", BCCoreGameTests::buildersBuilder);
+        registerTest(event, environment, "builders_replacer", BCCoreGameTests::buildersReplacer);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2329,6 +2330,90 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
 
     private static long builderCost(BlockPos builder, BlockPos target) {
         return (long) ((Math.sqrt(target.distSqr(builder)) + 10) * MjAPI.MJ);
+    }
+
+    private static void buildersReplacer(GameTestHelper helper) {
+        BlockPos replacerPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(replacerPos,
+                buildcraft.builders.BCBuildersBlocks.REPLACER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var replacer = (buildcraft.builders.block.entity.ReplacerBlockEntity)
+                helper.getLevel().getBlockEntity(replacerPos);
+        var eastStairs = Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.EAST);
+        var westStairs = Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.WEST);
+        var replacement = Blocks.SPRUCE_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.SOUTH);
+        var blueprint = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, new BlockPos(3, 1, 1), Direction.NORTH,
+                new BlockPos(2, 0, 0), java.util.List.of(Blocks.AIR.defaultBlockState(), eastStairs, westStairs),
+                java.util.List.of(1, 2, 1), "Replacer GameTest");
+        ItemStack blueprintStack = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        blueprintStack.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), blueprint);
+        ItemStack from = new ItemStack(buildcraft.builders.BCBuildersItems.SINGLE_SCHEMATIC.get());
+        from.set(buildcraft.builders.BCBuildersDataComponents.SCHEMATIC_STATE.get(), eastStairs);
+        ItemStack to = new ItemStack(buildcraft.builders.BCBuildersItems.SINGLE_SCHEMATIC.get());
+        to.set(buildcraft.builders.BCBuildersDataComponents.SCHEMATIC_STATE.get(), replacement);
+        replacer.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(blueprintStack), 1);
+        replacer.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(from), 1);
+        replacer.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(to), 1);
+
+        buildcraft.builders.block.entity.ReplacerBlockEntity.tick(helper.getLevel(), replacerPos,
+                helper.getLevel().getBlockState(replacerPos), replacer);
+        ItemStack replacedStack = replacer.inventory().getResource(0).toStack(1);
+        var replaced = replacedStack.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+        helper.assertTrue(replaced != null && replaced.stateAt(BlockPos.ZERO).equals(replacement)
+                        && replaced.stateAt(new BlockPos(1, 0, 0)).equals(westStairs)
+                        && replaced.stateAt(new BlockPos(2, 0, 0)).equals(replacement),
+                "Replacer did not replace only exact palette states");
+        helper.assertTrue(replacedStack.is(buildcraft.builders.BCBuildersItems.BLUEPRINT.get())
+                        && replaced.size().equals(blueprint.size()) && replaced.offset().equals(blueprint.offset())
+                        && replaced.facing() == blueprint.facing() && replaced.name().equals(blueprint.name())
+                        && replacer.inventory().getAmountAsLong(1) == 0
+                        && replacer.inventory().getAmountAsLong(2) == 0,
+                "Replacer lost Blueprint metadata or did not consume matched schematics");
+
+        ItemStack noMatch = new ItemStack(buildcraft.builders.BCBuildersItems.SINGLE_SCHEMATIC.get());
+        noMatch.set(buildcraft.builders.BCBuildersDataComponents.SCHEMATIC_STATE.get(), Blocks.DIRT.defaultBlockState());
+        replacer.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(noMatch), 1);
+        replacer.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(to), 1);
+        buildcraft.builders.block.entity.ReplacerBlockEntity.tick(helper.getLevel(), replacerPos,
+                helper.getLevel().getBlockState(replacerPos), replacer);
+        helper.assertTrue(replacer.inventory().getAmountAsLong(1) == 1
+                        && replacer.inventory().getAmountAsLong(2) == 1,
+                "Replacer consumed schematics without a matching palette state");
+
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(replacerPos, replacer.getBlockState(),
+                replacer.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.ReplacerBlockEntity restored
+                        && restored.inventory().getResource(0).toStack(1)
+                        .has(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get())
+                        && restored.inventory().getResource(1).toStack(1)
+                        .get(buildcraft.builders.BCBuildersDataComponents.SCHEMATIC_STATE.get()).is(Blocks.DIRT),
+                "Replacer inventory or typed schematic state did not reload");
+
+        var schematicRecipe = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(Items.LAPIS_LAZULI), new ItemStack(Items.LAPIS_LAZULI)));
+        ItemStack craftedSchematic = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, schematicRecipe, helper.getLevel())
+                .orElseThrow().value().assemble(schematicRecipe);
+        helper.assertTrue(craftedSchematic.is(buildcraft.builders.BCBuildersItems.SINGLE_SCHEMATIC.get()),
+                "Single Schematic recipe output");
+        var replacerRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()), new ItemStack(Items.BLACK_DYE),
+                new ItemStack(Items.RED_DYE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.RED_DYE),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.CHEST),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get())));
+        ItemStack craftedReplacer = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, replacerRecipe, helper.getLevel())
+                .orElseThrow().value().assemble(replacerRecipe);
+        helper.assertTrue(craftedReplacer.is(buildcraft.builders.BCBuildersItems.REPLACER.get()),
+                "Replacer recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(replacerPos), helper.getLevel(), replacerPos,
+                replacer, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.REPLACER.get()),
+                "Replacer loot output");
+        helper.succeed();
     }
 
     private static void buildersFiller(GameTestHelper helper) {
