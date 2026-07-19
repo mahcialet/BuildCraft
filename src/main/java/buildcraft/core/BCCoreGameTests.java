@@ -153,6 +153,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_construction_marker", BCCoreGameTests::buildersConstructionMarker);
         registerTest(event, environment, "robotics_redstone_board", BCCoreGameTests::roboticsRedstoneBoard);
         registerTest(event, environment, "robotics_requester", BCCoreGameTests::roboticsRequester);
+        registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2736,6 +2737,35 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 null, ItemStack.EMPTY);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.robotics.BCRoboticsItems.REQUESTER.get()),
                 "Requester block loot");
+        helper.succeed();
+    }
+
+    private static void roboticsZoneData(GameTestHelper helper) {
+        var zone = new buildcraft.robotics.zone.ZonePlan();
+        zone.set(-1, -1, true);
+        zone.set(0, 0, true);
+        zone.set(16, 32, true);
+        helper.assertTrue(zone.get(-1, -1) && zone.get(0, 0) && zone.get(16, 32) && zone.size() == 3,
+                "Zone chunk-bitset addressing");
+        zone.set(0, 0, false);
+        helper.assertTrue(!zone.get(0, 0) && zone.size() == 2, "Zone cell removal");
+        var encoded = buildcraft.robotics.zone.ZonePlan.CODEC.encodeStart(
+                com.mojang.serialization.JsonOps.INSTANCE, zone).getOrThrow();
+        var decoded = buildcraft.robotics.zone.ZonePlan.CODEC.parse(
+                com.mojang.serialization.JsonOps.INSTANCE, encoded).getOrThrow();
+        helper.assertValueEqual(decoded, zone, "Zone codec round-trip");
+        BlockPos random = decoded.random(new java.util.Random(1), 70);
+        helper.assertTrue(random != null && random.getY() == 70 && decoded.contains(random),
+                "Zone random position escaped selection");
+
+        ItemStack map = new ItemStack(buildcraft.core.BCCoreItems.MAP_LOCATION.get());
+        buildcraft.robotics.zone.ZoneMapLocation.set(map, zone, "Farm plots");
+        helper.assertValueEqual(buildcraft.core.BCCoreItems.MAP_LOCATION.get().getType(map),
+                buildcraft.api.items.MapLocationType.ZONE, "Zone Map Location type");
+        helper.assertValueEqual(buildcraft.core.BCCoreItems.MAP_LOCATION.get().getStoredName(map),
+                "Farm plots", "Zone Map Location name");
+        helper.assertValueEqual(buildcraft.robotics.zone.ZoneMapLocation.get(map), zone,
+                "Zone Map Location component");
         helper.succeed();
     }
 
