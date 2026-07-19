@@ -16,12 +16,17 @@ public final class BCBuilders {
         BCBuildersBlocks.register(modBus);
         BCBuildersBlockEntities.register(modBus);
         BCBuildersItems.register(modBus);
+        BCBuildersDataComponents.register(modBus);
         BCBuildersMenus.register(modBus);
         if (FMLEnvironment.getDist() == Dist.CLIENT) BCBuildersClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
     }
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) event.accept(BCBuildersItems.FILLER.get());
+        if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
+            event.accept(BCBuildersItems.FILLER.get());
+            event.accept(BCBuildersItems.BLUEPRINT.get());
+            event.accept(BCBuildersItems.TEMPLATE.get());
+        }
     }
 }

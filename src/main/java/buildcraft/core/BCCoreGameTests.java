@@ -144,6 +144,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
+        registerTest(event, environment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2081,6 +2082,67 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(1, drops.size(), "auto workbench returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.AUTO_WORKBENCH.get()),
             "auto workbench returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void buildersSnapshotData(GameTestHelper helper) {
+        BlockPos machine = helper.absolutePos(new BlockPos(1, 1, 1));
+        BlockPos min = machine.offset(2, 0, 1);
+        BlockPos max = min.offset(1, 1, 1);
+        helper.getLevel().setBlock(min, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(min.offset(1, 0, 0), Blocks.OAK_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.EAST), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(max, Blocks.GLASS.defaultBlockState(), Block.UPDATE_ALL);
+
+        var blueprint = buildcraft.builders.snapshot.SnapshotData.capture(helper.getLevel(), min, max,
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, Direction.NORTH, machine, "GameTest");
+        helper.assertTrue(blueprint.valid(), "captured Blueprint was invalid");
+        helper.assertValueEqual(blueprint.size(), new BlockPos(2, 2, 2), "Blueprint size");
+        helper.assertValueEqual(blueprint.offset(), new BlockPos(2, 0, 1), "Blueprint machine offset");
+        helper.assertTrue(blueprint.stateAt(BlockPos.ZERO).is(Blocks.STONE)
+                        && blueprint.stateAt(new BlockPos(1, 0, 0)).is(Blocks.OAK_STAIRS)
+                        && blueprint.stateAt(new BlockPos(1, 0, 0))
+                        .getValue(net.minecraft.world.level.block.StairBlock.FACING) == Direction.EAST
+                        && blueprint.stateAt(new BlockPos(1, 1, 1)).is(Blocks.GLASS),
+                "Blueprint did not preserve its block-state palette");
+        helper.assertValueEqual(blueprint.worldPosition(machine, new BlockPos(1, 0, 0),
+                        net.minecraft.world.level.block.Rotation.CLOCKWISE_90), machine.offset(-1, 0, 3),
+                "Blueprint clockwise placement transform");
+
+        var encoded = buildcraft.builders.snapshot.SnapshotData.CODEC.encodeStart(
+                com.mojang.serialization.JsonOps.INSTANCE, blueprint).getOrThrow();
+        var decoded = buildcraft.builders.snapshot.SnapshotData.CODEC.parse(
+                com.mojang.serialization.JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
+        helper.assertTrue(decoded.equals(blueprint), "Blueprint codec round-trip changed data");
+        ItemStack blueprintStack = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        blueprintStack.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), blueprint);
+        helper.assertValueEqual(blueprintStack.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get()),
+                blueprint, "Blueprint item component");
+
+        var template = buildcraft.builders.snapshot.SnapshotData.capture(helper.getLevel(), min, max,
+                buildcraft.builders.snapshot.SnapshotKind.TEMPLATE, Direction.NORTH, machine, "Template");
+        helper.assertTrue(template.valid() && template.palette().stream().allMatch(
+                        state -> state.isAir() || state.is(Blocks.STONE)),
+                "Template captured block identity instead of occupancy");
+
+        var blueprintRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.LAPIS_LAZULI), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER)));
+        var craftedBlueprint = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, blueprintRecipe, helper.getLevel())
+                .orElseThrow().value().assemble(blueprintRecipe);
+        helper.assertTrue(craftedBlueprint.is(buildcraft.builders.BCBuildersItems.BLUEPRINT.get()),
+                "Blueprint recipe output");
+        var templateRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.INK_SAC), new ItemStack(Items.PAPER),
+                new ItemStack(Items.PAPER), new ItemStack(Items.PAPER), new ItemStack(Items.PAPER)));
+        var craftedTemplate = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, templateRecipe, helper.getLevel())
+                .orElseThrow().value().assemble(templateRecipe);
+        helper.assertTrue(craftedTemplate.is(buildcraft.builders.BCBuildersItems.TEMPLATE.get()),
+                "Template recipe output");
         helper.succeed();
     }
 
