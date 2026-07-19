@@ -27,7 +27,7 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class PumpBlockEntity extends BlockEntity {
+public final class PumpBlockEntity extends BlockEntity implements buildcraft.api.core.IHasWork {
     public static final int CAPACITY = 16_000;
     public static final long POWER_PER_SOURCE = 10 * MjAPI.MJ;
     private static final int MAX_DEPTH = 512;
@@ -46,6 +46,8 @@ public final class PumpBlockEntity extends BlockEntity {
     private final ArrayDeque<BlockPos> sources = new ArrayDeque<>();
     private BlockPos intake;
     private int rebuildTicks;
+
+    @Override public boolean hasWork() { return intake != null || !sources.isEmpty(); }
 
     public PumpBlockEntity(BlockPos pos, BlockState state) {
         super(BCFactoryBlockEntities.PUMP.get(), pos, state);

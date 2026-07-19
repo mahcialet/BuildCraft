@@ -31,7 +31,7 @@ import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
 import java.util.List;
 
-public final class MiningWellBlockEntity extends BlockEntity {
+public final class MiningWellBlockEntity extends BlockEntity implements buildcraft.api.core.IHasWork {
     public static final long BATTERY_CAPACITY = 500 * MjAPI.MJ;
     public static final long MAX_POWER_PER_TICK = 10 * MjAPI.MJ;
     private static final int MAX_DEPTH = 512;
@@ -42,6 +42,8 @@ public final class MiningWellBlockEntity extends BlockEntity {
     private final OutputHandler output = new OutputHandler();
     private BlockPos target;
     private long progress;
+
+    @Override public boolean hasWork() { return target != null; }
 
     public MiningWellBlockEntity(BlockPos pos, BlockState state) {
         super(BCFactoryBlockEntities.MINING_WELL.get(), pos, state);

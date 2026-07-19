@@ -165,6 +165,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_inventory_triggers", BCCoreGameTests::siliconInventoryTriggers);
         registerTest(event, environment, "silicon_fluid_triggers", BCCoreGameTests::siliconFluidTriggers);
         registerTest(event, environment, "silicon_power_triggers", BCCoreGameTests::siliconPowerTriggers);
+        registerTest(event, environment, "silicon_machine_triggers", BCCoreGameTests::siliconMachineTriggers);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3491,6 +3492,69 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
+    }
+
+    private static void siliconMachineTriggers(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos wellPos = pipePos.north();
+        BlockPos targetPos = wellPos.below();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(wellPos,
+                buildcraft.factory.BCFactoryBlocks.MINING_WELL.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(targetPos, Blocks.STONE.defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        var well = (buildcraft.factory.block.entity.MiningWellBlockEntity)
+                helper.getLevel().getBlockEntity(wellPos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "machine trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+
+        buildcraft.factory.block.entity.MiningWellBlockEntity.tick(
+                helper.getLevel(), wellPos, helper.getLevel().getBlockState(wellPos), well);
+        helper.assertTrue(well.hasWork(), "mining well did not discover its stone target");
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_ACTIVE, true,
+                "working mining well did not trigger MACHINE_ACTIVE");
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_INACTIVE, false,
+                "working mining well triggered MACHINE_INACTIVE");
+
+        helper.getLevel().setBlock(targetPos, Blocks.BEDROCK.defaultBlockState(), 3);
+        buildcraft.factory.block.entity.MiningWellBlockEntity.tick(
+                helper.getLevel(), wellPos, helper.getLevel().getBlockState(wellPos), well);
+        helper.assertFalse(well.hasWork(), "mining well retained work across an unbreakable target");
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_ACTIVE, false,
+                "idle mining well triggered MACHINE_ACTIVE");
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_INACTIVE, true,
+                "idle mining well did not trigger MACHINE_INACTIVE");
+
+        helper.getLevel().removeBlock(wellPos, false);
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_ACTIVE, false,
+                "missing machine triggered MACHINE_ACTIVE");
+        assertMachineTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.MACHINE_INACTIVE, false,
+                "missing machine triggered MACHINE_INACTIVE");
+        helper.succeed();
+    }
+
+    private static void assertMachineTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(trigger,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
 
     private static void siliconPowerTriggers(GameTestHelper helper) {

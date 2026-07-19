@@ -211,6 +211,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         double level = readable.getStored() / (double) readable.getCapacity();
         return new PowerStatus(true, level < 0.05, level > 0.95);
     }
+    public MachineStatus adjacentMachine(Direction side) {
+        if (level == null) return MachineStatus.UNAVAILABLE;
+        var machine = level.getCapability(buildcraft.api.core.MachineAPI.CAP_HAS_WORK,
+                worldPosition.relative(side), side.getOpposite());
+        if (machine == null) return MachineStatus.UNAVAILABLE;
+        boolean active = machine.hasWork();
+        return new MachineStatus(true, active, !active);
+    }
     public InventoryStatus adjacentInventory(Direction side) {
         if (!(level instanceof ServerLevel serverLevel)) return InventoryStatus.UNAVAILABLE;
         var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
@@ -1541,5 +1549,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
     public record PowerStatus(boolean available, boolean low, boolean high) {
         public static final PowerStatus UNAVAILABLE = new PowerStatus(false, false, false);
+    }
+    public record MachineStatus(boolean available, boolean active, boolean inactive) {
+        public static final MachineStatus UNAVAILABLE = new MachineStatus(false, false, false);
     }
 }

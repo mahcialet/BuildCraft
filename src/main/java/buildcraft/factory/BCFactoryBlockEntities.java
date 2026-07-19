@@ -70,11 +70,15 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, PUMP.get(), (pump, side) -> pump.mjReceiver());
+        event.registerBlockEntity(buildcraft.api.core.MachineAPI.CAP_HAS_WORK,
+                PUMP.get(), (pump, side) -> pump);
         event.registerBlockEntity(Capabilities.Item.BLOCK, MINING_WELL.get(),
                 (well, side) -> well.outputHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, MINING_WELL.get(), (well, side) -> well.mjReceiver());
+        event.registerBlockEntity(buildcraft.api.core.MachineAPI.CAP_HAS_WORK,
+                MINING_WELL.get(), (well, side) -> well);
         event.registerBlockEntity(Capabilities.Item.BLOCK, CHUTE.get(), (chute, side) -> chute.inputHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, CHUTE.get(), (chute, side) -> chute.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, CHUTE.get(), (chute, side) -> chute.mjReceiver());
