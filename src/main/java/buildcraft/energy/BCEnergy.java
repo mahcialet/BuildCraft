@@ -10,6 +10,7 @@ import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 
 /** Energy module bootstrap, beginning with its always-present fluid foundation. */
@@ -24,11 +25,44 @@ public final class BCEnergy {
         BCEnergyMenus.register(modBus);
         BCEnergyItems.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
+        modBus.addListener(this::commonSetup);
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());
-        FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.OIL, 3_000_000L, 10_000);
-        FuelRegistry.INSTANCE.addFuel(BCEnergyFluids.FUEL_LIGHT, 6_000_000L, 15_000);
         buildcraft.lib.fluid.CoolantRegistry.INSTANCE.addCoolant(() -> Fluids.WATER, 0.0023F);
         if (FMLEnvironment.getDist().isClient()) BCEnergyClient.register(modBus);
+    }
+
+    private void commonSetup(FMLCommonSetupEvent event) {
+        event.enqueueWork(() -> {
+            BCEnergyRefineryRecipes.bootstrap();
+            registerRefineryFuels();
+        });
+    }
+
+    private static void registerRefineryFuels() {
+        registerFuel("fuel_gaseous", 8, 3_750);
+        registerFuel("fuel_light", 6, 10_000);
+        registerFuel("fuel_dense", 4, 90_000);
+        registerFuel("fuel_mixed_light", 3, 10_000);
+        registerFuel("fuel_mixed_heavy", 5, 19_200);
+        registerFuel("oil_distilled", 1, 37_500);
+        registerDirtyFuel("oil_dense", 4, 30_000, 500);
+        registerDirtyFuel("oil_heavy", 2, 40_000, 333);
+        registerDirtyFuel("oil", 3, 5_000, 62);
+    }
+
+    private static void registerFuel(String name, int mjPerCycle, int burningTime) {
+        for (var variant : BCEnergyFluids.refineryFluid(name).variants()) {
+            FuelRegistry.INSTANCE.addFuel(variant.source(), mjPerCycle * buildcraft.api.mj.MjAPI.MJ, burningTime);
+        }
+    }
+
+    private static void registerDirtyFuel(String name, int mjPerCycle, int burningTime, int residueAmount) {
+        var residue = BCEnergyFluids.refineryFluid("oil_residue");
+        for (int heat = 0; heat < 3; heat++) {
+            FuelRegistry.INSTANCE.addDirtyFuel(BCEnergyFluids.refineryFluid(name).heat(heat).source(),
+                mjPerCycle * buildcraft.api.mj.MjAPI.MJ, burningTime,
+                residue.heat(heat).source(), residueAmount);
+        }
     }
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
@@ -38,11 +72,23 @@ public final class BCEnergy {
             event.accept(ItemBlockEngine.rfEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
+            for (var family : BCEnergyFluids.REFINERY_FLUIDS.values()) {
+                var bucket = family.heat(0).bucket().get();
+                if (bucket != BCEnergyFluids.OIL_BUCKET.get() && bucket != BCEnergyFluids.FUEL_LIGHT_BUCKET.get()) {
+                    event.accept(bucket);
+                }
+            }
             event.accept(BCEnergyItems.MJ_DYNAMO.get());
         }
         if (event.getTabKey().equals(CreativeModeTabs.FUNCTIONAL_BLOCKS)) {
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
+            for (var family : BCEnergyFluids.REFINERY_FLUIDS.values()) {
+                var bucket = family.heat(0).bucket().get();
+                if (bucket != BCEnergyFluids.OIL_BUCKET.get() && bucket != BCEnergyFluids.FUEL_LIGHT_BUCKET.get()) {
+                    event.accept(bucket);
+                }
+            }
         }
     }
 }

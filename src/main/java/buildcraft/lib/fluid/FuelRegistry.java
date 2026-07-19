@@ -37,6 +37,19 @@ public enum FuelRegistry implements IFuelManager {
         return fuel;
     }
 
+    /** Registers a component-free built-in dirty fuel lazily during mod construction. */
+    public synchronized IDirtyFuel addDirtyFuel(
+        Supplier<? extends net.minecraft.world.level.material.Fluid> fluid,
+        long powerPerCycle, int totalBurningTime,
+        Supplier<? extends net.minecraft.world.level.material.Fluid> residue, int residueAmount) {
+        if (powerPerCycle <= 0 || totalBurningTime <= 0 || residueAmount <= 0) {
+            throw new IllegalArgumentException("Dirty fuel values must be positive");
+        }
+        IDirtyFuel fuel = new LazyDirtyFuel(fluid, powerPerCycle, totalBurningTime, residue, residueAmount);
+        fuels.add(fuel);
+        return fuel;
+    }
+
     @Override
     public IFuel addFuel(FluidStack fluid, long powerPerCycle, int totalBurningTime) {
         return addFuel(new Fuel(fluid.copyWithAmount(FluidType.BUCKET_VOLUME), powerPerCycle, totalBurningTime));
@@ -82,6 +95,16 @@ public enum FuelRegistry implements IFuelManager {
         @Override public FluidStack getFluid() { return new FluidStack(supplier.get(), FluidType.BUCKET_VOLUME); }
         @Override public long getPowerPerCycle() { return powerPerCycle; }
         @Override public int getTotalBurningTime() { return totalBurningTime; }
+    }
+
+    private record LazyDirtyFuel(Supplier<? extends net.minecraft.world.level.material.Fluid> supplier,
+        long powerPerCycle, int totalBurningTime,
+        Supplier<? extends net.minecraft.world.level.material.Fluid> residueSupplier,
+        int residueAmount) implements IDirtyFuel {
+        @Override public FluidStack getFluid() { return new FluidStack(supplier.get(), FluidType.BUCKET_VOLUME); }
+        @Override public long getPowerPerCycle() { return powerPerCycle; }
+        @Override public int getTotalBurningTime() { return totalBurningTime; }
+        @Override public FluidStack getResidue() { return new FluidStack(residueSupplier.get(), residueAmount); }
     }
 
 }

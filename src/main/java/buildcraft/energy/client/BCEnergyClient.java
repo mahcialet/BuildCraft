@@ -36,16 +36,19 @@ public final class BCEnergyClient {
     }
 
     private static void registerFluidModels(RegisterFluidModelsEvent event) {
-        event.register(model("oil_heat_0"), BCEnergyFluids.OIL, BCEnergyFluids.FLOWING_OIL);
-        event.register(model("fuel"), BCEnergyFluids.FUEL_LIGHT, BCEnergyFluids.FLOWING_FUEL_LIGHT);
+        for (var family : BCEnergyFluids.REFINERY_FLUIDS.values()) {
+            for (var variant : family.variants()) {
+                event.register(model(variant.textureName(), variant.tint()), variant.source(), variant.flowing());
+            }
+        }
     }
 
-    private static FluidModel.Unbaked model(String name) {
+    private static FluidModel.Unbaked model(String name, int tint) {
         return new FluidModel.Unbaked(
             new Material(Identifier.fromNamespaceAndPath(BCEnergy.MOD_ID, "block/fluids/" + name + "_still")),
             new Material(Identifier.fromNamespaceAndPath(BCEnergy.MOD_ID, "block/fluids/" + name + "_flow")),
             null,
-            null
+            (net.neoforged.neoforge.client.fluid.FluidTintSource) state -> tint
         );
     }
 }

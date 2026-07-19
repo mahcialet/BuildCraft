@@ -123,7 +123,10 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcraftenergy/textures/blocks/fluids') {
         include 'oil_heat_0_still.png', 'oil_heat_0_still.png.mcmeta',
             'oil_heat_0_flow.png', 'oil_heat_0_flow.png.mcmeta',
-            'fuel_still.png', 'fuel_still.png.mcmeta', 'fuel_flow.png', 'fuel_flow.png.mcmeta'
+            'fuel_still.png', 'fuel_still.png.mcmeta', 'fuel_flow.png', 'fuel_flow.png.mcmeta',
+            'heat_0_still.png', 'heat_0_still.png.mcmeta', 'heat_0_flow.png', 'heat_0_flow.png.mcmeta',
+            'heat_1_still.png', 'heat_1_still.png.mcmeta', 'heat_1_flow.png', 'heat_1_flow.png.mcmeta',
+            'heat_2_still.png', 'heat_2_still.png.mcmeta', 'heat_2_flow.png', 'heat_2_flow.png.mcmeta'
         into 'assets/buildcraftenergy/textures/block/fluids'
     }
     from('buildcraft_resources/assets/buildcraftenergy/textures/items') {
@@ -218,6 +221,41 @@ tasks.named('processResources', ProcessResources) {
         include 'bottom.png'
         into 'assets/buildcraftcore/textures/block/laser'
     }
+}
+
+def refineryResourceDirectory = layout.buildDirectory.dir('generated/refineryResources')
+tasks.register('generateRefineryResources') {
+    outputs.dir(refineryResourceDirectory)
+    doLast {
+        def root = refineryResourceDirectory.get().asFile
+        def families = ['oil', 'oil_residue', 'oil_heavy', 'oil_dense', 'oil_distilled',
+                        'fuel_dense', 'fuel_mixed_heavy', 'fuel_light', 'fuel_mixed_light', 'fuel_gaseous']
+        families.each { family ->
+            (0..2).each { heat ->
+                if ((family == 'oil' || family == 'fuel_light') && heat == 0) return
+                def fluidName = heat == 0 ? family : "${family}_heat_${heat}"
+                def blockName = "fluid_block_${family}_heat_${heat}"
+                def blockModel = new File(root, "assets/buildcraftenergy/models/block/${blockName}.json")
+                blockModel.parentFile.mkdirs()
+                blockModel.text = "{\"textures\":{\"particle\":\"buildcraftenergy:block/fluids/heat_${heat}_still\"}}"
+                def blockState = new File(root, "assets/buildcraftenergy/blockstates/${blockName}.json")
+                blockState.parentFile.mkdirs()
+                blockState.text = "{\"multipart\":[{\"apply\":{\"model\":\"buildcraftenergy:block/${blockName}\"}}]}"
+                def bucketTexture = family.startsWith('oil') ? 'oil_bucket' : 'fuel_light_bucket'
+                def bucketModel = new File(root, "assets/buildcraftenergy/models/item/${fluidName}_bucket.json")
+                bucketModel.parentFile.mkdirs()
+                bucketModel.text = "{\"parent\":\"minecraft:item/generated\",\"textures\":{\"layer0\":\"buildcraftenergy:item/${bucketTexture}\"}}"
+                def itemDefinition = new File(root, "assets/buildcraftenergy/items/${fluidName}_bucket.json")
+                itemDefinition.parentFile.mkdirs()
+                itemDefinition.text = "{\"model\":{\"type\":\"minecraft:model\",\"model\":\"buildcraftenergy:item/${fluidName}_bucket\"}}"
+            }
+        }
+    }
+}
+
+tasks.named('processResources', ProcessResources) {
+    dependsOn tasks.named('generateRefineryResources')
+    from(refineryResourceDirectory)
 }
 
 tasks.named('jar', Jar) {

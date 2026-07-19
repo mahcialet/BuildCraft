@@ -125,6 +125,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "combustion_containers", BCCoreGameTests::combustionContainers);
         registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
+        registerTest(event, environment, "energy_refinery_fluids", BCCoreGameTests::energyRefineryFluids);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
@@ -718,10 +719,10 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         );
         helper.assertTrue(oil != null, "oil fuel definition missing");
         helper.assertValueEqual(oil.getPowerPerCycle(), 3 * MjAPI.MJ, "oil fuel power");
-        helper.assertValueEqual(oil.getTotalBurningTime(), 10_000, "oil burn time");
+        helper.assertValueEqual(oil.getTotalBurningTime(), 5_000, "oil burn time");
         helper.assertTrue(fuel != null, "light fuel definition missing");
         helper.assertValueEqual(fuel.getPowerPerCycle(), 6 * MjAPI.MJ, "light fuel power");
-        helper.assertValueEqual(fuel.getTotalBurningTime(), 15_000, "light fuel burn time");
+        helper.assertValueEqual(fuel.getTotalBurningTime(), 10_000, "light fuel burn time");
         net.neoforged.neoforge.fluids.FluidStack water = new net.neoforged.neoforge.fluids.FluidStack(
             net.minecraft.world.level.material.Fluids.WATER, 1
         );
@@ -1287,6 +1288,67 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(1, drops.size(), "diamond power pipe returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_POWER.get()),
                 "diamond power pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void energyRefineryFluids(GameTestHelper helper) {
+        helper.assertValueEqual(10, buildcraft.energy.BCEnergyFluids.REFINERY_FLUIDS.size(),
+                "refinery fluid family count");
+        java.util.Set<net.minecraft.world.level.material.Fluid> fluids =
+                java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        for (var family : buildcraft.energy.BCEnergyFluids.REFINERY_FLUIDS.values()) {
+            helper.assertValueEqual(3, family.variants().size(), family.name() + " heat-state count");
+            for (int heat = 0; heat < 3; heat++) {
+                var variant = family.heat(heat);
+                helper.assertTrue(fluids.add(variant.source().get()),
+                        "duplicate refinery source fluid for " + variant.name());
+                helper.assertTrue(variant.block().get().defaultBlockState().getFluidState().getType()
+                                == variant.source().get(),
+                        "refinery block/source mismatch for " + variant.name());
+                helper.assertTrue(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                                variant.bucket().get()).getPath().equals(variant.name() + "_bucket"),
+                        "refinery bucket registry mismatch for " + variant.name());
+            }
+        }
+        helper.assertValueEqual(30, fluids.size(), "refinery source fluid identity count");
+        helper.assertValueEqual(10,
+                buildcraft.energy.BCEnergyRefineryRecipes.distillationRecipes().size(),
+                "distillation recipe count");
+        helper.assertValueEqual(20, buildcraft.energy.BCEnergyRefineryRecipes.heatingRecipes().size(),
+                "heating recipe count");
+        helper.assertValueEqual(20, buildcraft.energy.BCEnergyRefineryRecipes.coolingRecipes().size(),
+                "cooling recipe count");
+        var hotOil = buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(2).source().get();
+        var oilRecipe = buildcraft.energy.BCEnergyRefineryRecipes.distillation(hotOil);
+        helper.assertTrue(oilRecipe != null, "hot oil distillation recipe missing");
+        helper.assertValueEqual(16, oilRecipe.inputAmount(), "hot oil input ratio");
+        helper.assertValueEqual(8, oilRecipe.gasAmount(), "hot oil gas ratio");
+        helper.assertValueEqual(1, oilRecipe.liquidAmount(), "hot oil residue ratio");
+        helper.assertValueEqual(12 * MjAPI.MJ, oilRecipe.powerRequired(), "hot oil distillation power");
+        helper.assertTrue(oilRecipe.gasOutput() ==
+                        buildcraft.energy.BCEnergyFluids.refineryFluid("oil_distilled").heat(2).source().get(),
+                "hot oil gas output identity");
+        helper.assertTrue(oilRecipe.liquidOutput() ==
+                        buildcraft.energy.BCEnergyFluids.refineryFluid("oil_residue").heat(2).source().get(),
+                "hot oil liquid output identity");
+        var coldHeavy = buildcraft.energy.BCEnergyFluids.refineryFluid("oil_heavy").heat(0).source().get();
+        var heating = buildcraft.energy.BCEnergyRefineryRecipes.heating(coldHeavy);
+        helper.assertTrue(heating != null && heating.output() ==
+                        buildcraft.energy.BCEnergyFluids.refineryFluid("oil_heavy").heat(1).source().get(),
+                "heavy oil heating transition");
+        helper.assertValueEqual(10, heating.amount(), "heat exchange amount");
+        var hotCrude = buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(1).source().get();
+        var crudeFuel = buildcraft.lib.fluid.FuelRegistry.INSTANCE.getFuel(
+                new net.neoforged.neoforge.fluids.FluidStack(hotCrude, 1_000));
+        helper.assertTrue(crudeFuel instanceof buildcraft.api.fuels.IFuelManager.IDirtyFuel,
+                "hot crude oil dirty-fuel registration missing");
+        helper.assertValueEqual(3 * MjAPI.MJ, crudeFuel.getPowerPerCycle(), "crude oil MJ cycle");
+        helper.assertValueEqual(5_000, crudeFuel.getTotalBurningTime(), "crude oil burn time");
+        var dirtyCrude = (buildcraft.api.fuels.IFuelManager.IDirtyFuel) crudeFuel;
+        helper.assertValueEqual(62, dirtyCrude.getResidue().getAmount(), "crude oil residue amount");
+        helper.assertTrue(dirtyCrude.getResidue().getFluid() ==
+                        buildcraft.energy.BCEnergyFluids.refineryFluid("oil_residue").heat(1).source().get(),
+                "crude oil residue heat identity");
         helper.succeed();
     }
 
