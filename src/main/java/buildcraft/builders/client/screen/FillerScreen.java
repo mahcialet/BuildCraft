@@ -17,6 +17,8 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
     private Button hollowButton;
     private Button sphereFacingButton;
     private Button sphereRotationButton;
+    private Button shapeAxisButton;
+    private Button shapeRotationButton;
     public FillerScreen(FillerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 168);
         titleLabelX = 8;
@@ -43,7 +45,7 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                         if (minecraft != null && minecraft.gameMode != null) {
                             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10 + id);
                         }
-                    }).bounds(leftPos + 8 + pattern * 14, topPos + 2, 13, 14).build());
+            }).bounds(leftPos + 8 + pattern % 10 * 16, topPos + 2 + pattern / 10 * 15, 15, 14).build());
         }
         verticalButton = addRenderableWidget(Button.builder(Component.literal("U"), button -> {
             if (minecraft != null && minecraft.gameMode != null) {
@@ -70,6 +72,16 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 34);
             }
         }).bounds(leftPos + 96, topPos + 70, 18, 14).build());
+        shapeAxisButton = addRenderableWidget(Button.builder(Component.literal("Y"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 35);
+            }
+        }).bounds(leftPos + 74, topPos + 70, 20, 14).build());
+        shapeRotationButton = addRenderableWidget(Button.builder(Component.literal("0"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 36);
+            }
+        }).bounds(leftPos + 96, topPos + 70, 18, 14).build());
     }
 
     private static String patternLabel(FillerPattern pattern) {
@@ -85,6 +97,14 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
             case HEMISPHERE -> "H";
             case QUARTER_SPHERE -> "Q";
             case EIGHTH_SPHERE -> "E";
+            case ARC -> "a";
+            case CIRCLE -> "c";
+            case HEXAGON -> "h";
+            case OCTAGON -> "o";
+            case PENTAGON -> "p";
+            case SEMICIRCLE -> "d";
+            case SQUARE -> "q";
+            case TRIANGLE -> "t";
         };
     }
 
@@ -111,6 +131,12 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                 menu.sphereFacing().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
         sphereRotationButton.visible = menu.pattern().openFaces() > 1;
         sphereRotationButton.setMessage(Component.literal(Integer.toString(menu.sphereRotation())));
+        boolean shape2d = menu.pattern().isShape2d();
+        hollowButton.visible |= shape2d;
+        shapeAxisButton.visible = shape2d;
+        shapeAxisButton.setMessage(Component.literal(menu.shapeAxis().getName().toUpperCase(java.util.Locale.ROOT)));
+        shapeRotationButton.visible = shape2d;
+        shapeRotationButton.setMessage(Component.literal(Integer.toString(menu.shapeRotation())));
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY,

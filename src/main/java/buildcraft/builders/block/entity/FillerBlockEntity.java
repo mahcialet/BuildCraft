@@ -6,6 +6,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.builders.BCBuildersBlockEntities;
 import buildcraft.builders.FillerPattern;
+import buildcraft.builders.FillerShape2d;
 import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -68,6 +69,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private boolean hollow;
     private Direction sphereFacing = Direction.DOWN;
     private int sphereRotation;
+    private Direction.Axis shapeAxis = Direction.Axis.Y;
+    private int shapeRotation;
+    private transient FillerShape2d.Mask shape2dMask;
 
     public FillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.FILLER.get(), pos, state);
@@ -86,6 +90,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public boolean hollow() { return hollow; }
     public Direction sphereFacing() { return sphereFacing; }
     public int sphereRotation() { return sphereRotation; }
+    public Direction.Axis shapeAxis() { return shapeAxis; }
+    public int shapeRotation() { return shapeRotation; }
 
     public static void tick(Level level, BlockPos pos, BlockState state, FillerBlockEntity filler) {
         if (!(level instanceof ServerLevel serverLevel)) return;
@@ -127,6 +133,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (java.util.Objects.equals(areaMin, min) && java.util.Objects.equals(areaMax, max)) return true;
         areaMin = min.immutable();
         areaMax = max.immutable();
+        shape2dMask = null;
         cursor = 0;
         finished = false;
         sync();
@@ -193,6 +200,12 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
 
     private boolean includesTarget(BlockPos target) {
         if (pattern.isSphere()) return includesSphere(target);
+        if (pattern.isShape2d()) {
+            if (shape2dMask == null) {
+                shape2dMask = FillerShape2d.create(pattern, areaMin, areaMax, shapeAxis, shapeRotation, hollow);
+            }
+            return shape2dMask.includes(target);
+        }
         if (pattern != FillerPattern.PYRAMID && pattern != FillerPattern.STAIRS) {
             return pattern.includes(target, areaMin, areaMax);
         }
@@ -356,6 +369,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public void setPattern(FillerPattern pattern) {
         if (this.pattern == pattern) return;
         this.pattern = pattern;
+        shape2dMask = null;
         cursor = 0;
         finished = pattern == FillerPattern.NONE;
         sync();
@@ -380,6 +394,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public void setHollow(boolean hollow) {
         if (this.hollow == hollow) return;
         this.hollow = hollow;
+        shape2dMask = null;
         cursor = 0;
         finished = false;
         sync();
@@ -397,6 +412,25 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         int normalized = Math.floorMod(rotation, 4);
         if (sphereRotation == normalized) return;
         sphereRotation = normalized;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
+    public void setShapeAxis(Direction.Axis axis) {
+        if (shapeAxis == axis) return;
+        shapeAxis = axis;
+        shape2dMask = null;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
+    public void setShapeRotation(int rotation) {
+        int normalized = Math.floorMod(rotation, 4);
+        if (shapeRotation == normalized) return;
+        shapeRotation = normalized;
+        shape2dMask = null;
         cursor = 0;
         finished = false;
         sync();
@@ -426,6 +460,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         hollow = input.getBooleanOr("hollow", false);
         sphereFacing = input.read("sphere_facing", Direction.CODEC).orElse(Direction.DOWN);
         sphereRotation = Math.floorMod(input.getIntOr("sphere_rotation", 0), 4);
+        int axisOrdinal = Math.floorMod(input.getIntOr("shape_axis", Direction.Axis.Y.ordinal()), Direction.Axis.values().length);
+        shapeAxis = Direction.Axis.values()[axisOrdinal];
+        shapeRotation = Math.floorMod(input.getIntOr("shape_rotation", 0), 4);
     }
 
     @Override protected void saveAdditional(ValueOutput output) {
@@ -443,6 +480,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (hollow) output.putBoolean("hollow", true);
         output.store("sphere_facing", Direction.CODEC, sphereFacing);
         if (sphereRotation != 0) output.putInt("sphere_rotation", sphereRotation);
+        if (shapeAxis != Direction.Axis.Y) output.putInt("shape_axis", shapeAxis.ordinal());
+        if (shapeRotation != 0) output.putInt("shape_rotation", shapeRotation);
     }
 
     @Override public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {

@@ -8,12 +8,13 @@ import java.util.Locale;
 
 public enum FillerPattern implements StringRepresentable {
     NONE, CLEAR, FILL, BOX, FRAME, PYRAMID, STAIRS,
-    SPHERE, HEMISPHERE, QUARTER_SPHERE, EIGHTH_SPHERE;
+    SPHERE, HEMISPHERE, QUARTER_SPHERE, EIGHTH_SPHERE,
+    ARC, CIRCLE, HEXAGON, OCTAGON, PENTAGON, SEMICIRCLE, SQUARE, TRIANGLE;
 
     public static final Codec<FillerPattern> CODEC = StringRepresentable.fromEnum(FillerPattern::values);
 
     public boolean includes(BlockPos pos, BlockPos min, BlockPos max) {
-        if (this == NONE || this == PYRAMID || this == STAIRS || isSphere()) return false;
+        if (this == NONE || this == PYRAMID || this == STAIRS || isSphere() || isShape2d()) return false;
         if (this == CLEAR || this == FILL) return true;
         int boundaries = (pos.getX() == min.getX() || pos.getX() == max.getX() ? 1 : 0)
                 + (pos.getY() == min.getY() || pos.getY() == max.getY() ? 1 : 0)
@@ -26,6 +27,13 @@ public enum FillerPattern implements StringRepresentable {
     public boolean isSphere() {
         return this == SPHERE || this == HEMISPHERE || this == QUARTER_SPHERE
                 || this == EIGHTH_SPHERE;
+    }
+
+    public boolean isShape2d() {
+        return switch (this) {
+            case ARC, CIRCLE, HEXAGON, OCTAGON, PENTAGON, SEMICIRCLE, SQUARE, TRIANGLE -> true;
+            default -> false;
+        };
     }
 
     public int openFaces() {

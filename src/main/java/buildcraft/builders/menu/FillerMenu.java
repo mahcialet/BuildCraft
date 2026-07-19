@@ -82,6 +82,8 @@ public final class FillerMenu extends AbstractContainerMenu {
         return filler == null ? net.minecraft.core.Direction.DOWN : filler.sphereFacing();
     }
     public int sphereRotation() { return filler == null ? 0 : filler.sphereRotation(); }
+    public Direction.Axis shapeAxis() { return filler == null ? Direction.Axis.Y : filler.shapeAxis(); }
+    public int shapeRotation() { return filler == null ? 0 : filler.shapeRotation(); }
 
     @Override public boolean clickMenuButton(Player player, int id) {
         if (filler == null) return false;
@@ -114,6 +116,15 @@ public final class FillerMenu extends AbstractContainerMenu {
         }
         if (id == 34) {
             filler.setSphereRotation(filler.sphereRotation() + 1);
+            return true;
+        }
+        if (id == 35) {
+            Direction.Axis[] axes = Direction.Axis.values();
+            filler.setShapeAxis(axes[(filler.shapeAxis().ordinal() + 1) % axes.length]);
+            return true;
+        }
+        if (id == 36) {
+            filler.setShapeRotation(filler.shapeRotation() + 1);
             return true;
         }
         return false;

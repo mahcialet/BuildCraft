@@ -147,6 +147,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_sphere_patterns", BCCoreGameTests::buildersFillerSpherePatterns);
+        registerTest(event, environment, "builders_filler_2d_patterns", BCCoreGameTests::buildersFiller2dPatterns);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
@@ -2434,6 +2435,90 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         for (BlockPos target : BlockPos.betweenClosed(min, max)) {
             helper.getLevel().setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
         }
+    }
+
+    private static void buildersFiller2dPatterns(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos min = fillerPos.east();
+        BlockPos max = min.offset(4, 2, 6);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        helper.assertTrue(filler.configureArea(min, max), "2D Filler rejected valid bounds");
+        filler.setShapeAxis(Direction.Axis.Y);
+        filler.setShapeRotation(0);
+        filler.setHollow(false);
+
+        var patterns = new buildcraft.builders.FillerPattern[] {
+                buildcraft.builders.FillerPattern.ARC,
+                buildcraft.builders.FillerPattern.CIRCLE,
+                buildcraft.builders.FillerPattern.HEXAGON,
+                buildcraft.builders.FillerPattern.OCTAGON,
+                buildcraft.builders.FillerPattern.PENTAGON,
+                buildcraft.builders.FillerPattern.SEMICIRCLE,
+                buildcraft.builders.FillerPattern.SQUARE,
+                buildcraft.builders.FillerPattern.TRIANGLE
+        };
+        for (var pattern : patterns) {
+            filler.setPattern(pattern);
+            int expected = countShape2d(pattern, min, max, Direction.Axis.Y, 0, false);
+            helper.assertTrue(expected > 0 && expected <= 105,
+                    pattern + " generated an invalid filled template size");
+            insertPipeItem(filler.resources(), Items.STONE, expected);
+            helper.assertValueEqual(0L, filler.mjReceiver().receivePower(expected * 4L * MjAPI.MJ, false),
+                    pattern + " rejected nominal MJ input");
+            tickFiller(helper, fillerPos, filler, expected + 1);
+            helper.assertValueEqual(countBlocks(helper, min, max, Blocks.STONE), expected,
+                    pattern + " did not place its complete Y-axis extrusion");
+            clearTestArea(helper, min, max);
+        }
+
+        filler.setPattern(buildcraft.builders.FillerPattern.SQUARE);
+        filler.setHollow(true);
+        int hollowSquare = countShape2d(buildcraft.builders.FillerPattern.SQUARE,
+                min, max, Direction.Axis.Y, 0, true);
+        helper.assertValueEqual(hollowSquare, 60, "hollow 5x7 Square extrusion geometry");
+        insertPipeItem(filler.resources(), Items.GLASS, hollowSquare);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(hollowSquare * 4L * MjAPI.MJ, false),
+                "hollow Square rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, hollowSquare + 1);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.GLASS), 60,
+                "hollow Square placed the wrong total");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(2, 1, 3)).isAir(),
+                "hollow Square filled its interior");
+        var rotatedTriangle = buildcraft.builders.FillerShape2d.create(
+                buildcraft.builders.FillerPattern.TRIANGLE, min, max, Direction.Axis.Y, 1, true);
+        helper.assertTrue(rotatedTriangle.includes(min.offset(4, 1, 3)),
+                "rotated Triangle did not move its apex clockwise");
+        var zTriangle = buildcraft.builders.FillerShape2d.create(
+                buildcraft.builders.FillerPattern.TRIANGLE, min, max, Direction.Axis.Z, 0, true);
+        helper.assertTrue(zTriangle.includes(min.offset(2, 0, 6)),
+                "Z-axis Triangle was not extruded across its selected axis");
+
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(45, player.getInventory(), fillerPos);
+        Direction.Axis oldAxis = filler.shapeAxis();
+        helper.assertTrue(menu.clickMenuButton(player, 35), "Filler menu rejected 2D axis cycle");
+        helper.assertTrue(menu.clickMenuButton(player, 36), "Filler menu rejected 2D rotation");
+        helper.assertTrue(menu.clickMenuButton(player, 32), "Filler menu rejected 2D hollow toggle");
+        helper.assertTrue(filler.shapeAxis() != oldAxis && filler.shapeRotation() == 1 && !filler.hollow(),
+                "Filler menu selected the wrong 2D parameters");
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.pattern() == buildcraft.builders.FillerPattern.SQUARE
+                        && restored.shapeAxis() == filler.shapeAxis()
+                        && restored.shapeRotation() == 1 && !restored.hollow(),
+                "reloaded Filler lost its 2D parameters");
+        helper.succeed();
+    }
+
+    private static int countShape2d(buildcraft.builders.FillerPattern pattern, BlockPos min, BlockPos max,
+                                    Direction.Axis axis, int rotation, boolean hollow) {
+        int count = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            if (buildcraft.builders.FillerShape2d.includes(pattern, pos, min, max, axis, rotation, hollow)) count++;
+        }
+        return count;
     }
 
     private static void tickFiller(GameTestHelper helper, BlockPos pos,
