@@ -9,10 +9,12 @@ import buildcraft.silicon.item.PipePlugItem;
 import buildcraft.silicon.item.GateCopierItem;
 import buildcraft.silicon.item.PulsarItem;
 import buildcraft.silicon.item.LensItem;
+import buildcraft.silicon.item.FacadeItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.Identifier;
 import net.neoforged.bus.api.IEventBus;
@@ -34,6 +36,8 @@ public final class BCSiliconItems {
             ITEMS.registerItem("plug_pulsar", PulsarItem::new);
     public static final DeferredItem<LensItem> PLUG_LENS =
             ITEMS.registerItem("plug_lens", LensItem::new);
+    public static final DeferredItem<FacadeItem> PLUG_FACADE =
+            ITEMS.registerItem("plug_facade", FacadeItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =
             ITEMS.registerItem("plug_light_sensor", PipePlugItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_TIMER =
@@ -54,6 +58,13 @@ public final class BCSiliconItems {
         stack.set(BCSiliconDataComponents.LENS_FILTER.get(), filter);
         stack.set(DataComponents.ITEM_MODEL, Identifier.fromNamespaceAndPath(
                 BCSilicon.MOD_ID, "plug_" + (filter ? "filter_" : "lens_") + color.getName()));
+        return stack;
+    }
+
+    public static ItemStack facade(BlockState state) {
+        ItemStack stack = new ItemStack(PLUG_FACADE.get());
+        stack.set(BCSiliconDataComponents.FACADE_STATE.get(), state);
+        stack.set(DataComponents.ITEM_MODEL, state.getBlock().asItem().builtInRegistryHolder().key().identifier());
         return stack;
     }
 

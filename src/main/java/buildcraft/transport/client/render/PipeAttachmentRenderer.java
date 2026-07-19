@@ -1,6 +1,7 @@
 package buildcraft.transport.client.render;
 
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
+import buildcraft.transport.item.FacadeAttachment;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -32,11 +33,18 @@ public final class PipeAttachmentRenderer
             var stack = pipe.attachment(side);
             if (stack.isEmpty()) {
                 state.attachments[side.ordinal()] = null;
+                state.facades[side.ordinal()] = false;
             } else {
+                boolean facade = stack.getItem() instanceof FacadeAttachment;
+                if (facade) {
+                    var attachment = (FacadeAttachment) stack.getItem();
+                    stack = new net.minecraft.world.item.ItemStack(attachment.facadeState(stack).getBlock());
+                }
                 ItemStackRenderState itemState = new ItemStackRenderState();
                 itemModels.updateForTopItem(itemState, stack, ItemDisplayContext.FIXED,
                         pipe.getLevel(), null, seed + side.ordinal());
                 state.attachments[side.ordinal()] = itemState;
+                state.facades[side.ordinal()] = facade;
             }
         }
     }
@@ -46,11 +54,13 @@ public final class PipeAttachmentRenderer
             ItemStackRenderState item = state.attachments[side.ordinal()];
             if (item == null) continue;
             poseStack.pushPose();
-            poseStack.translate(.5 + side.getStepX() * .39, .5 + side.getStepY() * .39,
-                    .5 + side.getStepZ() * .39);
+            double offset = state.facades[side.ordinal()] ? .47 : .39;
+            poseStack.translate(.5 + side.getStepX() * offset, .5 + side.getStepY() * offset,
+                    .5 + side.getStepZ() * offset);
             poseStack.mulPose(new Quaternionf().rotationTo(0, 0, 1,
                     side.getStepX(), side.getStepY(), side.getStepZ()));
-            poseStack.scale(.34F, .34F, .34F);
+            if (state.facades[side.ordinal()]) poseStack.scale(1.01F, 1.01F, .08F);
+            else poseStack.scale(.34F, .34F, .34F);
             item.submit(poseStack, nodes, state.lightCoords, OverlayTexture.NO_OVERLAY, 0);
             poseStack.popPose();
         }

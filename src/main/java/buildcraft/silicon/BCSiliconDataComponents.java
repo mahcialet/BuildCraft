@@ -7,6 +7,7 @@ import buildcraft.silicon.gate.GateProgram;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -42,6 +43,9 @@ public final class BCSiliconDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> LENS_FILTER =
             COMPONENTS.register("lens_filter", () -> DataComponentType.<Boolean>builder()
                     .persistent(Codec.BOOL).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BlockState>> FACADE_STATE =
+            COMPONENTS.register("facade_state", () -> DataComponentType.<BlockState>builder()
+                    .persistent(BlockState.CODEC).build());
 
     private BCSiliconDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

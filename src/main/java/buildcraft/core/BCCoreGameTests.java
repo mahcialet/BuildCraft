@@ -161,6 +161,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
         registerTest(event, environment, "silicon_lens_routing", BCCoreGameTests::siliconLensRouting);
+        registerTest(event, environment, "silicon_facade", BCCoreGameTests::siliconFacade);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3486,6 +3487,44 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconFacade(GameTestHelper helper) {
+        java.util.List<ItemStack> stacks = new java.util.ArrayList<>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
+        stacks.set(0, new ItemStack(Blocks.COBBLESTONE_WALL));
+        stacks.set(1, new ItemStack(Blocks.COBBLESTONE_WALL));
+        stacks.set(2, new ItemStack(Blocks.COBBLESTONE_WALL));
+        stacks.set(4, new ItemStack(Blocks.OAK_PLANKS));
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        var recipe = buildcraft.silicon.recipe.FacadeRecipe.INSTANCE;
+        helper.assertTrue(recipe.matches(input, helper.getLevel()),
+                "facade recipe rejected three cobblestone walls and a block");
+        ItemStack facade = recipe.assemble(input);
+        helper.assertTrue(facade.is(buildcraft.silicon.BCSiliconItems.PLUG_FACADE.get()),
+                "facade recipe produced the wrong item");
+        helper.assertValueEqual(Blocks.OAK_PLANKS.defaultBlockState(),
+                facade.get(buildcraft.silicon.BCSiliconDataComponents.FACADE_STATE.get()),
+                "facade recipe did not capture the block state");
+
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 2, 3));
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, facade),
+                "crafted facade could not be installed");
+        ItemStack removed = holder.takeAttachment(Direction.NORTH);
+        helper.assertValueEqual(Blocks.OAK_PLANKS.defaultBlockState(),
+                removed.get(buildcraft.silicon.BCSiliconDataComponents.FACADE_STATE.get()),
+                "removed facade lost its block state");
+        helper.assertTrue(holder.installAttachment(Direction.SOUTH, removed),
+                "state-preserving facade could not be reinstalled");
+
+        stacks.set(4, new ItemStack(Items.COAL));
+        var invalid = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        helper.assertFalse(recipe.matches(invalid, helper.getLevel()),
+                "facade recipe accepted a non-block appearance item");
         helper.succeed();
     }
 
