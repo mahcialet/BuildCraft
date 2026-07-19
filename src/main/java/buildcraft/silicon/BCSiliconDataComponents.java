@@ -28,6 +28,9 @@ public final class BCSiliconDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<GateProgram>> GATE_PROGRAM =
             COMPONENTS.register("gate_program", () -> DataComponentType.<GateProgram>builder()
                     .persistent(GateProgram.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GateProgram>> COPIED_GATE_PROGRAM =
+            COMPONENTS.register("copied_gate_program", () -> DataComponentType.<GateProgram>builder()
+                    .persistent(GateProgram.CODEC).build());
 
     private BCSiliconDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

@@ -32,6 +32,7 @@ public final class BCSilicon {
         event.accept(BCSiliconItems.PLUG_PULSAR.get());
         event.accept(BCSiliconItems.PLUG_LIGHT_SENSOR.get());
         event.accept(BCSiliconItems.PLUG_TIMER.get());
+        event.accept(BCSiliconItems.GATE_COPIER.get());
         for (ChipsetType type : ChipsetType.values()) event.accept(BCSiliconItems.chipset(type));
         for (var material : buildcraft.silicon.gate.GateMaterial.values()) {
             if (material == buildcraft.silicon.gate.GateMaterial.CLAY_BRICK) {

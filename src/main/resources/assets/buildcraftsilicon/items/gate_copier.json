@@ -1,0 +1,1 @@
+{"model":{"type":"minecraft:condition","property":"minecraft:has_component","component":"buildcraftsilicon:copied_gate_program","on_true":{"type":"minecraft:model","model":"buildcraftsilicon:item/gate_copier_full"},"on_false":{"type":"minecraft:model","model":"buildcraftsilicon:item/gate_copier_empty"}}}

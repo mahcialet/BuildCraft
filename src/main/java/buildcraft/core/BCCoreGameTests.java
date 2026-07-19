@@ -2347,6 +2347,13 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.DIAMOND,
                 installed.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
                 "pipe attachment lost gate modifier");
+        ItemStack copier = new ItemStack(buildcraft.silicon.BCSiliconItems.GATE_COPIER.get());
+        helper.assertTrue(buildcraft.silicon.BCSiliconItems.GATE_COPIER.get()
+                        .useOn(useContext(helper, player, copier, relative)).consumesAction(),
+                "gate copier did not copy attached program");
+        helper.assertValueEqual(2,
+                copier.get(buildcraft.silicon.BCSiliconDataComponents.COPIED_GATE_PROGRAM.get()).rules().size(),
+                "gate copier copied wrong rule count");
         var gateMenu = new buildcraft.silicon.menu.GateMenu(31, player.getInventory(), pos, Direction.UP);
         helper.assertValueEqual(2, gateMenu.ruleSlots(), "gate menu ignored modifier slot divisor");
         helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR, gateMenu.logic(),
@@ -2371,6 +2378,19 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         ItemStack removed = holder.takeAttachment(Direction.UP);
         helper.assertTrue(removed.is(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()),
                 "pipe returned wrong attachment");
+        ItemStack basicGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.CLAY_BRICK,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.UP, basicGate),
+                "pipe rejected copier paste target");
+        helper.assertTrue(buildcraft.silicon.BCSiliconItems.GATE_COPIER.get()
+                        .useOn(useContext(helper, player, copier, relative)).consumesAction(),
+                "gate copier did not paste attached program");
+        helper.assertValueEqual(1,
+                holder.attachment(Direction.UP).get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
+                        .rules().size(), "gate copier did not truncate to target slot count");
+        holder.takeAttachment(Direction.UP);
         helper.assertTrue(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()
                         .useOn(useContext(helper, player, timer, relative)).consumesAction(),
                 "timer item did not install after side was cleared");

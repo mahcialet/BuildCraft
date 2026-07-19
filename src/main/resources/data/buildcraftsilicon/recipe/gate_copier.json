@@ -1,0 +1,1 @@
+{"type":"buildcraftsilicon:assembly","ingredients":["buildcraftcore:wrench",{"neoforge:ingredient_type":"neoforge:components","items":"buildcraftsilicon:redstone_chipset","components":{"buildcraftsilicon:chipset_type":"iron"}}],"result":{"id":"buildcraftsilicon:gate_copier"},"mj":500}
