@@ -1,6 +1,9 @@
 package buildcraft.silicon;
 
-import net.minecraft.world.item.Item;
+import buildcraft.silicon.gate.GateLogic;
+import buildcraft.silicon.gate.GateMaterial;
+import buildcraft.silicon.gate.GateModifier;
+import buildcraft.silicon.item.GateItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
@@ -10,8 +13,13 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 public final class BCSiliconItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCSilicon.MOD_ID);
     public static final DeferredItem<RedstoneChipsetItem> REDSTONE_CHIPSET = ITEMS.registerItem("redstone_chipset",
-        properties -> new RedstoneChipsetItem(properties.component(
-            BCSiliconDataComponents.CHIPSET_TYPE.get(), ChipsetType.RED)));
+            properties -> new RedstoneChipsetItem(properties.component(
+                    BCSiliconDataComponents.CHIPSET_TYPE.get(), ChipsetType.RED)));
+    public static final DeferredItem<GateItem> PLUG_GATE = ITEMS.registerItem("plug_gate",
+            properties -> new GateItem(properties
+                    .component(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK)
+                    .component(BCSiliconDataComponents.GATE_LOGIC.get(), GateLogic.AND)
+                    .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)));
     public static final DeferredItem<?> LASER = ITEMS.registerSimpleBlockItem("laser", BCSiliconBlocks.LASER);
     public static final DeferredItem<?> ASSEMBLY_TABLE =
         ITEMS.registerSimpleBlockItem("assembly_table", BCSiliconBlocks.ASSEMBLY_TABLE);
@@ -24,6 +32,14 @@ public final class BCSiliconItems {
     public static ItemStack chipset(ChipsetType type) {
         ItemStack stack = new ItemStack(REDSTONE_CHIPSET.get());
         stack.set(BCSiliconDataComponents.CHIPSET_TYPE.get(), type);
+        return stack;
+    }
+
+    public static ItemStack gate(GateMaterial material, GateLogic logic, GateModifier modifier) {
+        ItemStack stack = new ItemStack(PLUG_GATE.get());
+        stack.set(BCSiliconDataComponents.GATE_MATERIAL.get(), material);
+        stack.set(BCSiliconDataComponents.GATE_LOGIC.get(), logic);
+        stack.set(BCSiliconDataComponents.GATE_MODIFIER.get(), modifier);
         return stack;
     }
 }

@@ -29,5 +29,17 @@ public final class BCSilicon {
         event.accept(BCSiliconItems.ASSEMBLY_TABLE.get());
         event.accept(BCSiliconItems.ADVANCED_CRAFTING_TABLE.get());
         for (ChipsetType type : ChipsetType.values()) event.accept(BCSiliconItems.chipset(type));
+        for (var material : buildcraft.silicon.gate.GateMaterial.values()) {
+            if (material == buildcraft.silicon.gate.GateMaterial.CLAY_BRICK) {
+                event.accept(BCSiliconItems.gate(material, buildcraft.silicon.gate.GateLogic.AND,
+                        buildcraft.silicon.gate.GateModifier.NO_MODIFIER));
+            } else {
+                for (var logic : buildcraft.silicon.gate.GateLogic.values()) {
+                    for (var modifier : buildcraft.silicon.gate.GateModifier.values()) {
+                        event.accept(BCSiliconItems.gate(material, logic, modifier));
+                    }
+                }
+            }
+        }
     }
 }

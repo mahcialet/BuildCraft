@@ -143,6 +143,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
+        registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -2011,6 +2012,53 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.assertTrue(!stack.getHoverName().getString().isBlank(), "chipset localized name missing");
         }
         helper.assertValueEqual(5, found.size(), "wrong chipset subtype count");
+        helper.succeed();
+    }
+
+    private static void siliconGateItems(GameTestHelper helper) {
+        int variants = 0;
+        for (var material : buildcraft.silicon.gate.GateMaterial.values()) {
+            for (var logic : buildcraft.silicon.gate.GateLogic.values()) {
+                for (var modifier : buildcraft.silicon.gate.GateModifier.values()) {
+                    if (material == buildcraft.silicon.gate.GateMaterial.CLAY_BRICK
+                            && (logic != buildcraft.silicon.gate.GateLogic.AND
+                            || modifier != buildcraft.silicon.gate.GateModifier.NO_MODIFIER)) continue;
+                    ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(material, logic, modifier);
+                    helper.assertTrue(gate.is(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()),
+                            "gate variant changed registry item");
+                    helper.assertValueEqual(material,
+                            gate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MATERIAL.get()),
+                            "gate material component changed");
+                    helper.assertValueEqual(logic,
+                            gate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                            "gate logic component changed");
+                    helper.assertValueEqual(modifier,
+                            gate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
+                            "gate modifier component changed");
+                    helper.assertValueEqual(material.slots() / modifier.slotDivisor(),
+                            buildcraft.silicon.item.GateItem.slots(gate), "gate slot contract changed");
+                    helper.assertTrue(!gate.getHoverName().getString().isBlank(), "gate name missing");
+                    variants++;
+                }
+            }
+        }
+        helper.assertValueEqual(25, variants, "wrong gate variant count");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                ItemStack.EMPTY, new ItemStack(Items.IRON_INGOT), ItemStack.EMPTY,
+                new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE), new ItemStack(Items.IRON_INGOT),
+                ItemStack.EMPTY, new ItemStack(Items.COBBLESTONE), ItemStack.EMPTY));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()),
+                "iron gate recipe returned wrong item");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateMaterial.IRON,
+                crafted.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MATERIAL.get()),
+                "iron gate recipe lost material component");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.AND,
+                crafted.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                "iron gate recipe lost logic component");
         helper.succeed();
     }
 

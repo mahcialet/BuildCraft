@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"redstone","pattern":[" B ","BRB"," C "],"key":{"B":"minecraft:brick","R":"minecraft:redstone","C":"minecraft:cobblestone"},"result":{"id":"buildcraftsilicon:plug_gate","components":{"buildcraftsilicon:gate_material":"clay_brick","buildcraftsilicon:gate_logic":"and","buildcraftsilicon:gate_modifier":"no_modifier"}}}

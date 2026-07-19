@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"redstone","pattern":[" N ","NRN"," C "],"key":{"N":"minecraft:nether_brick","R":"minecraft:redstone","C":"minecraft:cobblestone"},"result":{"id":"buildcraftsilicon:plug_gate","components":{"buildcraftsilicon:gate_material":"nether_brick","buildcraftsilicon:gate_logic":"and","buildcraftsilicon:gate_modifier":"no_modifier"}}}

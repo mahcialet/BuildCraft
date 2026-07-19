@@ -252,6 +252,10 @@ tasks.named('processResources', ProcessResources) {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/item/redstone_chipset'
     }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/items/gates') {
+        include 'gate_logic_*.png'
+        into 'assets/buildcraftsilicon/textures/item/gates'
+    }
     from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/laser') {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/block/laser'
