@@ -6,6 +6,7 @@ import buildcraft.builders.BCBuildersMenus;
 import buildcraft.builders.FillerPattern;
 import buildcraft.builders.block.entity.FillerBlockEntity;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -76,6 +77,11 @@ public final class FillerMenu extends AbstractContainerMenu {
     public net.minecraft.core.Direction horizontalDirection() {
         return filler == null ? net.minecraft.core.Direction.EAST : filler.horizontalDirection();
     }
+    public boolean hollow() { return filler != null && filler.hollow(); }
+    public net.minecraft.core.Direction sphereFacing() {
+        return filler == null ? net.minecraft.core.Direction.DOWN : filler.sphereFacing();
+    }
+    public int sphereRotation() { return filler == null ? 0 : filler.sphereRotation(); }
 
     @Override public boolean clickMenuButton(Player player, int id) {
         if (filler == null) return false;
@@ -88,13 +94,26 @@ public final class FillerMenu extends AbstractContainerMenu {
             filler.setPattern(FillerPattern.values()[pattern]);
             return true;
         }
-        if (id == 20) {
+        if (id == 30) {
             filler.setVerticalDirection(filler.verticalDirection() == net.minecraft.core.Direction.UP
                     ? net.minecraft.core.Direction.DOWN : net.minecraft.core.Direction.UP);
             return true;
         }
-        if (id == 21) {
+        if (id == 31) {
             filler.setHorizontalDirection(filler.horizontalDirection().getClockWise());
+            return true;
+        }
+        if (id == 32) {
+            filler.setHollow(!filler.hollow());
+            return true;
+        }
+        if (id == 33) {
+            Direction[] directions = Direction.values();
+            filler.setSphereFacing(directions[(filler.sphereFacing().ordinal() + 1) % directions.length]);
+            return true;
+        }
+        if (id == 34) {
+            filler.setSphereRotation(filler.sphereRotation() + 1);
             return true;
         }
         return false;

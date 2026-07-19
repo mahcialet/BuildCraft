@@ -146,6 +146,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
+        registerTest(event, environment, "builders_filler_sphere_patterns", BCCoreGameTests::buildersFillerSpherePatterns);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
@@ -2312,8 +2313,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
 
         var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
         var menu = new buildcraft.builders.menu.FillerMenu(43, menuPlayer.getInventory(), fillerPos);
-        helper.assertTrue(menu.clickMenuButton(menuPlayer, 20), "Filler menu rejected downward direction");
-        helper.assertTrue(menu.clickMenuButton(menuPlayer, 21), "Filler menu rejected horizontal rotation");
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 30), "Filler menu rejected downward direction");
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 31), "Filler menu rejected horizontal rotation");
         helper.assertTrue(filler.verticalDirection() == Direction.DOWN
                         && filler.horizontalDirection() == Direction.SOUTH,
                 "Filler menu selected the wrong Stairs directions");
@@ -2343,6 +2344,96 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                         && restored.horizontalDirection() == Direction.SOUTH,
                 "reloaded Filler lost its Stairs directions");
         helper.succeed();
+    }
+
+    private static void buildersFillerSpherePatterns(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos min = fillerPos.east();
+        BlockPos max = min.offset(4, 4, 4);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        helper.assertTrue(filler.configureArea(min, max), "Sphere Filler rejected valid bounds");
+
+        filler.setHollow(false);
+        filler.setPattern(buildcraft.builders.FillerPattern.SPHERE);
+        insertPipeItem(filler.resources(), Items.STONE, 81);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(324 * MjAPI.MJ, false),
+                "filled Sphere rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 82);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.STONE), 81,
+                "filled 5x5x5 Sphere placed the wrong total");
+        BlockPos center = min.offset(2, 2, 2);
+        helper.assertTrue(helper.getLevel().getBlockState(center).is(Blocks.STONE)
+                        && helper.getLevel().getBlockState(center.offset(2, 0, 0)).is(Blocks.STONE)
+                        && helper.getLevel().getBlockState(center.offset(-2, 0, 0)).is(Blocks.STONE),
+                "filled Sphere was not symmetric across its centre");
+        helper.assertTrue(helper.getLevel().getBlockState(min).isAir()
+                        && helper.getLevel().getBlockState(max).isAir(),
+                "filled Sphere included bounding-box corners");
+
+        clearTestArea(helper, min, max);
+        filler.setHollow(true);
+        insertPipeItem(filler.resources(), Items.GLASS, 54);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(216 * MjAPI.MJ, false),
+                "hollow Sphere rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 55);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.GLASS), 54,
+                "hollow 5x5x5 Sphere placed the wrong shell total");
+        helper.assertTrue(helper.getLevel().getBlockState(center).isAir(),
+                "hollow Sphere filled its interior");
+
+        clearTestArea(helper, min, max);
+        filler.setHollow(false);
+        filler.setSphereFacing(Direction.DOWN);
+        filler.setSphereRotation(0);
+        filler.setPattern(buildcraft.builders.FillerPattern.HEMISPHERE);
+        insertPipeItem(filler.resources(), Items.BRICKS, 69);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(276 * MjAPI.MJ, false),
+                "Hemisphere rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 70);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.BRICKS), 69,
+                "Down-facing Hemisphere placed the wrong total");
+
+        clearTestArea(helper, min, max);
+        filler.setPattern(buildcraft.builders.FillerPattern.QUARTER_SPHERE);
+        insertPipeItem(filler.resources(), Items.SMOOTH_STONE, 70);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(280 * MjAPI.MJ, false),
+                "Quarter Sphere rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 71);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.SMOOTH_STONE), 70,
+                "Down/West Quarter Sphere placed the wrong total");
+
+        clearTestArea(helper, min, max);
+        filler.setPattern(buildcraft.builders.FillerPattern.EIGHTH_SPHERE);
+        insertPipeItem(filler.resources(), Items.DEEPSLATE, 69);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(276 * MjAPI.MJ, false),
+                "Eighth Sphere rejected nominal MJ input");
+        tickFiller(helper, fillerPos, filler, 70);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.DEEPSLATE), 69,
+                "Down/West/North Eighth Sphere placed the wrong total");
+
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(44, menuPlayer.getInventory(), fillerPos);
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 32), "Filler menu rejected hollow toggle");
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 33), "Filler menu rejected sphere facing cycle");
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 34), "Filler menu rejected sphere rotation");
+        helper.assertTrue(filler.hollow() && filler.sphereFacing() == Direction.UP
+                        && filler.sphereRotation() == 1,
+                "Filler menu selected the wrong sphere parameters");
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.pattern() == buildcraft.builders.FillerPattern.EIGHTH_SPHERE
+                        && restored.hollow() && restored.sphereFacing() == Direction.UP
+                        && restored.sphereRotation() == 1,
+                "reloaded Filler lost its sphere parameters");
+        helper.succeed();
+    }
+
+    private static void clearTestArea(GameTestHelper helper, BlockPos min, BlockPos max) {
+        for (BlockPos target : BlockPos.betweenClosed(min, max)) {
+            helper.getLevel().setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
     }
 
     private static void tickFiller(GameTestHelper helper, BlockPos pos,

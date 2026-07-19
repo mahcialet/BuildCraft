@@ -65,6 +65,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private FillerPattern pattern = FillerPattern.FILL;
     private Direction verticalDirection = Direction.UP;
     private Direction horizontalDirection = Direction.EAST;
+    private boolean hollow;
+    private Direction sphereFacing = Direction.DOWN;
+    private int sphereRotation;
 
     public FillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.FILLER.get(), pos, state);
@@ -80,6 +83,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public FillerPattern pattern() { return pattern; }
     public Direction verticalDirection() { return verticalDirection; }
     public Direction horizontalDirection() { return horizontalDirection; }
+    public boolean hollow() { return hollow; }
+    public Direction sphereFacing() { return sphereFacing; }
+    public int sphereRotation() { return sphereRotation; }
 
     public static void tick(Level level, BlockPos pos, BlockState state, FillerBlockEntity filler) {
         if (!(level instanceof ServerLevel serverLevel)) return;
@@ -186,6 +192,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     }
 
     private boolean includesTarget(BlockPos target) {
+        if (pattern.isSphere()) return includesSphere(target);
         if (pattern != FillerPattern.PYRAMID && pattern != FillerPattern.STAIRS) {
             return pattern.includes(target, areaMin, areaMax);
         }
@@ -204,6 +211,63 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
             case NORTH -> target.getZ() <= areaMax.getZ() - layer;
             default -> false;
         };
+    }
+
+    private boolean includesSphere(BlockPos target) {
+        java.util.EnumSet<Direction> open = sphereOpenFaces();
+        if (!insideSphere(target, open)) return false;
+        if (!hollow) return true;
+        for (Direction direction : Direction.values()) {
+            if (open.contains(direction)) continue;
+            BlockPos neighbour = target.relative(direction);
+            if (!insideArea(neighbour) || !insideSphere(neighbour, open)) return true;
+        }
+        return false;
+    }
+
+    private boolean insideSphere(BlockPos pos, java.util.Set<Direction> open) {
+        double cx = (areaMin.getX() + areaMax.getX()) / 2.0;
+        double cy = (areaMin.getY() + areaMax.getY()) / 2.0;
+        double cz = (areaMin.getZ() + areaMax.getZ()) / 2.0;
+        double rx = (areaMax.getX() - areaMin.getX() + 1) / 2.0;
+        double ry = (areaMax.getY() - areaMin.getY() + 1) / 2.0;
+        double rz = (areaMax.getZ() - areaMin.getZ() + 1) / 2.0;
+        for (Direction direction : open) {
+            switch (direction.getAxis()) {
+                case X -> { cx += direction.getStepX() * rx; rx *= 2; }
+                case Y -> { cy += direction.getStepY() * ry; ry *= 2; }
+                case Z -> { cz += direction.getStepZ() * rz; rz *= 2; }
+            }
+        }
+        double dx = (pos.getX() - cx) / rx;
+        double dy = (pos.getY() - cy) / ry;
+        double dz = (pos.getZ() - cz) / rz;
+        return dx * dx + dy * dy + dz * dz <= 1.0 + 1.0E-9;
+    }
+
+    private boolean insideArea(BlockPos pos) {
+        return pos.getX() >= areaMin.getX() && pos.getX() <= areaMax.getX()
+                && pos.getY() >= areaMin.getY() && pos.getY() <= areaMax.getY()
+                && pos.getZ() >= areaMin.getZ() && pos.getZ() <= areaMax.getZ();
+    }
+
+    private java.util.EnumSet<Direction> sphereOpenFaces() {
+        java.util.EnumSet<Direction> result = java.util.EnumSet.noneOf(Direction.class);
+        int count = pattern.openFaces();
+        if (count == 0) return result;
+        result.add(sphereFacing);
+        Direction.Axis primary = sphereFacing.getAxis();
+        if (count >= 2) result.add(sphereSecondary(primary, sphereRotation));
+        if (count >= 3) result.add(sphereSecondary(primary, (sphereRotation + 1) & 3));
+        return result;
+    }
+
+    private static Direction sphereSecondary(Direction.Axis primary, int rotation) {
+        Direction.Axis axis = rotation % 2 == 1
+                ? switch (primary) { case X -> Direction.Axis.Y; case Y -> Direction.Axis.Z; case Z -> Direction.Axis.X; }
+                : switch (primary) { case X -> Direction.Axis.Z; case Y -> Direction.Axis.X; case Z -> Direction.Axis.Y; };
+        return Direction.get(rotation >= 2 ? Direction.AxisDirection.POSITIVE
+                : Direction.AxisDirection.NEGATIVE, axis);
     }
 
     private boolean place(ServerLevel level, BlockPos target, ItemResource resource) {
@@ -313,6 +377,31 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         sync();
     }
 
+    public void setHollow(boolean hollow) {
+        if (this.hollow == hollow) return;
+        this.hollow = hollow;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
+    public void setSphereFacing(Direction direction) {
+        if (sphereFacing == direction) return;
+        sphereFacing = direction;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
+    public void setSphereRotation(int rotation) {
+        int normalized = Math.floorMod(rotation, 4);
+        if (sphereRotation == normalized) return;
+        sphereRotation = normalized;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
     private void sync() {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -334,6 +423,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (verticalDirection.getAxis() != Direction.Axis.Y) verticalDirection = Direction.UP;
         horizontalDirection = input.read("horizontal_direction", Direction.CODEC).orElse(Direction.EAST);
         if (horizontalDirection.getAxis().isVertical()) horizontalDirection = Direction.EAST;
+        hollow = input.getBooleanOr("hollow", false);
+        sphereFacing = input.read("sphere_facing", Direction.CODEC).orElse(Direction.DOWN);
+        sphereRotation = Math.floorMod(input.getIntOr("sphere_rotation", 0), 4);
     }
 
     @Override protected void saveAdditional(ValueOutput output) {
@@ -348,6 +440,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         output.store("pattern", FillerPattern.CODEC, pattern);
         output.store("vertical_direction", Direction.CODEC, verticalDirection);
         output.store("horizontal_direction", Direction.CODEC, horizontalDirection);
+        if (hollow) output.putBoolean("hollow", true);
+        output.store("sphere_facing", Direction.CODEC, sphereFacing);
+        if (sphereRotation != 0) output.putInt("sphere_rotation", sphereRotation);
     }
 
     @Override public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {

@@ -14,6 +14,9 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
     private final Button[] patternButtons = new Button[FillerPattern.values().length];
     private Button verticalButton;
     private Button horizontalButton;
+    private Button hollowButton;
+    private Button sphereFacingButton;
+    private Button sphereRotationButton;
     public FillerScreen(FillerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 168);
         titleLabelX = 8;
@@ -40,18 +43,33 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                         if (minecraft != null && minecraft.gameMode != null) {
                             minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 10 + id);
                         }
-                    }).bounds(leftPos + 8 + pattern * 22, topPos + 2, 20, 14).build());
+                    }).bounds(leftPos + 8 + pattern * 14, topPos + 2, 13, 14).build());
         }
         verticalButton = addRenderableWidget(Button.builder(Component.literal("U"), button -> {
             if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 20);
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 30);
             }
         }).bounds(leftPos + 8, topPos + 70, 20, 14).build());
         horizontalButton = addRenderableWidget(Button.builder(Component.literal("E"), button -> {
             if (minecraft != null && minecraft.gameMode != null) {
-                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 21);
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 31);
             }
         }).bounds(leftPos + 30, topPos + 70, 20, 14).build());
+        hollowButton = addRenderableWidget(Button.builder(Component.literal("O"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 32);
+            }
+        }).bounds(leftPos + 52, topPos + 70, 20, 14).build());
+        sphereFacingButton = addRenderableWidget(Button.builder(Component.literal("D"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 33);
+            }
+        }).bounds(leftPos + 74, topPos + 70, 20, 14).build());
+        sphereRotationButton = addRenderableWidget(Button.builder(Component.literal("0"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 34);
+            }
+        }).bounds(leftPos + 96, topPos + 70, 18, 14).build());
     }
 
     private static String patternLabel(FillerPattern pattern) {
@@ -63,6 +81,10 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
             case FRAME -> "R";
             case PYRAMID -> "P";
             case STAIRS -> "S";
+            case SPHERE -> "O";
+            case HEMISPHERE -> "H";
+            case QUARTER_SPHERE -> "Q";
+            case EIGHTH_SPHERE -> "E";
         };
     }
 
@@ -81,6 +103,14 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
         horizontalButton.visible = menu.pattern() == FillerPattern.STAIRS;
         horizontalButton.setMessage(Component.literal(
                 menu.horizontalDirection().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
+        boolean sphere = menu.pattern().isSphere();
+        hollowButton.visible = sphere;
+        hollowButton.setMessage(Component.literal(menu.hollow() ? "H" : "O"));
+        sphereFacingButton.visible = menu.pattern().openFaces() > 0;
+        sphereFacingButton.setMessage(Component.literal(
+                menu.sphereFacing().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
+        sphereRotationButton.visible = menu.pattern().openFaces() > 1;
+        sphereRotationButton.setMessage(Component.literal(Integer.toString(menu.sphereRotation())));
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
