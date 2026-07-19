@@ -7,11 +7,14 @@ import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.gate.GateProgram;
 import buildcraft.silicon.gate.GateRule;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
+import buildcraft.transport.item.PipeAttachmentMenu;
+import buildcraft.silicon.menu.GateMenu;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 
-public final class GateItem extends PipePlugItem {
+public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
     public GateItem(Properties properties) { super(properties); }
     @Override public Component getName(ItemStack stack) {
         GateMaterial material = stack.getOrDefault(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK);
@@ -51,5 +54,8 @@ public final class GateItem extends PipePlugItem {
             case REDSTONE_INACTIVE -> !pipe.hasExternalRedstoneSignal();
             case ITEMS_TRAVERSING -> pipe.hasTravellingItems();
         };
+    }
+    @Override public void openAttachmentMenu(ServerPlayer player, PipeHolderBlockEntity pipe, Direction side) {
+        GateMenu.open(player, pipe.getBlockPos(), side);
     }
 }

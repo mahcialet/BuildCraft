@@ -4,6 +4,7 @@ import buildcraft.transport.BCTransportBlockEntities;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeItem;
+import buildcraft.transport.item.PipeAttachmentMenu;
 import buildcraft.api.tools.IWrenchable;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
@@ -151,6 +152,15 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
                 if (!player.addItem(removed)) popResource(level, pos, removed);
             }
             return InteractionResult.SUCCESS;
+        }
+        if (level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder) {
+            var attachment = holder.attachment(hitResult.getDirection());
+            if (!attachment.isEmpty() && attachment.getItem() instanceof PipeAttachmentMenu menu) {
+                if (player instanceof ServerPlayer serverPlayer) {
+                    menu.openAttachmentMenu(serverPlayer, holder, hitResult.getDirection());
+                }
+                return InteractionResult.SUCCESS;
+            }
         }
         if (state.getValue(TYPE) != PipeType.DIAMOND_WOOD_ITEM
             && state.getValue(TYPE) != PipeType.DIAMOND_WOOD_FLUID && state.getValue(TYPE) != PipeType.EMZULI_ITEM

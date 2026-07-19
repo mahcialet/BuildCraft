@@ -2347,6 +2347,18 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.DIAMOND,
                 installed.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
                 "pipe attachment lost gate modifier");
+        var gateMenu = new buildcraft.silicon.menu.GateMenu(31, player.getInventory(), pos, Direction.UP);
+        helper.assertValueEqual(2, gateMenu.ruleSlots(), "gate menu ignored modifier slot divisor");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR, gateMenu.logic(),
+                "gate menu synchronized wrong logic");
+        helper.assertTrue(gateMenu.clickMenuButton(player, 0), "gate menu rejected trigger cycle");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateTrigger.REDSTONE_INACTIVE,
+                holder.attachment(Direction.UP).get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
+                        .rules().getFirst().trigger(), "gate menu did not persist cycled trigger");
+        helper.assertTrue(gateMenu.clickMenuButton(player, 3), "gate menu rejected row clear");
+        helper.assertValueEqual(1,
+                holder.attachment(Direction.UP).get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
+                        .rules().size(), "gate menu did not persist row clear");
         buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
                 helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
         helper.assertValueEqual(15, helper.getLevel().getSignal(pos, Direction.NORTH),

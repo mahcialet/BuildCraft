@@ -112,6 +112,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         sync();
         return stack;
     }
+    public void setAttachment(Direction side, ItemStack stack) {
+        attachments.set(side.ordinal(), stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
+        sync();
+    }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
         if (level instanceof ServerLevel serverLevel) holder.serverTick(serverLevel);

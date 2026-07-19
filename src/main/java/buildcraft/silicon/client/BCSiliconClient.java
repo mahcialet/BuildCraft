@@ -4,6 +4,7 @@ import buildcraft.silicon.BCSiliconMenus;
 import buildcraft.silicon.client.screen.AssemblyTableScreen;
 import buildcraft.silicon.client.screen.AdvancedCraftingTableScreen;
 import buildcraft.silicon.client.screen.IntegrationTableScreen;
+import buildcraft.silicon.client.screen.GateScreen;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
@@ -20,6 +21,7 @@ public final class BCSiliconClient {
         event.register(BCSiliconMenus.ASSEMBLY_TABLE.get(), AssemblyTableScreen::new);
         event.register(BCSiliconMenus.ADVANCED_CRAFTING_TABLE.get(), AdvancedCraftingTableScreen::new);
         event.register(BCSiliconMenus.INTEGRATION_TABLE.get(), IntegrationTableScreen::new);
+        event.register(BCSiliconMenus.GATE.get(), GateScreen::new);
     }
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BCSiliconBlockEntities.LASER.get(), LaserRenderer::new);
