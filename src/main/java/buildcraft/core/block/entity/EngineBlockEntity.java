@@ -5,7 +5,7 @@ import net.minecraft.core.Direction;
 import org.jspecify.annotations.Nullable;
 
 /** Common block and render hooks shared by core-owned engine variants. */
-public interface EngineBlockEntity {
+public interface EngineBlockEntity extends buildcraft.api.core.IEngineStage {
     @Nullable IMjConnector connector(@Nullable Direction side);
 
     boolean rotateToNextReceiver();
@@ -19,4 +19,8 @@ public interface EngineBlockEntity {
     }
 
     String trunkTexture();
+
+    @Override default buildcraft.api.enums.EnumPowerStage powerStage() {
+        return buildcraft.api.enums.EnumPowerStage.BLUE;
+    }
 }

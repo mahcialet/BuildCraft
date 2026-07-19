@@ -83,6 +83,8 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case POWER_HIGH -> pipe.adjacentPower(gateSide).high();
             case MACHINE_ACTIVE -> pipe.adjacentMachine(gateSide).active();
             case MACHINE_INACTIVE -> pipe.adjacentMachine(gateSide).inactive();
+            case ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED ->
+                    rule.trigger().matchesEngineStage(pipe.adjacentEngineStage(gateSide));
         };
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {

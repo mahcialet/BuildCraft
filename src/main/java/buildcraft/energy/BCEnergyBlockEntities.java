@@ -46,6 +46,12 @@ public final class BCEnergyBlockEntities {
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                ENGINE_STIRLING.get(), (engine, side) -> engine);
+        event.registerBlockEntity(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                ENGINE_COMBUSTION.get(), (engine, side) -> engine);
+        event.registerBlockEntity(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                ENGINE_RF.get(), (engine, side) -> engine);
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_STIRLING.get(),
             (engine, side) -> engine.connector(side));
         event.registerBlockEntity(Capabilities.Item.BLOCK, ENGINE_STIRLING.get(),

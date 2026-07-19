@@ -110,7 +110,7 @@ public final class CombustionEngineBlockEntity extends BlockEntity implements En
         IFuel fuel = currentFuel();
         if (powered && fuel != null) burn(fuel);
         cool(powered);
-        stage = computeStage();
+        stage = stageForHeat(heat);
         advancePiston(receiver, true);
         if (progressPart == 0 && powered && extractable(receiver) > 0) {
             progressPart = 1;
@@ -162,7 +162,7 @@ public final class CombustionEngineBlockEntity extends BlockEntity implements En
         heat = Math.max(MIN_HEAT, heat - used * degrees);
     }
 
-    private EnumPowerStage computeStage() {
+    public static EnumPowerStage stageForHeat(double heat) {
         double level = (heat - MIN_HEAT) / (MAX_HEAT - MIN_HEAT);
         if (level < 0.25) return EnumPowerStage.BLUE;
         if (level < 0.5) return EnumPowerStage.GREEN;
@@ -258,6 +258,7 @@ public final class CombustionEngineBlockEntity extends BlockEntity implements En
     public double burnTime() { return burnTime; }
     public long storedPower() { return power; }
     public EnumPowerStage stage() { return stage; }
+    @Override public EnumPowerStage powerStage() { return stage; }
     public boolean pumping() { return pumping; }
     public float renderProgress(float partialTicks) { return Mth.lerp(partialTicks, previousProgress, progress); }
     public String baseTexture() { return "buildcraftenergy:block/engine/iron"; }

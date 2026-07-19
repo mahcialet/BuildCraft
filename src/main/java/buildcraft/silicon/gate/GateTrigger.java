@@ -11,7 +11,18 @@ public enum GateTrigger implements StringRepresentable {
     FLUID_EMPTY, FLUID_CONTAINS, FLUID_SPACE, FLUID_FULL,
     INVENTORY_BELOW_25, INVENTORY_BELOW_50, INVENTORY_BELOW_75,
     FLUID_BELOW_25, FLUID_BELOW_50, FLUID_BELOW_75,
-    POWER_LOW, POWER_HIGH, MACHINE_ACTIVE, MACHINE_INACTIVE;
+    POWER_LOW, POWER_HIGH, MACHINE_ACTIVE, MACHINE_INACTIVE,
+    ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED;
     public static final Codec<GateTrigger> CODEC = StringRepresentable.fromEnum(GateTrigger::values);
     @Override public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
+
+    public boolean matchesEngineStage(buildcraft.api.enums.EnumPowerStage stage) {
+        return switch (this) {
+            case ENGINE_BLUE -> stage == buildcraft.api.enums.EnumPowerStage.BLUE;
+            case ENGINE_GREEN -> stage == buildcraft.api.enums.EnumPowerStage.GREEN;
+            case ENGINE_YELLOW -> stage == buildcraft.api.enums.EnumPowerStage.YELLOW;
+            case ENGINE_RED -> stage == buildcraft.api.enums.EnumPowerStage.RED;
+            default -> false;
+        };
+    }
 }

@@ -166,6 +166,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_fluid_triggers", BCCoreGameTests::siliconFluidTriggers);
         registerTest(event, environment, "silicon_power_triggers", BCCoreGameTests::siliconPowerTriggers);
         registerTest(event, environment, "silicon_machine_triggers", BCCoreGameTests::siliconMachineTriggers);
+        registerTest(event, environment, "silicon_engine_stage_triggers", BCCoreGameTests::siliconEngineStageTriggers);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3492,6 +3493,72 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
+    }
+
+    private static void siliconEngineStageTriggers(GameTestHelper helper) {
+        double min = buildcraft.energy.block.entity.CombustionEngineBlockEntity.MIN_HEAT;
+        double range = buildcraft.energy.block.entity.CombustionEngineBlockEntity.MAX_HEAT - min;
+        var stages = new buildcraft.api.enums.EnumPowerStage[] {
+                buildcraft.api.enums.EnumPowerStage.BLUE, buildcraft.api.enums.EnumPowerStage.GREEN,
+                buildcraft.api.enums.EnumPowerStage.YELLOW, buildcraft.api.enums.EnumPowerStage.RED
+        };
+        var triggers = new buildcraft.silicon.gate.GateTrigger[] {
+                buildcraft.silicon.gate.GateTrigger.ENGINE_BLUE,
+                buildcraft.silicon.gate.GateTrigger.ENGINE_GREEN,
+                buildcraft.silicon.gate.GateTrigger.ENGINE_YELLOW,
+                buildcraft.silicon.gate.GateTrigger.ENGINE_RED
+        };
+        double[] boundaryHeat = { min, min + range * .25, min + range * .50, min + range * .75 };
+        for (int index = 0; index < stages.length; index++) {
+            helper.assertValueEqual(stages[index],
+                    buildcraft.energy.block.entity.CombustionEngineBlockEntity.stageForHeat(boundaryHeat[index]),
+                    "combustion engine stage boundary was incorrect");
+            for (int triggerIndex = 0; triggerIndex < triggers.length; triggerIndex++) {
+                helper.assertValueEqual(index == triggerIndex, triggers[triggerIndex].matchesEngineStage(stages[index]),
+                        "engine stage trigger mapped to the wrong stage");
+            }
+        }
+        helper.assertValueEqual(buildcraft.api.enums.EnumPowerStage.OVERHEAT,
+                buildcraft.energy.block.entity.CombustionEngineBlockEntity.stageForHeat(min + range * .85),
+                "combustion engine overheat boundary was incorrect");
+
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos enginePos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(enginePos, buildcraft.core.BCCoreBlocks.ENGINE.get().defaultBlockState()
+                .setValue(buildcraft.core.block.BlockEngine.ENGINE_TYPE,
+                        buildcraft.api.enums.EnumEngineType.STONE)
+                .setValue(buildcraft.core.block.BlockEngine.FACING, Direction.UP), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "engine stage trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        for (int index = 0; index < triggers.length; index++) {
+            assertEngineStageTrigger(helper, holder, gate, triggers[index], index == 0,
+                    "stirling engine reported the wrong Gate power stage");
+        }
+        helper.getLevel().removeBlock(enginePos, false);
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.ENGINE_BLUE, false,
+                "missing engine triggered ENGINE_BLUE");
+        helper.succeed();
+    }
+
+    private static void assertEngineStageTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(trigger,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
 
     private static void siliconMachineTriggers(GameTestHelper helper) {

@@ -47,6 +47,10 @@ public final class BCCoreBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_REDSTONE.get(),
             (engine, side) -> engine.connector(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_CREATIVE.get(),
-            (engine, side) -> engine.connector(side));
+                (engine, side) -> engine.connector(side));
+        event.registerBlockEntity(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                ENGINE_REDSTONE.get(), (engine, side) -> engine);
+        event.registerBlockEntity(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                ENGINE_CREATIVE.get(), (engine, side) -> engine);
     }
 }

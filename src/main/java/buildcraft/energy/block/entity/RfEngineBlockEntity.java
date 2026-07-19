@@ -229,6 +229,7 @@ public final class RfEngineBlockEntity extends BlockEntity implements EngineBloc
     public long storedPower() { return power; }
     public double heat() { return heat; }
     public EnumPowerStage stage() { return stage; }
+    @Override public EnumPowerStage powerStage() { return stage; }
     public boolean pumping() { return pumping; }
     public float renderProgress(float partialTicks) { return Mth.lerp(partialTicks, previousProgress, progress); }
     public String baseTexture() { return "buildcraftenergy:block/engine/rf"; }

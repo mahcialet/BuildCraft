@@ -219,6 +219,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         boolean active = machine.hasWork();
         return new MachineStatus(true, active, !active);
     }
+    public buildcraft.api.enums.EnumPowerStage adjacentEngineStage(Direction side) {
+        if (level == null) return null;
+        var engine = level.getCapability(buildcraft.api.core.EngineAPI.CAP_POWER_STAGE,
+                worldPosition.relative(side), side.getOpposite());
+        return engine == null ? null : engine.powerStage();
+    }
     public InventoryStatus adjacentInventory(Direction side) {
         if (!(level instanceof ServerLevel serverLevel)) return InventoryStatus.UNAVAILABLE;
         var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
