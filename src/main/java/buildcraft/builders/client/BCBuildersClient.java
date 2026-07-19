@@ -8,6 +8,7 @@ import buildcraft.builders.client.screen.ReplacerScreen;
 import buildcraft.builders.client.screen.BlueprintLibraryScreen;
 import buildcraft.builders.BCBuildersBlockEntities;
 import buildcraft.builders.client.render.QuarryRenderer;
+import buildcraft.builders.client.render.ConstructionMarkerRenderer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
@@ -20,6 +21,7 @@ public final class BCBuildersClient {
     }
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BCBuildersBlockEntities.QUARRY.get(), QuarryRenderer::new);
+        event.registerBlockEntityRenderer(BCBuildersBlockEntities.CONSTRUCTION_MARKER.get(), ConstructionMarkerRenderer::new);
     }
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(BCBuildersMenus.FILLER.get(), FillerScreen::new);

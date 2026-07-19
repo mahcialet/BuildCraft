@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["G","T"],"key":{"G":"buildcraftcore:gear_gold","T":"minecraft:redstone_torch"},"result":{"id":"buildcraftbuilders:construction_marker"}}

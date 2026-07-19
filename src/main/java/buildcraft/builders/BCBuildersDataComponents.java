@@ -7,6 +7,7 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.BlockPos;
 
 public final class BCBuildersDataComponents {
     private static final DeferredRegister<DataComponentType<?>> COMPONENTS =
@@ -17,6 +18,9 @@ public final class BCBuildersDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BlockState>> SCHEMATIC_STATE =
             COMPONENTS.register("schematic_state", () -> DataComponentType.<BlockState>builder()
                     .persistent(BlockState.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BlockPos>> CONSTRUCTION_LINK =
+            COMPONENTS.register("construction_link", () -> DataComponentType.<BlockPos>builder()
+                    .persistent(BlockPos.CODEC).build());
 
     private BCBuildersDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

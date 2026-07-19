@@ -222,6 +222,14 @@ tasks.named('processResources', ProcessResources) {
         include 'top.png', 'bottom.png', 'front.png', 'back.png', 'left.png', 'right.png'
         into 'assets/buildcraftbuilders/textures/block/blueprint_library'
     }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/blocks/marker') {
+        include 'construction.png'
+        into 'assets/buildcraftbuilders/textures/block/marker'
+    }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/items/constructionMarkerBlock') {
+        include 'default.png', 'recording.png'
+        into 'assets/buildcraftbuilders/textures/item/construction_marker'
+    }
     from('buildcraft_resources/assets/buildcraftbuilders/textures/items/schematic_single') {
         include 'clean.png', 'used.png'
         into 'assets/buildcraftbuilders/textures/item/single_schematic'

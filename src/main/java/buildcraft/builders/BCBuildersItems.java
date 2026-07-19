@@ -5,6 +5,7 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.minecraft.world.item.Item;
 import buildcraft.builders.item.SingleSchematicItem;
+import buildcraft.builders.item.ConstructionMarkerItem;
 
 public final class BCBuildersItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCBuilders.MOD_ID);
@@ -16,6 +17,9 @@ public final class BCBuildersItems {
     public static final DeferredItem<?> FRAME = ITEMS.registerSimpleBlockItem("frame", BCBuildersBlocks.FRAME);
     public static final DeferredItem<?> BLUEPRINT_LIBRARY =
             ITEMS.registerSimpleBlockItem("blueprint_library", BCBuildersBlocks.BLUEPRINT_LIBRARY);
+    public static final DeferredItem<ConstructionMarkerItem> CONSTRUCTION_MARKER = ITEMS.registerItem(
+            "construction_marker", properties -> new ConstructionMarkerItem(
+                    BCBuildersBlocks.CONSTRUCTION_MARKER.get(), properties.useBlockDescriptionPrefix()));
     public static final DeferredItem<Item> BLUEPRINT = ITEMS.registerSimpleItem("blueprint", properties -> properties.stacksTo(16));
     public static final DeferredItem<Item> TEMPLATE = ITEMS.registerSimpleItem("template", properties -> properties.stacksTo(16));
     public static final DeferredItem<SingleSchematicItem> SINGLE_SCHEMATIC =

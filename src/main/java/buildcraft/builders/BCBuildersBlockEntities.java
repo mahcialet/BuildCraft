@@ -8,6 +8,7 @@ import buildcraft.builders.block.entity.BuilderBlockEntity;
 import buildcraft.builders.block.entity.ReplacerBlockEntity;
 import buildcraft.builders.block.entity.QuarryBlockEntity;
 import buildcraft.builders.block.entity.BlueprintLibraryBlockEntity;
+import buildcraft.builders.block.entity.ConstructionMarkerBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -34,6 +35,9 @@ public final class BCBuildersBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<BlueprintLibraryBlockEntity>> BLUEPRINT_LIBRARY =
             BLOCK_ENTITIES.register("blueprint_library", () -> new BlockEntityType<>(
                     BlueprintLibraryBlockEntity::new, BCBuildersBlocks.BLUEPRINT_LIBRARY.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ConstructionMarkerBlockEntity>> CONSTRUCTION_MARKER =
+            BLOCK_ENTITIES.register("construction_marker", () -> new BlockEntityType<>(
+                    ConstructionMarkerBlockEntity::new, BCBuildersBlocks.CONSTRUCTION_MARKER.get()));
 
     private BCBuildersBlockEntities() {}
 

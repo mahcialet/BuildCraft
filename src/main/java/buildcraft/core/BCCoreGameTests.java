@@ -150,6 +150,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_replacer", BCCoreGameTests::buildersReplacer);
         registerTest(event, environment, "builders_quarry", BCCoreGameTests::buildersQuarry);
         registerTest(event, environment, "builders_blueprint_library", BCCoreGameTests::buildersBlueprintLibrary);
+        registerTest(event, environment, "builders_construction_marker", BCCoreGameTests::buildersConstructionMarker);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2516,6 +2517,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(BlockPos.betweenClosedStream(min, max).noneMatch(pos ->
                 helper.getLevel().getBlockState(pos).is(buildcraft.builders.BCBuildersBlocks.FRAME.get())),
                 "Quarry did not remove its generated frame");
+        helper.getLevel().removeBlock(quarryPos, false);
         helper.succeed();
     }
 
@@ -2620,6 +2622,96 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 restored, null, ItemStack.EMPTY);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.BLUEPRINT_LIBRARY.get()),
                 "Blueprint Library loot output");
+        helper.succeed();
+    }
+
+    private static void buildersConstructionMarker(GameTestHelper helper) {
+        BlockPos architectPos = helper.absolutePos(new BlockPos(1, 3, 1));
+        BlockPos mainPos = architectPos.east();
+        BlockPos markerPos = helper.absolutePos(new BlockPos(5, 3, 1));
+        helper.getLevel().setBlock(architectPos,
+                buildcraft.builders.BCBuildersBlocks.ARCHITECT_TABLE.get().defaultBlockState(), Block.UPDATE_ALL);
+        var architect = (buildcraft.builders.block.entity.ArchitectTableBlockEntity)
+                helper.getLevel().getBlockEntity(architectPos);
+        helper.assertTrue(architect.configureArea(mainPos, mainPos), "Architect rejected compound primary area");
+        helper.getLevel().setBlock(mainPos, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(markerPos.below(), Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(markerPos,
+                buildcraft.builders.BCBuildersBlocks.CONSTRUCTION_MARKER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var marker = (buildcraft.builders.block.entity.ConstructionMarkerBlockEntity)
+                helper.getLevel().getBlockEntity(markerPos);
+        var stairs = Blocks.SPRUCE_STAIRS.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.WEST);
+        var linkedSnapshot = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, new BlockPos(2, 1, 1), Direction.SOUTH,
+                new BlockPos(1, 0, 0), java.util.List.of(stairs, Blocks.GLASS.defaultBlockState()),
+                java.util.List.of(0, 1), "Linked Marker");
+        ItemStack linkedBlueprint = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        linkedBlueprint.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), linkedSnapshot);
+        helper.assertTrue(marker.setBlueprint(linkedBlueprint), "Construction Marker rejected used Blueprint");
+
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        ItemStack linker = new ItemStack(buildcraft.builders.BCBuildersItems.CONSTRUCTION_MARKER.get());
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, linker);
+        var architectHit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(architectPos),
+                Direction.UP, architectPos, false);
+        var markerHit = new net.minecraft.world.phys.BlockHitResult(net.minecraft.world.phys.Vec3.atCenterOf(markerPos),
+                Direction.UP, markerPos, false);
+        helper.assertTrue(buildcraft.builders.BCBuildersItems.CONSTRUCTION_MARKER.get().useOn(
+                new net.minecraft.world.item.context.UseOnContext(helper.getLevel(), player,
+                        net.minecraft.world.InteractionHand.MAIN_HAND, linker, architectHit)).consumesAction(),
+                "Construction Marker item did not start link");
+        helper.assertTrue(linker.has(buildcraft.builders.BCBuildersDataComponents.CONSTRUCTION_LINK.get())
+                        && linker.has(net.minecraft.core.component.DataComponents.ITEM_MODEL),
+                "Construction Marker link state or recording model missing");
+        helper.assertTrue(buildcraft.builders.BCBuildersItems.CONSTRUCTION_MARKER.get().useOn(
+                new net.minecraft.world.item.context.UseOnContext(helper.getLevel(), player,
+                        net.minecraft.world.InteractionHand.MAIN_HAND, linker, markerHit)).consumesAction(),
+                "Construction Marker item did not finish link");
+        helper.assertTrue(architect.linkedMarkers().equals(java.util.List.of(markerPos))
+                        && !linker.has(buildcraft.builders.BCBuildersDataComponents.CONSTRUCTION_LINK.get())
+                        && !linker.has(net.minecraft.core.component.DataComponents.ITEM_MODEL),
+                "Construction Marker did not register or clear link state");
+
+        var loadedArchitect = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(architectPos,
+                architect.getBlockState(), architect.saveWithFullMetadata(helper.getLevel().registryAccess()),
+                helper.getLevel().registryAccess());
+        var loadedMarker = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(markerPos,
+                marker.getBlockState(), marker.saveWithFullMetadata(helper.getLevel().registryAccess()),
+                helper.getLevel().registryAccess());
+        helper.assertTrue(loadedArchitect instanceof buildcraft.builders.block.entity.ArchitectTableBlockEntity restoredArchitect
+                        && restoredArchitect.linkedMarkers().equals(java.util.List.of(markerPos)),
+                "Architect lost linked Construction Marker on reload");
+        helper.assertTrue(loadedMarker instanceof buildcraft.builders.block.entity.ConstructionMarkerBlockEntity restoredMarker
+                        && linkedSnapshot.equals(restoredMarker.snapshot()),
+                "Construction Marker lost Blueprint on reload");
+        architect = (buildcraft.builders.block.entity.ArchitectTableBlockEntity) loadedArchitect;
+        helper.getLevel().setBlockEntity(architect);
+        architect.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), 1);
+        buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(helper.getLevel(), architectPos,
+                helper.getLevel().getBlockState(architectPos), architect);
+        var composite = architect.inventory().getResource(1).toStack(1)
+                .get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+        helper.assertTrue(composite != null && composite.valid(), "Architect did not emit compound Blueprint");
+        helper.assertValueEqual(composite.size(), new BlockPos(6, 1, 1), "compound Blueprint union size");
+        helper.assertValueEqual(composite.offset(), new BlockPos(1, 0, 0), "compound Blueprint union offset");
+        helper.assertTrue(composite.stateAt(BlockPos.ZERO).is(Blocks.STONE)
+                        && composite.stateAt(new BlockPos(4, 0, 0)).equals(stairs)
+                        && composite.stateAt(new BlockPos(5, 0, 0)).is(Blocks.GLASS),
+                "compound Blueprint lost primary or linked exact states");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, java.util.List.of(
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.REDSTONE_TORCH)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.CONSTRUCTION_MARKER.get()),
+                "Construction Marker recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(markerPos), helper.getLevel(), markerPos,
+                marker, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.CONSTRUCTION_MARKER.get()),
+                "Construction Marker loot output");
         helper.succeed();
     }
 
