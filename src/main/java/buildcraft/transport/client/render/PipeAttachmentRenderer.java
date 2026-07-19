@@ -46,6 +46,23 @@ public final class PipeAttachmentRenderer
         state.powerCapacity = pipe.powerCapacity();
         state.powerLimitShift = pipe.powerLimitShift();
         state.powerLimiter = pipe.isPowerLimiter();
+        state.travellingItems.clear();
+        state.travellingPositions.clear();
+        int transitIndex = 0;
+        for (var transit : pipe.travellingItems()) {
+            ItemStackRenderState itemState = new ItemStackRenderState();
+            itemModels.updateForTopItem(itemState, transit.stack(), ItemDisplayContext.FIXED,
+                    pipe.getLevel(), null, seed + 31 * transitIndex++);
+            double segmentTicks = Math.max(1, (int) Math.ceil(0.5 / Math.max(0.001, transit.speed())));
+            double progress = Math.clamp(1.0 - (transit.ticks() - partialTicks) / segmentTicks, 0, 1);
+            Direction direction = transit.toCenter() ? transit.from() : transit.to();
+            double distance = 0.5 * (transit.toCenter() ? 1.0 - progress : progress);
+            state.travellingItems.add(itemState);
+            state.travellingPositions.add(new Vec3(
+                    0.5 + direction.getStepX() * distance,
+                    0.5 + direction.getStepY() * distance,
+                    0.5 + direction.getStepZ() * distance));
+        }
         for (Direction side : Direction.values()) {
             state.connected[side.ordinal()] = pipe.getBlockState().getValue(PipeHolderBlock.property(side));
             var stack = pipe.attachment(side);
@@ -70,6 +87,15 @@ public final class PipeAttachmentRenderer
                                  SubmitNodeCollector nodes, CameraRenderState camera) {
         submitWires(state, poseStack, nodes);
         submitPowerMeter(state, poseStack, nodes);
+        for (int index = 0; index < state.travellingItems.size(); index++) {
+            Vec3 position = state.travellingPositions.get(index);
+            poseStack.pushPose();
+            poseStack.translate(position.x, position.y, position.z);
+            poseStack.scale(.28F, .28F, .28F);
+            state.travellingItems.get(index).submit(
+                    poseStack, nodes, state.lightCoords, OverlayTexture.NO_OVERLAY, 0);
+            poseStack.popPose();
+        }
         for (Direction side : Direction.values()) {
             ItemStackRenderState item = state.attachments[side.ordinal()];
             if (item == null) continue;

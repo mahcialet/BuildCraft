@@ -2,6 +2,10 @@ package buildcraft.transport.client.render;
 
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.world.phys.Vec3;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     final ItemStackRenderState[] attachments = new ItemStackRenderState[6];
@@ -13,4 +17,6 @@ public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     long powerCapacity;
     int powerLimitShift;
     boolean powerLimiter;
+    final List<ItemStackRenderState> travellingItems = new ArrayList<>();
+    final List<Vec3> travellingPositions = new ArrayList<>();
 }

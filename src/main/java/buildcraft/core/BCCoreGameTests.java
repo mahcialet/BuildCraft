@@ -157,6 +157,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_diamond_fluid_pipe", BCCoreGameTests::transportDiamondFluidPipe);
         registerTest(event, environment, "transport_diamond_wood_fluid_pipe", BCCoreGameTests::transportDiamondWoodFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
+        registerTest(event, environment, "transport_partial_item_bounce", BCCoreGameTests::transportPartialItemBounce);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
@@ -3271,6 +3272,67 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(pendingLoaded != null, "pending pipe input block entity failed to reload");
         helper.assertValueEqual(pendingLoaded.input(net.minecraft.core.Direction.WEST).getAmountAsInt(0), 5,
             "pending pipe capability input did not survive codec reload");
+        helper.succeed();
+    }
+
+    private static void transportPartialItemBounce(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState pipeState = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        BlockPos pipePos = helper.absolutePos(new BlockPos(2, 2, 2));
+        BlockPos partialTargetPos = pipePos.east();
+        BlockPos alternateTargetPos = pipePos.south();
+        helper.getLevel().setBlock(pipePos, pipeState, Block.UPDATE_ALL);
+        helper.getLevel().setBlock(partialTargetPos, Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        var partialTarget = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(partialTargetPos);
+        partialTarget.setItem(0, new ItemStack(Items.DIAMOND, 62));
+        for (int slot = 1; slot < partialTarget.getContainerSize(); slot++) {
+            partialTarget.setItem(slot, new ItemStack(Items.COBBLESTONE, 64));
+        }
+
+        var input = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
+                pipePos, Direction.WEST);
+        helper.assertTrue(input != null, "partial-bounce pipe input capability missing");
+        insertPipeItem(input, Items.DIAMOND, 5);
+        tickPipes(helper, 11, pipePos);
+        helper.getLevel().setBlock(alternateTargetPos, Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        tickPipes(helper, 16, pipePos);
+
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        helper.assertValueEqual(containerCount(partialTarget, Items.DIAMOND), 64,
+                "partial target did not accept its available two items");
+        helper.assertValueEqual(holder.travellingCount(), 1,
+                "partial target did not return the excess stack to pipe flow");
+        var excess = holder.travellingItems().getFirst();
+        helper.assertValueEqual(excess.stack().getCount(), 3,
+                "partial target returned the wrong excess count");
+        helper.assertTrue(excess.blocked().orElse(null) == Direction.EAST,
+                "bounced stack did not remember the blocked target");
+
+        var tag = holder.saveWithFullMetadata(helper.getLevel().registryAccess());
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                pipePos, holder.getBlockState(), tag, helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity,
+                "partial-bounce pipe did not reload from its saved tag");
+        var restored = (buildcraft.transport.block.entity.PipeHolderBlockEntity) loaded;
+        helper.assertValueEqual(restored.travellingCount(), 1,
+                "reloaded pipe lost the bounced stack");
+        helper.assertValueEqual(restored.travellingItems().getFirst().stack().getCount(), 3,
+                "reloaded bounced stack had the wrong count");
+        helper.assertTrue(restored.travellingItems().getFirst().blocked().orElse(null) == Direction.EAST,
+                "reloaded bounced stack lost its blocked target");
+
+        tickPipes(helper, 70, pipePos);
+        var alternateTarget = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(alternateTargetPos);
+        helper.assertValueEqual(containerCount(alternateTarget, Items.DIAMOND), 3,
+                "bounced excess did not select the available alternate target");
+        helper.assertValueEqual(holder.travellingCount(), 0,
+                "pipe retained the delivered bounced stack");
         helper.succeed();
     }
 
