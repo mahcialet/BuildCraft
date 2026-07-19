@@ -2444,6 +2444,24 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(0, containerCount(source, Items.COAL),
                 "pulsar did not feed 1 MJ into wood pipe");
         helper.assertValueEqual(1, holder.travellingCount(), "pulsar extraction did not enter pipe flow");
+
+        holder.attachment(Direction.UP).set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PULSAR_SINGLE,
+                                java.util.Optional.of(Direction.DOWN)))));
+        source.setItem(0, new ItemStack(Items.COAL));
+        tickPipes(helper, 19, woodPos);
+        helper.assertValueEqual(1, containerCount(source, Items.COAL),
+                "single pulsar emitted before its 20 tick period");
+        tickPipes(helper, 1, woodPos);
+        helper.assertValueEqual(0, containerCount(source, Items.COAL),
+                "single pulsar did not emit once on activation");
+        source.setItem(0, new ItemStack(Items.COAL));
+        tickPipes(helper, 40, woodPos);
+        helper.assertValueEqual(1, containerCount(source, Items.COAL),
+                "single pulsar repeated while its trigger stayed active");
         helper.succeed();
     }
 

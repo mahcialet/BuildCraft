@@ -57,6 +57,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private final List<ItemStack> attachments = new ArrayList<>();
     private boolean gateRedstoneOutput;
     private final java.util.EnumSet<Direction> pulsarRequests = java.util.EnumSet.noneOf(Direction.class);
+    private final java.util.EnumSet<Direction> queuedPulsarRequests = java.util.EnumSet.noneOf(Direction.class);
+    private final java.util.Set<Integer> activeSinglePulsarRules = new java.util.HashSet<>();
+    private final java.util.Set<Integer> nextSinglePulsarRules = new java.util.HashSet<>();
     private int pulsarStage;
     private final FluidBuffer fluidBuffer = new FluidBuffer();
     private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
@@ -179,12 +182,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private void evaluateAttachments() {
         boolean previous = gateRedstoneOutput;
         gateRedstoneOutput = false;
+        nextSinglePulsarRules.clear();
         for (Direction side : Direction.values()) {
             ItemStack stack = attachment(side);
             if (!stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment) {
                 attachment.tickAttachment(this, side, stack);
             }
         }
+        activeSinglePulsarRules.clear();
+        activeSinglePulsarRules.addAll(nextSinglePulsarRules);
         if (previous != gateRedstoneOutput) {
             setChanged();
             if (level != null) level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
@@ -204,15 +210,33 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             }
         }
     }
+    public void updateSinglePulsar(Direction gateSide, int ruleIndex, @Nullable Direction side, boolean active) {
+        int key = gateSide.ordinal() * 16 + ruleIndex;
+        if (!active) return;
+        nextSinglePulsarRules.add(key);
+        if (!activeSinglePulsarRules.contains(key)) addPulsarTargets(queuedPulsarRequests, side);
+    }
+    private void addPulsarTargets(java.util.EnumSet<Direction> targets, @Nullable Direction side) {
+        if (side != null) {
+            if (attachment(side).getItem() instanceof PulsarAttachment) targets.add(side);
+        } else {
+            for (Direction candidate : Direction.values()) {
+                if (attachment(candidate).getItem() instanceof PulsarAttachment) targets.add(candidate);
+            }
+        }
+    }
     private void tickPulsars() {
         boolean active = false;
         for (Direction side : pulsarRequests) {
             if (attachment(side).getItem() instanceof PulsarAttachment) { active = true; break; }
         }
+        queuedPulsarRequests.removeIf(side -> !(attachment(side).getItem() instanceof PulsarAttachment));
+        active |= !queuedPulsarRequests.isEmpty();
         pulsarRequests.clear();
         if (!active) { pulsarStage = 0; return; }
         if (++pulsarStage < 20) return;
         pulsarStage = 0;
+        queuedPulsarRequests.clear();
         IMjRedstoneReceiver receiver = mjReceiver();
         if (receiver != null) receiver.receivePower(MjAPI.MJ, false);
     }

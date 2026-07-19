@@ -3,6 +3,7 @@ package buildcraft.silicon.item;
 import buildcraft.silicon.BCSiliconDataComponents;
 import buildcraft.silicon.BCSiliconItems;
 import buildcraft.silicon.gate.GateLogic;
+import buildcraft.silicon.gate.GateAction;
 import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.gate.GateProgram;
@@ -40,13 +41,16 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             boolean active = isActive(pipe, side, program.rules().get(index));
             resolved = logic == GateLogic.AND ? resolved && active : resolved || active;
         }
-        if (resolved) {
-            for (int index = 0; index < limit; index++) {
-                GateRule rule = program.rules().get(index);
+        for (int index = 0; index < limit; index++) {
+            GateRule rule = program.rules().get(index);
+            if (resolved) {
                 switch (rule.action()) {
                     case REDSTONE_OUTPUT -> pipe.activateGateRedstoneOutput();
                     case PULSAR_CONSTANT -> pipe.activatePulsar(rule.actionSide().orElse(null));
+                    case PULSAR_SINGLE -> pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), true);
                 }
+            } else if (rule.action() == GateAction.PULSAR_SINGLE) {
+                pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);
             }
         }
     }
