@@ -1,0 +1,1 @@
+{"type":"buildcraftsilicon:assembly","ingredients":["minecraft:yellow_stained_glass"],"result":{"id":"buildcraftsilicon:plug_lens","components":{"buildcraftsilicon:lens_color":"yellow","buildcraftsilicon:lens_filter":false,"minecraft:item_model":"buildcraftsilicon:plug_lens_yellow"}},"mj":500}

@@ -8,9 +8,13 @@ import buildcraft.silicon.item.GateItem;
 import buildcraft.silicon.item.PipePlugItem;
 import buildcraft.silicon.item.GateCopierItem;
 import buildcraft.silicon.item.PulsarItem;
+import buildcraft.silicon.item.LensItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.DyeColor;
+import net.minecraft.core.component.DataComponents;
+import net.minecraft.resources.Identifier;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -28,6 +32,8 @@ public final class BCSiliconItems {
                     .component(BCSiliconDataComponents.GATE_PROGRAM.get(), GateProgram.EMPTY)));
     public static final DeferredItem<PulsarItem> PLUG_PULSAR =
             ITEMS.registerItem("plug_pulsar", PulsarItem::new);
+    public static final DeferredItem<LensItem> PLUG_LENS =
+            ITEMS.registerItem("plug_lens", LensItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =
             ITEMS.registerItem("plug_light_sensor", PipePlugItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_TIMER =
@@ -41,6 +47,15 @@ public final class BCSiliconItems {
         ITEMS.registerSimpleBlockItem("advanced_crafting_table", BCSiliconBlocks.ADVANCED_CRAFTING_TABLE);
     public static final DeferredItem<?> INTEGRATION_TABLE =
         ITEMS.registerSimpleBlockItem("integration_table", BCSiliconBlocks.INTEGRATION_TABLE);
+
+    public static ItemStack lens(DyeColor color, boolean filter) {
+        ItemStack stack = new ItemStack(PLUG_LENS.get());
+        stack.set(BCSiliconDataComponents.LENS_COLOR.get(), color);
+        stack.set(BCSiliconDataComponents.LENS_FILTER.get(), filter);
+        stack.set(DataComponents.ITEM_MODEL, Identifier.fromNamespaceAndPath(
+                BCSilicon.MOD_ID, "plug_" + (filter ? "filter_" : "lens_") + color.getName()));
+        return stack;
+    }
 
     private BCSiliconItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

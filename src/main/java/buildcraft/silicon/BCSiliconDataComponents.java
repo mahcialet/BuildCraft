@@ -6,6 +6,7 @@ import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.gate.GateProgram;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.component.DataComponentType;
+import net.minecraft.world.item.DyeColor;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -34,6 +35,12 @@ public final class BCSiliconDataComponents {
                     .persistent(GateProgram.CODEC).build());
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> PULSAR_MANUALLY_ENABLED =
             COMPONENTS.register("pulsar_manually_enabled", () -> DataComponentType.<Boolean>builder()
+                    .persistent(Codec.BOOL).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<DyeColor>> LENS_COLOR =
+            COMPONENTS.register("lens_color", () -> DataComponentType.<DyeColor>builder()
+                    .persistent(DyeColor.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> LENS_FILTER =
+            COMPONENTS.register("lens_filter", () -> DataComponentType.<Boolean>builder()
                     .persistent(Codec.BOOL).build());
 
     private BCSiliconDataComponents() {}

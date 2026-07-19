@@ -160,6 +160,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
         registerTest(event, environment, "transport_colored_item_pipes", BCCoreGameTests::transportColoredItemPipes);
+        registerTest(event, environment, "silicon_lens_routing", BCCoreGameTests::siliconLensRouting);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3485,6 +3486,73 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconLensRouting(GameTestHelper helper) {
+        var pipeBlock = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState wood = pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.WOOD_ITEM);
+        BlockState cobble = pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE, buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(1, 2, 3));
+        BlockPos woodPos = sourcePos.east();
+        BlockPos centerPos = woodPos.east();
+        BlockPos blueTargetPos = centerPos.east();
+        BlockPos redTargetPos = centerPos.north();
+        BlockPos openTargetPos = centerPos.south();
+        helper.getLevel().setBlock(sourcePos, Blocks.CHEST.defaultBlockState(), 3);
+        helper.getLevel().setBlock(woodPos, wood, 3);
+        helper.getLevel().setBlock(centerPos, cobble, 3);
+        helper.getLevel().setBlock(blueTargetPos, Blocks.CHEST.defaultBlockState(), 3);
+        helper.getLevel().setBlock(redTargetPos, Blocks.CHEST.defaultBlockState(), 3);
+        helper.getLevel().setBlock(openTargetPos, Blocks.CHEST.defaultBlockState(), 3);
+        var source = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(sourcePos);
+        var blueTarget = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(blueTargetPos);
+        var redTarget = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(redTargetPos);
+        var openTarget = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(openTargetPos);
+        var woodHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(woodPos);
+        var centerHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(centerPos);
+        helper.assertTrue(woodHolder.installAttachment(Direction.WEST,
+                        buildcraft.silicon.BCSiliconItems.lens(DyeColor.BLUE, false)),
+                "blue lens could not be installed on the item input");
+        helper.assertTrue(centerHolder.installAttachment(Direction.EAST,
+                        buildcraft.silicon.BCSiliconItems.lens(DyeColor.BLUE, true)),
+                "blue filter could not be installed on its branch");
+        helper.assertTrue(centerHolder.installAttachment(Direction.NORTH,
+                        buildcraft.silicon.BCSiliconItems.lens(DyeColor.RED, true)),
+                "red filter could not be installed on its branch");
+        source.setItem(0, new ItemStack(Items.COAL));
+        tickPipes(helper, 1, woodPos, centerPos);
+        helper.assertValueEqual(Direction.WEST, woodHolder.extractionDirection(),
+                "lens test wood pipe did not face its source");
+        woodHolder.mjReceiver().receivePower(buildcraft.api.mj.MjAPI.MJ, false);
+        tickPipes(helper, 50, woodPos, centerPos);
+        helper.assertValueEqual(1, containerCount(blueTarget, Items.COAL),
+                "blue-painted item did not choose the matching blue filter");
+        helper.assertValueEqual(0, containerCount(redTarget, Items.COAL),
+                "blue-painted item crossed the mismatched red filter");
+
+        ItemStack removedLens = woodHolder.takeAttachment(Direction.WEST);
+        helper.assertValueEqual(DyeColor.BLUE,
+                removedLens.get(buildcraft.silicon.BCSiliconDataComponents.LENS_COLOR.get()),
+                "removed lens lost its color component");
+        source.setItem(0, new ItemStack(Items.COAL));
+        woodHolder.mjReceiver().receivePower(buildcraft.api.mj.MjAPI.MJ, false);
+        tickPipes(helper, 50, woodPos, centerPos);
+        helper.assertValueEqual(1, containerCount(openTarget, Items.COAL),
+                "uncolored item did not prefer the unfiltered branch");
+        helper.assertValueEqual(1, containerCount(blueTarget, Items.COAL),
+                "uncolored item incorrectly preferred the blue filter");
+        ItemStack removedFilter = centerHolder.takeAttachment(Direction.NORTH);
+        helper.assertTrue(removedFilter.getOrDefault(
+                        buildcraft.silicon.BCSiliconDataComponents.LENS_FILTER.get(), false),
+                "removed filter lost its filter component");
+        helper.assertValueEqual(DyeColor.RED,
+                removedFilter.get(buildcraft.silicon.BCSiliconDataComponents.LENS_COLOR.get()),
+                "removed filter lost its color component");
         helper.succeed();
     }
 

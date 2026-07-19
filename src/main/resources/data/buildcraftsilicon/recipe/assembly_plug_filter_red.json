@@ -1,0 +1,1 @@
+{"type":"buildcraftsilicon:assembly","ingredients":["minecraft:red_stained_glass","minecraft:iron_bars"],"result":{"id":"buildcraftsilicon:plug_lens","components":{"buildcraftsilicon:lens_color":"red","buildcraftsilicon:lens_filter":true,"minecraft:item_model":"buildcraftsilicon:plug_filter_red"}},"mj":500}

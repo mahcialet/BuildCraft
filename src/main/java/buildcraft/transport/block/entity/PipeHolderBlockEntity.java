@@ -9,6 +9,7 @@ import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
 import buildcraft.transport.item.PipeAttachment;
 import buildcraft.transport.item.PulsarAttachment;
+import buildcraft.transport.item.LensAttachment;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
@@ -154,6 +155,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             } else if (transit.toCenter()) {
                 if (pipeType() == PipeType.VOID_ITEM) continue;
                 if (pipeType() == PipeType.LAPIS_ITEM) transit = transit.withColor(Optional.of(pipeColor));
+                transit = transit.withColor(paintWithLens(transit.from(), transit.color()));
                 if (pipeType() == PipeType.STRIPES_ITEM && stripesDirection != null
                     && transit.from() != stripesDirection) {
                     useOrDropStripesItem(level, transit);
@@ -168,7 +170,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 else {
                     double speed = modifySpeed(transit.speed());
                     next.add(new Transit(transit.stack(), transit.from(), destination, false,
-                        segmentTicks(speed), speed, Optional.empty(), transit.color()));
+                        segmentTicks(speed), speed, Optional.empty(), paintWithLens(destination, transit.color())));
                 }
             } else {
                 deliver(level, transit, next);
@@ -372,6 +374,26 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
+    private Optional<DyeColor> paintWithLens(Direction side, Optional<DyeColor> color) {
+        ItemStack stack = attachment(side);
+        if (stack.getItem() instanceof LensAttachment lens && !lens.isFilter(stack)) {
+            return Optional.of(lens.lensColor(stack));
+        }
+        return color;
+    }
+
+    private boolean lensAllows(Direction side, Optional<DyeColor> color) {
+        ItemStack stack = attachment(side);
+        if (!(stack.getItem() instanceof LensAttachment lens) || !lens.isFilter(stack)) return true;
+        return color.isEmpty() || color.get() == lens.lensColor(stack);
+    }
+
+    private int lensPriority(Direction side, Optional<DyeColor> color) {
+        ItemStack stack = attachment(side);
+        if (!(stack.getItem() instanceof LensAttachment lens) || !lens.isFilter(stack)) return 0;
+        return color.filter(lens.lensColor(stack)::equals).isPresent() ? 1 : -1;
+    }
+
     private @Nullable Direction chooseDestination(ServerLevel level, Direction from, Optional<Direction> blocked,
         Optional<DyeColor> color) {
         if (pipeType() == PipeType.IRON_ITEM) {
@@ -387,12 +409,18 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         List<Direction> inventories = new ArrayList<>();
         for (Direction direction : Direction.values()) {
             if (direction != from && blocked.filter(direction::equals).isEmpty() && canExit(level, direction)
+                && lensAllows(direction, color)
                 && !(pipeType() == PipeType.DAIZULI_ITEM && direction == routingDirection)) {
                 candidates.add(direction);
                 if (isInventory(level, direction)) inventories.add(direction);
             }
         }
-        if (candidates.isEmpty() && canExit(level, from)) return from;
+        if (!candidates.isEmpty()) {
+            int bestLensPriority = candidates.stream().mapToInt(direction -> lensPriority(direction, color)).max().orElse(0);
+            candidates.removeIf(direction -> lensPriority(direction, color) < bestLensPriority);
+            inventories.retainAll(candidates);
+        }
+        if (candidates.isEmpty() && canExit(level, from) && lensAllows(from, color)) return from;
         if (candidates.isEmpty()) return null;
         List<Direction> choices = pipeType() == PipeType.CLAY_ITEM && !inventories.isEmpty()
             ? inventories : candidates;
