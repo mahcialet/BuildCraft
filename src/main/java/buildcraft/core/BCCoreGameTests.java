@@ -2119,6 +2119,34 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             diamondChipset.get(buildcraft.silicon.BCSiliconDataComponents.CHIPSET_TYPE.get()),
             "assembly table selection fell back to red recipe");
 
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            table.inventory().set(slot, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        }
+        ItemStack baseGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.OR,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(baseGate), 1);
+        table.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.silicon.BCSiliconItems.chipset(buildcraft.silicon.ChipsetType.DIAMOND)), 1);
+        helper.assertValueEqual(80_000L * MjAPI.MJ, table.getRequiredLaserPower(),
+                "iron diamond gate modifier requested wrong power");
+        table.receiveLaserPower(table.getRequiredLaserPower());
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        ItemStack upgradedGate = ItemStack.EMPTY;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.PLUG_GATE.get()) {
+                upgradedGate = table.inventory().getResource(slot).toStack(table.inventory().getAmountAsInt(slot));
+            }
+        }
+        helper.assertValueEqual(buildcraft.silicon.gate.GateLogic.OR,
+                upgradedGate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
+                "gate modifier assembly changed gate logic");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateModifier.DIAMOND,
+                upgradedGate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_MODIFIER.get()),
+                "gate modifier assembly returned wrong modifier");
+
         var laserRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
             new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN),
             new ItemStack(Items.REDSTONE), new ItemStack(Items.DIAMOND), new ItemStack(Items.DIAMOND),

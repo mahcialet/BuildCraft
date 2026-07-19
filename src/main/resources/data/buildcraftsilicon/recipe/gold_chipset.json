@@ -1,1 +1,1 @@
-{"type":"buildcraftsilicon:assembly","chipset_type":"gold","ingredients":["minecraft:redstone","minecraft:gold_ingot"],"mj":40000}
+{"type":"buildcraftsilicon:assembly","chipset_type":"gold","ingredients":["minecraft:redstone","minecraft:gold_ingot"],"result":{"id":"buildcraftsilicon:redstone_chipset","components":{"buildcraftsilicon:chipset_type":"gold"}},"mj":40000}
