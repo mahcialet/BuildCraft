@@ -138,6 +138,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_pump", BCCoreGameTests::factoryPump);
         registerTest(event, environment, "factory_mining_well", BCCoreGameTests::factoryMiningWell);
         registerTest(event, environment, "factory_chute", BCCoreGameTests::factoryChute);
+        registerTest(event, environment, "factory_distiller", BCCoreGameTests::factoryDistiller);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1666,6 +1667,70 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.assertValueEqual(1, drops.size(), "chute returned wrong drop count");
             helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.CHUTE.get()),
                     "chute returned wrong drop");
+            helper.succeed();
+        });
+    }
+
+    private static void factoryDistiller(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(pos, buildcraft.factory.BCFactoryBlocks.DISTILLER.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        var input = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, pos, Direction.NORTH);
+        var gasOutput = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, pos, Direction.UP);
+        var liquidOutput = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, pos, Direction.DOWN);
+        helper.assertTrue(input != null && gasOutput != null && liquidOutput != null,
+                "distiller directional fluid capabilities missing");
+        var hotOil = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(2).source().get());
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(16, input.insert(hotOil, 16, transaction),
+                    "distiller rejected hot oil recipe input");
+            helper.assertValueEqual(0, input.extract(hotOil, 1, transaction),
+                    "distiller exposed input extraction");
+            helper.assertValueEqual(0, gasOutput.insert(hotOil, 1, transaction),
+                    "distiller gas output accepted insertion");
+            transaction.commit();
+        }
+        var receiver = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, pos, Direction.WEST);
+        helper.assertTrue(receiver != null, "distiller MJ receiver missing");
+        helper.assertValueEqual(0L, receiver.receivePower(512 * MjAPI.MJ, false),
+                "distiller rejected working power");
+        helper.runAfterDelay(3, () -> {
+            var distiller = (buildcraft.factory.block.entity.DistillerBlockEntity)
+                    helper.getLevel().getBlockEntity(pos);
+            helper.assertValueEqual(0, distiller.inputTank().getAmountAsInt(0),
+                    "distiller did not consume exact input ratio");
+            helper.assertValueEqual(8, distiller.gasOutputTank().getAmountAsInt(0),
+                    "distiller produced wrong gas-side amount");
+            helper.assertTrue(distiller.gasOutputTank().getResource(0).value() ==
+                            buildcraft.energy.BCEnergyFluids.refineryFluid("oil_distilled").heat(2).source().get(),
+                    "distiller produced wrong gas-side fluid");
+            helper.assertValueEqual(1, distiller.liquidOutputTank().getAmountAsInt(0),
+                    "distiller produced wrong liquid-side amount");
+            helper.assertTrue(distiller.liquidOutputTank().getResource(0).value() ==
+                            buildcraft.energy.BCEnergyFluids.refineryFluid("oil_residue").heat(2).source().get(),
+                    "distiller produced wrong liquid-side fluid");
+            helper.assertValueEqual(500 * MjAPI.MJ, distiller.storedMj(),
+                    "distiller consumed wrong recipe power");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 2, java.util.List.of(
+                    new ItemStack(Items.REDSTONE_TORCH), new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get()),
+                    new ItemStack(Items.REDSTONE_TORCH),
+                    new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get()),
+                    new ItemStack(BCCoreItems.GEAR_DIAMOND.get()),
+                    new ItemStack(buildcraft.factory.BCFactoryItems.TANK.get())
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                    .orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.DISTILLER.get()),
+                    "distiller recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos, distiller);
+            helper.assertValueEqual(1, drops.size(), "distiller returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.DISTILLER.get()),
+                    "distiller returned wrong drop");
             helper.succeed();
         });
     }

@@ -208,6 +208,10 @@ tasks.named('processResources', ProcessResources) {
         include 'bottom.png', 'top.png', 'top_side.png', 'side.png', 'side2.png', 'top_bottom.png'
         into 'assets/buildcraftfactory/textures/block/chute'
     }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/distiller') {
+        include 'tank_sprite_a.png', 'tank_sprite_b.png'
+        into 'assets/buildcraftfactory/textures/block/distiller'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/models/block') {
         include 'chute.json'
         filter { line -> line.replace('buildcraftfactory:blocks/chute/', 'buildcraftfactory:block/chute/') }

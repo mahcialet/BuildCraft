@@ -5,6 +5,7 @@ import buildcraft.factory.block.entity.FloodGateBlockEntity;
 import buildcraft.factory.block.entity.PumpBlockEntity;
 import buildcraft.factory.block.entity.MiningWellBlockEntity;
 import buildcraft.factory.block.entity.ChuteBlockEntity;
+import buildcraft.factory.block.entity.DistillerBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -37,6 +38,10 @@ public final class BCFactoryBlockEntities {
             BLOCK_ENTITIES.register("chute", () -> new BlockEntityType<>(
                     ChuteBlockEntity::new, BCFactoryBlocks.CHUTE.get()
             ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DistillerBlockEntity>> DISTILLER =
+            BLOCK_ENTITIES.register("distiller", () -> new BlockEntityType<>(
+                    DistillerBlockEntity::new, BCFactoryBlocks.DISTILLER.get()
+            ));
 
     private BCFactoryBlockEntities() {}
 
@@ -64,5 +69,13 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, CHUTE.get(), (chute, side) -> chute.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, CHUTE.get(), (chute, side) -> chute.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, CHUTE.get(), (chute, side) -> chute.mjReceiver());
+        event.registerBlockEntity(Capabilities.Fluid.BLOCK, DISTILLER.get(),
+                (distiller, side) -> distiller.fluidHandler(side));
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, DISTILLER.get(),
+                (distiller, side) -> distiller.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, DISTILLER.get(),
+                (distiller, side) -> distiller.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_READABLE, DISTILLER.get(),
+                (distiller, side) -> distiller.mjReceiver());
     }
 }

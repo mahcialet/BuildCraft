@@ -13,6 +13,8 @@ public final class BCFactoryItems {
     public static final DeferredItem<?> MINING_WELL =
             ITEMS.registerSimpleBlockItem("mining_well", BCFactoryBlocks.MINING_WELL);
     public static final DeferredItem<?> CHUTE = ITEMS.registerSimpleBlockItem("chute", BCFactoryBlocks.CHUTE);
+    public static final DeferredItem<?> DISTILLER =
+            ITEMS.registerSimpleBlockItem("distiller", BCFactoryBlocks.DISTILLER);
 
     private BCFactoryItems() {}
 
