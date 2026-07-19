@@ -157,6 +157,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
         registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
+        registerTest(event, environment, "robotics_carrier_robot", BCCoreGameTests::roboticsCarrierRobot);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -6756,6 +6757,96 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Delivery scheduler did not finish its task");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Delivery flight consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsCarrierRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 2, 1);
+        BlockPos providerRelative = new BlockPos(4, 2, 1);
+        BlockPos receiverRelative = new BlockPos(8, 2, 1);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(providerRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(receiverRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(providerRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var provider = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(providerRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        helper.assertTrue(home.installAttachment(Direction.UP,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Carrier home station installation failed");
+        ItemStack providerStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        providerStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        helper.assertTrue(provider.installAttachment(Direction.UP, providerStation),
+                "Carrier provider station installation failed");
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        helper.assertTrue(receiver.installAttachment(Direction.UP, receiverStation),
+                "Carrier receiver station installation failed");
+
+        net.minecraft.world.Container providerChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(providerRelative.above()));
+        net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        providerChest.setItem(0, new ItemStack(Items.COBBLESTONE, 32));
+        providerChest.setItem(1, new ItemStack(Items.DIRT, 7));
+
+        var homeStation = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), provider.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.CARRIER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeStation.reserve(robot.getUUID()) && robot.dock(homeStation),
+                "Carrier could not dock at home");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 500 && (receiverChest.getItem(0).getCount() != 32
+                || robot.carrierPhase() != buildcraft.robotics.CarrierPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), provider.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(providerChest.getItem(0).isEmpty(),
+                "Carrier did not extract provider cargo");
+        helper.assertValueEqual(7, providerChest.getItem(1).getCount(),
+                "Carrier ignored provider item filter");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.COBBLESTONE)
+                        && receiverChest.getItem(0).getCount() == 32,
+                "Carrier did not unload into receiver station");
+        helper.assertTrue(robot.isEmpty(), "Carrier retained successfully unloaded cargo");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Carrier did not return home");
+        helper.assertValueEqual(buildcraft.robotics.CarrierPhase.NONE, robot.carrierPhase(),
+                "Carrier scheduler did not finish");
+
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        helper.assertTrue(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                        .useAttachment(home, Direction.UP, home.attachment(Direction.UP), player).consumesAction(),
+                "empty-hand station configuration did not consume the interaction");
+        var cycled = home.attachment(Direction.UP).getOrDefault(
+                buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                buildcraft.robotics.RobotStationConfig.DEFAULT);
+        helper.assertValueEqual(buildcraft.robotics.RobotStationMode.PROVIDE, cycled.mode(),
+                "station mode did not cycle from both to provide");
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,
+                new ItemStack(Items.DIAMOND));
+        buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                .useAttachment(home, Direction.UP, home.attachment(Direction.UP), player);
+        var filtered = home.attachment(Direction.UP).getOrDefault(
+                buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                buildcraft.robotics.RobotStationConfig.DEFAULT);
+        helper.assertTrue(filtered.matches(new ItemStack(Items.DIAMOND)) && filtered.filters().size() == 1,
+                "held-item station filter was not added");
         helper.succeed();
     }
 

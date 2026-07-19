@@ -22,6 +22,9 @@ public final class BCRoboticsDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<RobotItemData>> ROBOT =
             COMPONENTS.register("robot", () -> DataComponentType.<RobotItemData>builder()
                     .persistent(RobotItemData.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<RobotStationConfig>> ROBOT_STATION_CONFIG =
+            COMPONENTS.register("robot_station_config", () -> DataComponentType.<RobotStationConfig>builder()
+                    .persistent(RobotStationConfig.CODEC).build());
 
     private BCRoboticsDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

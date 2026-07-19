@@ -7,6 +7,9 @@ import buildcraft.robotics.RobotStationRegistry;
 import buildcraft.robotics.RobotTaskState;
 import buildcraft.robotics.DeliveryPhase;
 import buildcraft.robotics.RequesterRegistry;
+import buildcraft.robotics.CarrierPhase;
+import buildcraft.robotics.RobotStationConfig;
+import buildcraft.robotics.BCRoboticsDataComponents;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -50,6 +53,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private RequesterRegistry.Reservation deliveryReservation;
     private RobotStationRegistry.Address deliverySource;
     private DeliveryPhase deliveryPhase = DeliveryPhase.NONE;
+    private RobotStationRegistry.Address carrierTarget;
+    private CarrierPhase carrierPhase = CarrierPhase.NONE;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -93,6 +98,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public Optional<RequesterRegistry.Reservation> deliveryReservation() {
         return Optional.ofNullable(deliveryReservation);
     }
+    public CarrierPhase carrierPhase() { return carrierPhase; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -134,6 +140,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (board() == RobotBoardType.DELIVERY && deliveryPhase == DeliveryPhase.NONE
                     && tickCount % 20 == 0 && isEmpty()) {
                 beginDelivery(serverLevel);
+            } else if (board() == RobotBoardType.CARRIER && carrierPhase == CarrierPhase.NONE
+                    && tickCount % 20 == 0) {
+                beginCarrier(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -153,6 +162,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             }
         }
         if (deliveryPhase != DeliveryPhase.NONE) tickDelivery(serverLevel);
+        if (carrierPhase != CarrierPhase.NONE) tickCarrier(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -179,6 +189,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private boolean sourceContains(ServerLevel level, RobotStationRegistry.Address address, ItemStack requested) {
+        RobotStationConfig config = stationConfig(level, address);
+        if (!config.mode().provides() || !config.matches(requested)) return false;
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         if (handler == null) return false;
         ItemResource resource = ItemResource.of(requested);
@@ -198,6 +210,149 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         Direction side = address.side();
         return Vec3.atCenterOf(address.pipePos()).add(
                 side.getStepX() * 0.75, side.getStepY() * 0.75, side.getStepZ() * 0.75);
+    }
+
+    private RobotStationConfig stationConfig(ServerLevel level, RobotStationRegistry.Address address) {
+        if (!(level.getBlockEntity(address.pipePos())
+                instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity holder)) {
+            return new RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED, java.util.List.of());
+        }
+        ItemStack attachment = holder.attachment(address.side());
+        return attachment.getOrDefault(BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                RobotStationConfig.DEFAULT);
+    }
+
+    private void beginCarrier(ServerLevel level) {
+        Optional<RobotStationRegistry.Address> target = isEmpty()
+                ? findCarrierLoadStation(level) : findCarrierUnloadStation(level, null);
+        if (target.isEmpty()) return;
+        carrierTarget = target.get();
+        carrierPhase = isEmpty() ? CarrierPhase.TO_LOAD : CarrierPhase.TO_UNLOAD;
+        leaveStation();
+    }
+
+    private Optional<RobotStationRegistry.Address> findCarrierLoadStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemResource resource = handler.getResource(slot);
+                        if (!resource.isEmpty() && handler.getAmountAsLong(slot) > 0
+                                && config.matches(resource.toStack())) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private Optional<RobotStationRegistry.Address> findCarrierUnloadStation(
+            ServerLevel level, RobotStationRegistry.Address excluded) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
+                .filter(address -> canUnloadAt(level, address))
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private boolean canUnloadAt(ServerLevel level, RobotStationRegistry.Address address) {
+        RobotStationConfig config = stationConfig(level, address);
+        if (!config.mode().receives()) return false;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+        if (handler == null) return false;
+        for (ItemStack stack : inventory) {
+            if (stack.isEmpty() || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.insert(ItemResource.of(stack), stack.getCount(), transaction) > 0) return true;
+            }
+        }
+        return false;
+    }
+
+    private void tickCarrier(ServerLevel level) {
+        if (carrierTarget == null) {
+            carrierPhase = CarrierPhase.RETURN_HOME;
+        }
+        if (carrierPhase == CarrierPhase.TO_LOAD) {
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(carrierTarget))) {
+                loadCarrier(level, carrierTarget);
+                Optional<RobotStationRegistry.Address> unload = findCarrierUnloadStation(level, carrierTarget);
+                if (unload.isPresent()) {
+                    carrierTarget = unload.get();
+                    carrierPhase = CarrierPhase.TO_UNLOAD;
+                } else {
+                    returnCarrierCargo(level, carrierTarget);
+                    carrierPhase = CarrierPhase.RETURN_HOME;
+                }
+            }
+        } else if (carrierPhase == CarrierPhase.TO_UNLOAD) {
+            if (flyToward(sourcePosition(carrierTarget))) {
+                RobotStationRegistry.Address attempted = carrierTarget;
+                unloadCarrier(level, attempted);
+                if (isEmpty()) {
+                    carrierPhase = CarrierPhase.RETURN_HOME;
+                } else {
+                    Optional<RobotStationRegistry.Address> next = findCarrierUnloadStation(level, attempted);
+                    if (next.isPresent()) carrierTarget = next.get();
+                    else carrierPhase = CarrierPhase.RETURN_HOME;
+                }
+            }
+        } else if (carrierPhase == CarrierPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                carrierTarget = null;
+                carrierPhase = CarrierPhase.NONE;
+            }
+        }
+    }
+
+    private void loadCarrier(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int sourceSlot = 0; sourceSlot < handler.size(); sourceSlot++) {
+            ItemResource resource = handler.getResource(sourceSlot);
+            if (resource.isEmpty() || !config.matches(resource.toStack())) continue;
+            ItemStack template = resource.toStack();
+            int capacity = inventoryCapacity(template);
+            if (capacity <= 0) break;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int extracted = handler.extract(sourceSlot, resource,
+                        Math.min(capacity, handler.getAmountAsInt(sourceSlot)), transaction);
+                if (extracted > 0 && insertIntoRobot(resource.toStack(extracted)) == extracted) {
+                    transaction.commit();
+                }
+            }
+        }
+    }
+
+    private void unloadCarrier(ServerLevel level, RobotStationRegistry.Address destination) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives()) return;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = inventory.get(slot);
+            if (stack.isEmpty() || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int inserted = handler.insert(ItemResource.of(stack), stack.getCount(), transaction);
+                if (inserted > 0) {
+                    stack.shrink(inserted);
+                    transaction.commit();
+                }
+            }
+        }
+    }
+
+    private void returnCarrierCargo(ServerLevel level, RobotStationRegistry.Address source) {
+        carrierTarget = source;
+        insertInventoryAt(level, source);
     }
 
     private void tickDelivery(ServerLevel level) {
@@ -307,7 +462,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private void returnLeftovers(ServerLevel level) {
-        ResourceHandler<ItemResource> handler = sourceHandler(level, deliverySource);
+        insertInventoryAt(level, deliverySource);
+    }
+
+    private void insertInventoryAt(ServerLevel level, RobotStationRegistry.Address address) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         if (handler == null) return;
         for (int slot = 0; slot < inventory.size(); slot++) {
             ItemStack remaining = inventory.get(slot);
@@ -402,6 +561,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             output.putLong("DeliverySourcePos", deliverySource.pipePos().asLong());
             output.putInt("DeliverySourceSide", deliverySource.side().get3DDataValue());
         }
+        output.putInt("CarrierPhase", carrierPhase.ordinal());
+        if (carrierTarget != null) {
+            output.putLong("CarrierTargetPos", carrierTarget.pipePos().asLong());
+            output.putInt("CarrierTargetSide", carrierTarget.side().get3DDataValue());
+        }
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -439,6 +603,17 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (deliveryPhase != DeliveryPhase.NONE && (deliveryReservation == null || deliverySource == null)) {
             deliveryPhase = DeliveryPhase.NONE;
         }
+        int carrierOrdinal = input.getIntOr("CarrierPhase", CarrierPhase.NONE.ordinal());
+        CarrierPhase[] carrierPhases = CarrierPhase.values();
+        carrierPhase = carrierOrdinal >= 0 && carrierOrdinal < carrierPhases.length
+                ? carrierPhases[carrierOrdinal] : CarrierPhase.NONE;
+        if (input.getLong("CarrierTargetPos").isPresent()) {
+            carrierTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("CarrierTargetPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "CarrierTargetSide", Direction.UP.get3DDataValue())));
+        }
+        if (carrierPhase != CarrierPhase.NONE && carrierTarget == null) carrierPhase = CarrierPhase.NONE;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

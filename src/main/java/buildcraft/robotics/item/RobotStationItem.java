@@ -7,6 +7,7 @@ import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeAttachment;
 import buildcraft.api.mj.IMjReceiver;
 import buildcraft.robotics.entity.RobotEntity;
+import buildcraft.robotics.RobotStationConfig;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -15,7 +16,27 @@ import net.minecraft.world.item.ItemStack;
 public final class RobotStationItem extends Item implements PipeAttachment {
     public RobotStationItem(Properties properties) {
         super(properties.stacksTo(16)
-                .component(BCRoboticsDataComponents.ROBOT_STATION.get(), RobotStationData.AVAILABLE));
+                .component(BCRoboticsDataComponents.ROBOT_STATION.get(), RobotStationData.AVAILABLE)
+                .component(BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), RobotStationConfig.DEFAULT));
+    }
+
+    @Override
+    public net.minecraft.world.InteractionResult useAttachment(PipeHolderBlockEntity pipe, Direction side,
+                                                                ItemStack stack,
+                                                                net.minecraft.world.entity.player.Player player) {
+        ItemStack held = player.getMainHandItem();
+        if (held.is(buildcraft.core.BCCoreItems.WRENCH.get())) return net.minecraft.world.InteractionResult.PASS;
+        RobotStationConfig config = stack.getOrDefault(
+                BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), RobotStationConfig.DEFAULT);
+        RobotStationConfig updated = held.isEmpty() ? config.cycleMode() : config.toggle(held);
+        if (!player.level().isClientSide()) {
+            stack.set(BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), updated);
+            pipe.setAttachment(side, stack);
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.buildcraftrobotics.robot_station.config",
+                    updated.mode().getSerializedName(), updated.filters().size()));
+        }
+        return net.minecraft.world.InteractionResult.SUCCESS;
     }
 
     @Override
