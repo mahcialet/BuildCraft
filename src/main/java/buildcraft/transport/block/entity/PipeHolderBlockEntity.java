@@ -1088,6 +1088,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return true;
     }
 
+    public int activeEmzuliPreset() {
+        return selectedEmzuliPreset();
+    }
+
     private int selectedEmzuliPreset() {
         if (emzuliCurrent >= 0 && emzuliTtl[emzuliCurrent] > 0
             && !emzuliFilters.get(emzuliCurrent).isEmpty()) return emzuliCurrent;

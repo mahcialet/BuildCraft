@@ -52,6 +52,9 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                     case POWER_LIMIT_0, POWER_LIMIT_1, POWER_LIMIT_2, POWER_LIMIT_3,
                             POWER_LIMIT_4, POWER_LIMIT_5, POWER_LIMIT_6 ->
                             pipe.activatePowerLimit(rule.action().powerLimitShift());
+                    case EXTRACTION_PRESET_SQUARE, EXTRACTION_PRESET_CIRCLE,
+                            EXTRACTION_PRESET_TRIANGLE, EXTRACTION_PRESET_CROSS ->
+                            pipe.activateEmzuliPreset(rule.action().extractionPresetIndex());
                 }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);
