@@ -12,6 +12,7 @@ public final class BCFactoryItems {
     public static final DeferredItem<?> PUMP = ITEMS.registerSimpleBlockItem("pump", BCFactoryBlocks.PUMP);
     public static final DeferredItem<?> MINING_WELL =
             ITEMS.registerSimpleBlockItem("mining_well", BCFactoryBlocks.MINING_WELL);
+    public static final DeferredItem<?> CHUTE = ITEMS.registerSimpleBlockItem("chute", BCFactoryBlocks.CHUTE);
 
     private BCFactoryItems() {}
 

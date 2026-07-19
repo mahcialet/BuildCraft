@@ -136,6 +136,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
         registerTest(event, environment, "factory_pump", BCCoreGameTests::factoryPump);
         registerTest(event, environment, "factory_mining_well", BCCoreGameTests::factoryMiningWell);
+        registerTest(event, environment, "factory_chute", BCCoreGameTests::factoryChute);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1547,6 +1548,62 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.assertTrue(helper.getLevel().getBlockState(targetPos).isAir()
                             && helper.getLevel().getBlockState(upperTubePos).isAir(),
                     "mining well removal did not clear its tube column");
+            helper.succeed();
+        });
+    }
+
+    private static void factoryChute(GameTestHelper helper) {
+        BlockPos chutePos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(chutePos, buildcraft.factory.BCFactoryBlocks.CHUTE.get().defaultBlockState()
+                .setValue(buildcraft.factory.block.ChuteBlock.FACING, Direction.UP), Block.UPDATE_ALL);
+        var input = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, chutePos, Direction.NORTH);
+        helper.assertTrue(input != null, "chute item capability missing");
+        var iron = net.neoforged.neoforge.transfer.item.ItemResource.of(new ItemStack(Items.IRON_INGOT));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(1, input.insert(iron, 1, transaction), "chute rejected inserted item");
+            transaction.commit();
+        }
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, input.extract(iron, 1, transaction),
+                    "chute exposed external item extraction");
+        }
+        var receiver = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, chutePos, Direction.DOWN);
+        helper.assertTrue(receiver != null, "chute MJ receiver missing");
+        helper.assertValueEqual(0L, receiver.receivePower(buildcraft.factory.block.entity.ChuteBlockEntity.PICKUP_COST,
+                false), "chute rejected pickup power");
+        var entity = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
+                chutePos.getX() + 0.5, chutePos.getY() + 1.05, chutePos.getZ() + 0.5,
+                new ItemStack(Items.COBBLESTONE, 5));
+        helper.getLevel().addFreshEntity(entity);
+        helper.runAfterDelay(2, () -> {
+            var chute = (buildcraft.factory.block.entity.ChuteBlockEntity)
+                    helper.getLevel().getBlockEntity(chutePos);
+            int cobblestone = 0;
+            for (int slot = 0; slot < chute.inventory().size(); slot++) {
+                if (chute.inventory().getResource(slot).is(Items.COBBLESTONE)) {
+                    cobblestone += chute.inventory().getAmountAsInt(slot);
+                }
+            }
+            helper.assertValueEqual(3, cobblestone, "chute did not pick up exactly three items");
+            helper.assertValueEqual(2, entity.getItem().getCount(), "chute consumed wrong entity item count");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(Items.CHEST),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_STONE.get()),
+                    new ItemStack(Items.IRON_INGOT),
+                    ItemStack.EMPTY, new ItemStack(Items.IRON_INGOT), ItemStack.EMPTY
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                    .orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.CHUTE.get()),
+                    "chute recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(chutePos), helper.getLevel(), chutePos,
+                    chute);
+            helper.assertValueEqual(1, drops.size(), "chute returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.CHUTE.get()),
+                    "chute returned wrong drop");
             helper.succeed();
         });
     }

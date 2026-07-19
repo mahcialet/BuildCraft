@@ -5,6 +5,7 @@ import buildcraft.factory.block.FloodGateBlock;
 import buildcraft.factory.block.PumpBlock;
 import buildcraft.factory.block.TubeBlock;
 import buildcraft.factory.block.MiningWellBlock;
+import buildcraft.factory.block.ChuteBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -18,6 +19,7 @@ public final class BCFactoryBlocks {
     public static final DeferredBlock<TubeBlock> TUBE = BLOCKS.registerBlock("tube", TubeBlock::new);
     public static final DeferredBlock<MiningWellBlock> MINING_WELL =
             BLOCKS.registerBlock("mining_well", MiningWellBlock::new);
+    public static final DeferredBlock<ChuteBlock> CHUTE = BLOCKS.registerBlock("chute", ChuteBlock::new);
 
     private BCFactoryBlocks() {}
 

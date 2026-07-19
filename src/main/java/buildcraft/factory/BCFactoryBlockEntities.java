@@ -4,6 +4,7 @@ import buildcraft.factory.block.entity.TankBlockEntity;
 import buildcraft.factory.block.entity.FloodGateBlockEntity;
 import buildcraft.factory.block.entity.PumpBlockEntity;
 import buildcraft.factory.block.entity.MiningWellBlockEntity;
+import buildcraft.factory.block.entity.ChuteBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -32,6 +33,10 @@ public final class BCFactoryBlockEntities {
             BLOCK_ENTITIES.register("mining_well", () -> new BlockEntityType<>(
                     MiningWellBlockEntity::new, BCFactoryBlocks.MINING_WELL.get()
             ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChuteBlockEntity>> CHUTE =
+            BLOCK_ENTITIES.register("chute", () -> new BlockEntityType<>(
+                    ChuteBlockEntity::new, BCFactoryBlocks.CHUTE.get()
+            ));
 
     private BCFactoryBlockEntities() {}
 
@@ -55,5 +60,9 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, MINING_WELL.get(), (well, side) -> well.mjReceiver());
+        event.registerBlockEntity(Capabilities.Item.BLOCK, CHUTE.get(), (chute, side) -> chute.inputHandler());
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, CHUTE.get(), (chute, side) -> chute.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, CHUTE.get(), (chute, side) -> chute.mjReceiver());
+        event.registerBlockEntity(MjAPI.CAP_READABLE, CHUTE.get(), (chute, side) -> chute.mjReceiver());
     }
 }
