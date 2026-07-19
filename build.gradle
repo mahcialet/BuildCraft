@@ -202,6 +202,10 @@ tasks.named('processResources', ProcessResources) {
         include 'top.png', 'bottom.png', 'front_off.png', 'back.png', 'left.png', 'right.png'
         into 'assets/buildcraftbuilders/textures/block/architect_table'
     }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/blocks/builder') {
+        include 'top.png', 'bottom.png', 'front.png', 'back.png', 'side.png'
+        into 'assets/buildcraftbuilders/textures/block/builder'
+    }
     from('buildcraft_resources/assets/buildcraftbuilders/textures/items/blueprint') {
         include 'clean.png', 'used.png'
         into 'assets/buildcraftbuilders/textures/item/blueprint'

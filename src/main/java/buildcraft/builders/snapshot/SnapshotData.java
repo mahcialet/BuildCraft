@@ -82,4 +82,8 @@ public record SnapshotData(SnapshotKind kind, BlockPos size, Direction facing, B
     public BlockPos worldPosition(BlockPos builderPos, BlockPos local, Rotation rotation) {
         return builderPos.offset(offset.rotate(rotation)).offset(local.rotate(rotation));
     }
+
+    public BlockState rotatedStateAt(BlockPos local, Rotation rotation) {
+        return stateAt(local).rotate(rotation);
+    }
 }

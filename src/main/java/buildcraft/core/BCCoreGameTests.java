@@ -146,6 +146,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
         registerTest(event, environment, "builders_architect_table", BCCoreGameTests::buildersArchitectTable);
+        registerTest(event, environment, "builders_builder", BCCoreGameTests::buildersBuilder);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2220,6 +2221,114 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.ARCHITECT_TABLE.get()),
                 "Architect loot output");
         helper.succeed();
+    }
+
+    private static void buildersBuilder(GameTestHelper helper) {
+        BlockPos builderPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(builderPos, buildcraft.builders.BCBuildersBlocks.BUILDER.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        var builder = (buildcraft.builders.block.entity.BuilderBlockEntity)
+                helper.getLevel().getBlockEntity(builderPos);
+        var palette = java.util.List.of(Blocks.AIR.defaultBlockState(), Blocks.STONE.defaultBlockState(),
+                Blocks.OAK_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.EAST),
+                Blocks.GLASS.defaultBlockState());
+        var blueprint = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, new BlockPos(2, 1, 2), Direction.NORTH,
+                new BlockPos(2, 0, 0), palette, java.util.List.of(1, 2, 0, 3), "Builder GameTest");
+        ItemStack blueprintStack = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        blueprintStack.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), blueprint);
+        builder.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(blueprintStack), 1);
+        builder.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.STONE), 1);
+        builder.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.OAK_STAIRS), 1);
+        builder.inventory().set(3, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.GLASS), 1);
+        BlockPos first = builderPos.offset(2, 0, 0);
+        BlockPos stairs = builderPos.offset(3, 0, 0);
+        BlockPos glass = builderPos.offset(3, 0, 1);
+        helper.getLevel().setBlock(first, Blocks.DIRT.defaultBlockState(), Block.UPDATE_ALL);
+        long required = builderCost(builderPos, first) * 2
+                + builderCost(builderPos, stairs) + builderCost(builderPos, glass);
+        helper.assertValueEqual(0L, builder.mjReceiver().receivePower(required, false),
+                "Builder rejected exact construction MJ");
+
+        for (int tick = 0; tick < 3; tick++) buildcraft.builders.block.entity.BuilderBlockEntity.tick(
+                helper.getLevel(), builderPos, helper.getLevel().getBlockState(builderPos), builder);
+        helper.assertTrue(helper.getLevel().getBlockState(first).is(Blocks.DIRT)
+                        && builder.storedMj() == builderCost(builderPos, first) * 2,
+                "non-excavating Builder changed obstruction or failed to build unobstructed targets");
+        builder.setCanExcavate(true);
+        buildcraft.builders.block.entity.BuilderBlockEntity.tick(helper.getLevel(), builderPos,
+                helper.getLevel().getBlockState(builderPos), builder);
+        helper.assertTrue(helper.getLevel().getBlockState(first).isAir(),
+                "excavating Builder did not clear obstruction first");
+        buildcraft.builders.block.entity.BuilderBlockEntity.tick(helper.getLevel(), builderPos,
+                helper.getLevel().getBlockState(builderPos), builder);
+        helper.assertTrue(helper.getLevel().getBlockState(first).is(Blocks.STONE),
+                "Builder did not place first Blueprint block");
+
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(builderPos, builder.getBlockState(),
+                builder.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.BuilderBlockEntity,
+                "Builder block entity did not reload");
+        var restored = (buildcraft.builders.block.entity.BuilderBlockEntity) loaded;
+        helper.assertValueEqual(restored.cursor(), 1, "reloaded Builder lost construction cursor");
+        helper.getLevel().setBlockEntity(restored);
+        for (int tick = 0; tick < 8; tick++) buildcraft.builders.block.entity.BuilderBlockEntity.tick(
+                helper.getLevel(), builderPos, helper.getLevel().getBlockState(builderPos), restored);
+        helper.assertTrue(restored.finished() && helper.getLevel().getBlockState(stairs).is(Blocks.OAK_STAIRS)
+                        && helper.getLevel().getBlockState(stairs)
+                        .getValue(net.minecraft.world.level.block.StairBlock.FACING) == Direction.EAST
+                        && helper.getLevel().getBlockState(glass).is(Blocks.GLASS),
+                "Builder did not complete exact Blueprint states");
+        helper.assertValueEqual(restored.storedMj(), 0L, "Builder construction MJ accounting");
+
+        var template = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.TEMPLATE, new BlockPos(2, 1, 1), Direction.NORTH,
+                new BlockPos(2, 0, 3), java.util.List.of(Blocks.AIR.defaultBlockState(), Blocks.STONE.defaultBlockState()),
+                java.util.List.of(1, 0), "Template GameTest");
+        ItemStack templateStack = new ItemStack(buildcraft.builders.BCBuildersItems.TEMPLATE.get());
+        templateStack.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), template);
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(templateStack), 1);
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.COBBLESTONE), 1);
+        BlockPos templateTarget = builderPos.offset(2, 0, 3);
+        long templateCost = builderCost(builderPos, templateTarget);
+        helper.assertValueEqual(0L, restored.mjReceiver().receivePower(templateCost, false),
+                "Builder rejected Template MJ");
+        for (int tick = 0; tick < 5; tick++) buildcraft.builders.block.entity.BuilderBlockEntity.tick(
+                helper.getLevel(), builderPos, helper.getLevel().getBlockState(builderPos), restored);
+        helper.assertTrue(helper.getLevel().getBlockState(templateTarget).is(Blocks.COBBLESTONE)
+                        && helper.getLevel().getBlockState(templateTarget.east()).isAir(),
+                "Template Builder did not use arbitrary block or preserve empty mask");
+
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.BuilderMenu(47, player.getInventory(), builderPos);
+        helper.assertTrue(menu.clickMenuButton(player, 10) && menu.clickMenuButton(player, 11)
+                        && menu.clickMenuButton(player, 2), "Builder menu rejected controls");
+        helper.assertTrue(restored.rotation() == net.minecraft.world.level.block.Rotation.CLOCKWISE_90
+                        && !restored.canExcavate()
+                        && restored.controlMode() == buildcraft.api.core.IControllable.ControlMode.LOOP,
+                "Builder menu selected wrong controls");
+        var reloaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(builderPos, restored.getBlockState(),
+                restored.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(reloaded instanceof buildcraft.builders.block.entity.BuilderBlockEntity saved
+                        && saved.rotation() == net.minecraft.world.level.block.Rotation.CLOCKWISE_90
+                        && !saved.canExcavate()
+                        && saved.controlMode() == buildcraft.api.core.IControllable.ControlMode.LOOP,
+                "reloaded Builder lost controls");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.BLACK_DYE), new ItemStack(buildcraft.core.BCCoreItems.MARKER_VOLUME.get()), new ItemStack(Items.BLACK_DYE),
+                new ItemStack(Items.BLUE_DYE), new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.BLUE_DYE),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(Items.CHEST),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get())));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.BUILDER.get()), "Builder recipe output");
+        helper.succeed();
+    }
+
+    private static long builderCost(BlockPos builder, BlockPos target) {
+        return (long) ((Math.sqrt(target.distSqr(builder)) + 10) * MjAPI.MJ);
     }
 
     private static void buildersFiller(GameTestHelper helper) {
