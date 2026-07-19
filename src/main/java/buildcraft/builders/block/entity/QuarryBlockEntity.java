@@ -6,6 +6,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.builders.BCBuildersBlockEntities;
 import buildcraft.builders.BCBuildersBlocks;
+import buildcraft.builders.BCBuilders;
 import buildcraft.builders.block.QuarryBlock;
 import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
@@ -15,6 +16,11 @@ import buildcraft.lib.mj.MjBatteryReceiver;
 import com.mojang.serialization.Codec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
@@ -22,11 +28,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.common.CommonHooks;
 import net.neoforged.neoforge.common.util.FakePlayerFactory;
@@ -54,6 +62,7 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
     private final ItemStacksResourceHandler drops = new ItemStacksResourceHandler(18);
     private final OutputHandler output = new OutputHandler();
     private final Set<Integer> blockedColumns = new HashSet<>();
+    private final Set<Long> forcedChunks = new HashSet<>();
     private BlockPos areaMin;
     private BlockPos areaMax;
     private Stage stage = Stage.BUILDING;
@@ -62,6 +71,7 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
     private int miningCursor;
     private BlockPos target;
     private long progress;
+    private Vec3 head;
 
     public QuarryBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.QUARRY.get(), pos, state);
@@ -76,6 +86,8 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
     public BlockPos areaMax() { return areaMax; }
     public BlockPos target() { return target; }
     public long progress() { return progress; }
+    public Vec3 head() { return head; }
+    public int forcedChunkCount() { return forcedChunks.size(); }
     public int frameCursor() { return frameCursor; }
     public int miningCursor() { return miningCursor; }
 
@@ -85,6 +97,7 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
         quarry.pushDrops(serverLevel);
         if (quarry.mode == ControlMode.OFF) return;
         if (quarry.areaMin == null && !quarry.acquireArea(serverLevel)) quarry.configureDefaultArea();
+        quarry.ensureTickets(serverLevel);
         if (quarry.stage == Stage.DONE && quarry.mode == ControlMode.LOOP) {
             quarry.stage = Stage.MINING;
             quarry.miningCursor = 0;
@@ -102,9 +115,12 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
                 || sizeZ > MAX_HORIZONTAL_SIZE || max.getY() < worldPosition.getY()) return false;
         BlockPos adjustedMax = new BlockPos(max.getX(), Math.max(max.getY(), min.getY() + 4), max.getZ());
         if (min.equals(areaMin) && adjustedMax.equals(areaMax)) return true;
+        releaseTickets();
         clearFrames();
         areaMin = min.immutable();
         areaMax = adjustedMax.immutable();
+        head = new Vec3((areaMin.getX() + areaMax.getX() + 1) * 0.5, areaMax.getY() - 0.5,
+                (areaMin.getZ() + areaMax.getZ() + 1) * 0.5);
         reset();
         sync();
         return true;
@@ -174,6 +190,7 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
                 return;
             }
         }
+        if (!moveHead()) return;
         BlockState state = level.getBlockState(target);
         if (!mineable(state, level, target)) {
             target = null;
@@ -202,6 +219,17 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
         target = null;
         progress = 0;
         sync();
+    }
+
+    private boolean moveHead() {
+        Vec3 destination = Vec3.atCenterOf(target).add(0, 0.75, 0);
+        if (head == null) head = destination;
+        Vec3 delta = destination.subtract(head);
+        double distance = delta.length();
+        if (distance <= 0.05) { head = destination; return true; }
+        head = head.add(delta.scale(Math.min(0.35, distance) / distance));
+        sync();
+        return false;
     }
 
     private BlockPos findTarget(ServerLevel level) {
@@ -266,6 +294,35 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
         });
     }
 
+    private Set<Long> desiredChunks() {
+        Set<Long> chunks = new HashSet<>();
+        chunks.add(ChunkPos.pack(worldPosition.getX() >> 4, worldPosition.getZ() >> 4));
+        if (areaMin != null && areaMax != null) {
+            for (int x = areaMin.getX() >> 4; x <= areaMax.getX() >> 4; x++) {
+                for (int z = areaMin.getZ() >> 4; z <= areaMax.getZ() >> 4; z++) chunks.add(ChunkPos.pack(x, z));
+            }
+        }
+        return chunks;
+    }
+    private void ensureTickets(ServerLevel level) {
+        for (long packed : desiredChunks()) {
+            if (forcedChunks.add(packed)) {
+                ChunkPos chunk = ChunkPos.unpack(packed);
+                BCBuilders.QUARRY_TICKETS.forceChunk(level, worldPosition, chunk.x(), chunk.z(), true, false);
+            }
+        }
+    }
+    public void releaseTickets() {
+        if (!(level instanceof ServerLevel serverLevel)) { forcedChunks.clear(); return; }
+        Set<Long> chunks = forcedChunks.isEmpty() ? desiredChunks() : Set.copyOf(forcedChunks);
+        for (long packed : chunks) {
+            ChunkPos chunk = ChunkPos.unpack(packed);
+            BCBuilders.QUARRY_TICKETS.forceChunk(serverLevel, worldPosition, chunk.x(), chunk.z(), false, false);
+        }
+        forcedChunks.clear();
+    }
+    public void destroy() { releaseTickets(); clearFrames(); }
+
     private void storeOrDrop(ServerLevel level, ItemStack stack) {
         int remaining = stack.getCount();
         try (Transaction transaction = Transaction.openRoot()) {
@@ -328,7 +385,11 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
         target = input.getLong("target").stream().map(BlockPos::of).findFirst().orElse(null);
         progress = Math.max(0, input.getLongOr("progress", 0));
         blockedColumns.clear();
+        forcedChunks.clear();
         blockedColumns.addAll(input.read("blocked_columns", Codec.INT.listOf()).orElse(List.of()));
+        if (input.getBooleanOr("has_head", false)) head = new Vec3(input.getDoubleOr("head_x", 0),
+                input.getDoubleOr("head_y", 0), input.getDoubleOr("head_z", 0));
+        else head = null;
     }
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
@@ -343,7 +404,16 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
         if (target != null) output.putLong("target", target.asLong());
         if (progress > 0) output.putLong("progress", progress);
         if (!blockedColumns.isEmpty()) output.store("blocked_columns", Codec.INT.listOf(), new ArrayList<>(blockedColumns));
+        if (head != null) {
+            output.putBoolean("has_head", true);
+            output.putDouble("head_x", head.x);
+            output.putDouble("head_y", head.y);
+            output.putDouble("head_z", head.z);
+        }
     }
+
+    @Override public Packet<ClientGamePacketListener> getUpdatePacket() { return ClientboundBlockEntityDataPacket.create(this); }
+    @Override public CompoundTag getUpdateTag(HolderLookup.Provider registries) { return saveWithoutMetadata(registries); }
 
     private final class OutputHandler implements ResourceHandler<ItemResource> {
         @Override public int size() { return drops.size(); }

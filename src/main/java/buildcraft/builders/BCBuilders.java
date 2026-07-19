@@ -7,10 +7,19 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.minecraft.resources.Identifier;
+import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
+import net.neoforged.neoforge.common.world.chunk.TicketController;
 
 @Mod(BCBuilders.MOD_ID)
 public final class BCBuilders {
     public static final String MOD_ID = "buildcraftbuilders";
+    public static final TicketController QUARRY_TICKETS = new TicketController(
+            Identifier.fromNamespaceAndPath(MOD_ID, "quarry"), (level, helper) -> {
+                for (var owner : helper.getBlockTickets().keySet()) {
+                    if (!level.getBlockState(owner).is(BCBuildersBlocks.QUARRY.get())) helper.removeAllTickets(owner);
+                }
+            });
 
     public BCBuilders(IEventBus modBus) {
         BCBuildersBlocks.register(modBus);
@@ -18,8 +27,12 @@ public final class BCBuilders {
         BCBuildersItems.register(modBus);
         BCBuildersDataComponents.register(modBus);
         BCBuildersMenus.register(modBus);
+        modBus.addListener(BCBuilders::registerTicketControllers);
         if (FMLEnvironment.getDist() == Dist.CLIENT) BCBuildersClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
+    }
+    private static void registerTicketControllers(RegisterTicketControllersEvent event) {
+        event.register(QUARRY_TICKETS);
     }
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {

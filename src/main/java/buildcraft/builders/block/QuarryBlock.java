@@ -47,7 +47,7 @@ public final class QuarryBlock extends BaseEntityBlock implements IWrenchable {
         return createTickerHelper(type, BCBuildersBlockEntities.QUARRY.get(), QuarryBlockEntity::tick);
     }
     @Override protected void affectNeighborsAfterRemoval(BlockState state, ServerLevel level, BlockPos pos, boolean movedByPiston) {
-        if (level.getBlockEntity(pos) instanceof QuarryBlockEntity quarry) quarry.clearFrames();
+        if (level.getBlockEntity(pos) instanceof QuarryBlockEntity quarry) quarry.destroy();
         super.affectNeighborsAfterRemoval(state, level, pos, movedByPiston);
     }
 }

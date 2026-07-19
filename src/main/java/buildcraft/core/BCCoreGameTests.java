@@ -2445,6 +2445,14 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         quarry.setControlMode(buildcraft.api.core.IControllable.ControlMode.ON);
         for (int tick = 0; tick < 10; tick++) buildcraft.builders.block.entity.QuarryBlockEntity.tick(
                 helper.getLevel(), quarryPos, helper.getLevel().getBlockState(quarryPos), quarry);
+        java.util.Set<Long> expectedChunks = new java.util.HashSet<>();
+        expectedChunks.add(net.minecraft.world.level.ChunkPos.pack(quarryPos.getX() >> 4, quarryPos.getZ() >> 4));
+        for (int chunkX = min.getX() >> 4; chunkX <= max.getX() >> 4; chunkX++) {
+            for (int chunkZ = min.getZ() >> 4; chunkZ <= max.getZ() >> 4; chunkZ++)
+                expectedChunks.add(net.minecraft.world.level.ChunkPos.pack(chunkX, chunkZ));
+        }
+        helper.assertValueEqual(quarry.forcedChunkCount(), expectedChunks.size(),
+                "Quarry did not retain its machine and work-area chunks");
         var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(quarryPos, quarry.getBlockState(),
                 quarry.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
         helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.QuarryBlockEntity,
@@ -2454,6 +2462,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(restored.storedMj(), quarry.storedMj(), "reloaded Quarry lost stored MJ");
         helper.assertValueEqual(restored.areaMin(), min, "reloaded Quarry lost area minimum");
         helper.assertValueEqual(restored.areaMax(), max, "reloaded Quarry lost area maximum");
+        helper.assertTrue(restored.head() != null, "reloaded Quarry lost mechanical-arm position");
         helper.getLevel().setBlockEntity(restored);
 
         for (int tick = 0; tick < 80 && restored.stage()
@@ -2501,7 +2510,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 restored, null, ItemStack.EMPTY);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.QUARRY.get()),
                 "Quarry loot output");
-        restored.clearFrames();
+        restored.destroy();
+        helper.assertValueEqual(restored.forcedChunkCount(), 0, "removed Quarry retained chunk tickets");
         helper.assertTrue(BlockPos.betweenClosedStream(min, max).noneMatch(pos ->
                 helper.getLevel().getBlockState(pos).is(buildcraft.builders.BCBuildersBlocks.FRAME.get())),
                 "Quarry did not remove its generated frame");
