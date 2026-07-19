@@ -216,6 +216,14 @@ tasks.named('processResources', ProcessResources) {
         include 'sprite_a.png', 'sprite_b.png', 'sprite_c.png', 'sprite_d.png', 'sprite_e.png'
         into 'assets/buildcraftfactory/textures/block/heat_exchange'
     }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/gel') {
+        include '*.png'
+        into 'assets/buildcraftfactory/textures/block/gel'
+    }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/items') {
+        include 'water_gel.png', 'gel.png'
+        into 'assets/buildcraftfactory/textures/item'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/models/item') {
         include 'heat_exchange_start.json', 'heat_exchange_middle.json', 'heat_exchange_end.json'
         filter { line ->

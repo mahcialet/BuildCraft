@@ -1,5 +1,7 @@
 package buildcraft.factory;
 
+import buildcraft.factory.item.WaterGelItem;
+
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -16,7 +18,10 @@ public final class BCFactoryItems {
     public static final DeferredItem<?> DISTILLER =
             ITEMS.registerSimpleBlockItem("distiller", BCFactoryBlocks.DISTILLER);
     public static final DeferredItem<?> HEAT_EXCHANGER =
-            ITEMS.registerSimpleBlockItem("heat_exchange", BCFactoryBlocks.HEAT_EXCHANGER);
+        ITEMS.registerSimpleBlockItem("heat_exchange", BCFactoryBlocks.HEAT_EXCHANGER);
+    public static final DeferredItem<WaterGelItem> WATER_GEL =
+        ITEMS.registerItem("water_gel_spawn", WaterGelItem::new);
+    public static final DeferredItem<?> GEL = ITEMS.registerSimpleItem("gel");
 
     private BCFactoryItems() {}
 

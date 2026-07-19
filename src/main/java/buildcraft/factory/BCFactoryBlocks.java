@@ -8,6 +8,7 @@ import buildcraft.factory.block.MiningWellBlock;
 import buildcraft.factory.block.ChuteBlock;
 import buildcraft.factory.block.DistillerBlock;
 import buildcraft.factory.block.HeatExchangerBlock;
+import buildcraft.factory.block.WaterGelBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -25,7 +26,9 @@ public final class BCFactoryBlocks {
     public static final DeferredBlock<DistillerBlock> DISTILLER =
             BLOCKS.registerBlock("distiller", DistillerBlock::new);
     public static final DeferredBlock<HeatExchangerBlock> HEAT_EXCHANGER =
-            BLOCKS.registerBlock("heat_exchange", HeatExchangerBlock::new);
+        BLOCKS.registerBlock("heat_exchange", HeatExchangerBlock::new);
+    public static final DeferredBlock<WaterGelBlock> WATER_GEL =
+        BLOCKS.registerBlock("water_gel", WaterGelBlock::new);
 
     private BCFactoryBlocks() {}
 

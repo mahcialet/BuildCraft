@@ -140,6 +140,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_chute", BCCoreGameTests::factoryChute);
         registerTest(event, environment, "factory_distiller", BCCoreGameTests::factoryDistiller);
         registerTest(event, environment, "factory_heat_exchanger", BCCoreGameTests::factoryHeatExchanger);
+        registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1849,6 +1850,56 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                     "heat exchanger returned wrong drop");
             helper.succeed();
         }
+    }
+
+    private static void factoryWaterGel(GameTestHelper helper) {
+        BlockPos center = helper.absolutePos(new BlockPos(3, 2, 3));
+        BlockState initial = buildcraft.factory.BCFactoryBlocks.WATER_GEL.get().defaultBlockState();
+        helper.getLevel().setBlock(center, initial, Block.UPDATE_ALL);
+        java.util.List<BlockPos> sources = java.util.List.of(
+            center.north(), center.south(), center.east()
+        );
+        for (BlockPos source : sources) {
+            helper.getLevel().setBlock(source, Blocks.WATER.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        buildcraft.factory.block.WaterGelBlock.advance(
+            initial, helper.getLevel(), center, helper.getLevel().getRandom()
+        );
+        for (BlockPos source : sources) {
+            helper.assertTrue(helper.getLevel().getBlockState(source).is(buildcraft.factory.BCFactoryBlocks.WATER_GEL.get()),
+                "water gel did not replace a connected source");
+            helper.assertValueEqual(helper.getLevel().getBlockState(source).getValue(
+                buildcraft.factory.block.WaterGelBlock.STAGE),
+                buildcraft.factory.block.WaterGelBlock.Stage.SPREAD_1, "spread stage");
+        }
+
+        BlockState gelling = initial.setValue(buildcraft.factory.block.WaterGelBlock.STAGE,
+            buildcraft.factory.block.WaterGelBlock.Stage.GELLING_0);
+        helper.getLevel().setBlock(center, gelling, Block.UPDATE_ALL);
+        for (Direction direction : Direction.values()) {
+            BlockPos adjacent = center.relative(direction);
+            if (!sources.contains(adjacent)) helper.getLevel().setBlock(adjacent, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        for (BlockPos source : sources) helper.getLevel().setBlock(source, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        buildcraft.factory.block.WaterGelBlock.advance(gelling, helper.getLevel(), center, helper.getLevel().getRandom());
+        BlockState gellingOne = helper.getLevel().getBlockState(center);
+        buildcraft.factory.block.WaterGelBlock.advance(gellingOne, helper.getLevel(), center, helper.getLevel().getRandom());
+        helper.assertValueEqual(helper.getLevel().getBlockState(center).getValue(
+            buildcraft.factory.block.WaterGelBlock.STAGE),
+            buildcraft.factory.block.WaterGelBlock.Stage.GEL, "hardened stage");
+
+        var drops = Block.getDrops(helper.getLevel().getBlockState(center), helper.getLevel(), center, null);
+        helper.assertValueEqual(1, drops.size(), "water gel returned wrong drop count");
+        helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.GEL.get()), "water gel returned wrong drop");
+
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(1, 2, java.util.List.of(
+            new ItemStack(buildcraft.factory.BCFactoryItems.GEL.get()), new ItemStack(Items.BUCKET)
+        ));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel()
+        ).orElseThrow().value().assemble(input);
+        helper.assertTrue(crafted.is(Items.WATER_BUCKET), "gel recipe returned wrong item");
+        helper.succeed();
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {

@@ -25,6 +25,8 @@ public final class BCFactory {
             event.accept(BCFactoryItems.CHUTE.get());
             event.accept(BCFactoryItems.DISTILLER.get());
             event.accept(BCFactoryItems.HEAT_EXCHANGER.get());
+            event.accept(BCFactoryItems.WATER_GEL.get());
+            event.accept(BCFactoryItems.GEL.get());
         }
     }
 }
