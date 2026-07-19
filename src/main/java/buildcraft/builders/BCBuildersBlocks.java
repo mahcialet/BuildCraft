@@ -6,6 +6,7 @@ import buildcraft.builders.block.BuilderBlock;
 import buildcraft.builders.block.ReplacerBlock;
 import buildcraft.builders.block.FrameBlock;
 import buildcraft.builders.block.QuarryBlock;
+import buildcraft.builders.block.BlueprintLibraryBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -19,6 +20,8 @@ public final class BCBuildersBlocks {
     public static final DeferredBlock<ReplacerBlock> REPLACER = BLOCKS.registerBlock("replacer", ReplacerBlock::new);
     public static final DeferredBlock<QuarryBlock> QUARRY = BLOCKS.registerBlock("quarry", QuarryBlock::new);
     public static final DeferredBlock<FrameBlock> FRAME = BLOCKS.registerBlock("frame", FrameBlock::new);
+    public static final DeferredBlock<BlueprintLibraryBlock> BLUEPRINT_LIBRARY =
+            BLOCKS.registerBlock("blueprint_library", BlueprintLibraryBlock::new);
 
     private BCBuildersBlocks() {}
     public static void register(IEventBus bus) { BLOCKS.register(bus); }

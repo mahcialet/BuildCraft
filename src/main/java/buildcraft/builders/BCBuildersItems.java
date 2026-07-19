@@ -14,6 +14,8 @@ public final class BCBuildersItems {
     public static final DeferredItem<?> REPLACER = ITEMS.registerSimpleBlockItem("replacer", BCBuildersBlocks.REPLACER);
     public static final DeferredItem<?> QUARRY = ITEMS.registerSimpleBlockItem("quarry", BCBuildersBlocks.QUARRY);
     public static final DeferredItem<?> FRAME = ITEMS.registerSimpleBlockItem("frame", BCBuildersBlocks.FRAME);
+    public static final DeferredItem<?> BLUEPRINT_LIBRARY =
+            ITEMS.registerSimpleBlockItem("blueprint_library", BCBuildersBlocks.BLUEPRINT_LIBRARY);
     public static final DeferredItem<Item> BLUEPRINT = ITEMS.registerSimpleItem("blueprint", properties -> properties.stacksTo(16));
     public static final DeferredItem<Item> TEMPLATE = ITEMS.registerSimpleItem("template", properties -> properties.stacksTo(16));
     public static final DeferredItem<SingleSchematicItem> SINGLE_SCHEMATIC =

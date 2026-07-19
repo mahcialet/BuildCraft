@@ -1,0 +1,1 @@
+{"variants":{"facing=north":{"model":"buildcraftbuilders:block/blueprint_library"},"facing=east":{"model":"buildcraftbuilders:block/blueprint_library","y":90},"facing=south":{"model":"buildcraftbuilders:block/blueprint_library","y":180},"facing=west":{"model":"buildcraftbuilders:block/blueprint_library","y":270}}}

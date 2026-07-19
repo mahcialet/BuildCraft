@@ -7,6 +7,7 @@ import buildcraft.builders.block.entity.ArchitectTableBlockEntity;
 import buildcraft.builders.block.entity.BuilderBlockEntity;
 import buildcraft.builders.block.entity.ReplacerBlockEntity;
 import buildcraft.builders.block.entity.QuarryBlockEntity;
+import buildcraft.builders.block.entity.BlueprintLibraryBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -30,6 +31,9 @@ public final class BCBuildersBlockEntities {
             BLOCK_ENTITIES.register("replacer", () -> new BlockEntityType<>(ReplacerBlockEntity::new, BCBuildersBlocks.REPLACER.get()));
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<QuarryBlockEntity>> QUARRY =
             BLOCK_ENTITIES.register("quarry", () -> new BlockEntityType<>(QuarryBlockEntity::new, BCBuildersBlocks.QUARRY.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<BlueprintLibraryBlockEntity>> BLUEPRINT_LIBRARY =
+            BLOCK_ENTITIES.register("blueprint_library", () -> new BlockEntityType<>(
+                    BlueprintLibraryBlockEntity::new, BCBuildersBlocks.BLUEPRINT_LIBRARY.get()));
 
     private BCBuildersBlockEntities() {}
 
@@ -55,6 +59,8 @@ public final class BCBuildersBlockEntities {
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, QUARRY.get(), (quarry, side) -> quarry.mjReceiver());
         event.registerBlockEntity(MachineAPI.CAP_HAS_WORK, QUARRY.get(), (quarry, side) -> quarry);
         event.registerBlockEntity(MachineAPI.CAP_CONTROLLABLE, QUARRY.get(), (quarry, side) -> quarry);
+        event.registerBlockEntity(Capabilities.Item.BLOCK, BLUEPRINT_LIBRARY.get(),
+                (library, side) -> library.inventory());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, FILLER.get(),
                 (filler, side) -> filler.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, FILLER.get(),

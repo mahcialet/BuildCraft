@@ -149,6 +149,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_builder", BCCoreGameTests::buildersBuilder);
         registerTest(event, environment, "builders_replacer", BCCoreGameTests::buildersReplacer);
         registerTest(event, environment, "builders_quarry", BCCoreGameTests::buildersQuarry);
+        registerTest(event, environment, "builders_blueprint_library", BCCoreGameTests::buildersBlueprintLibrary);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2515,6 +2516,110 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(BlockPos.betweenClosedStream(min, max).noneMatch(pos ->
                 helper.getLevel().getBlockState(pos).is(buildcraft.builders.BCBuildersBlocks.FRAME.get())),
                 "Quarry did not remove its generated frame");
+        helper.succeed();
+    }
+
+    private static void buildersBlueprintLibrary(GameTestHelper helper) {
+        BlockPos libraryPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(libraryPos,
+                buildcraft.builders.BCBuildersBlocks.BLUEPRINT_LIBRARY.get().defaultBlockState(), Block.UPDATE_ALL);
+        var library = (buildcraft.builders.block.entity.BlueprintLibraryBlockEntity)
+                helper.getLevel().getBlockEntity(libraryPos);
+        int baseline = buildcraft.builders.library.BlueprintLibrarySavedData.get(helper.getLevel()).entries().size();
+        String name = "Library GameTest " + libraryPos.asLong();
+        var snapshot = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, new BlockPos(2, 1, 1), Direction.WEST,
+                new BlockPos(3, 0, -1), java.util.List.of(Blocks.AIR.defaultBlockState(),
+                Blocks.OAK_STAIRS.defaultBlockState().setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.SOUTH)),
+                java.util.List.of(1, 0), name);
+        ItemStack used = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        used.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), snapshot);
+        library.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(used), 1);
+        for (int tick = 0; tick < 50; tick++) buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(
+                helper.getLevel(), libraryPos, helper.getLevel().getBlockState(libraryPos), library);
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(libraryPos, library.getBlockState(),
+                library.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.BlueprintLibraryBlockEntity,
+                "Blueprint Library block entity did not reload");
+        var restored = (buildcraft.builders.block.entity.BlueprintLibraryBlockEntity) loaded;
+        helper.assertValueEqual(restored.progressIn(), 50, "reloaded Library lost store progress");
+        helper.assertTrue(restored.inventory().getResource(0).toStack(1)
+                .has(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get()),
+                "reloaded Library lost store input");
+        helper.getLevel().setBlockEntity(restored);
+        for (int tick = 50; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        helper.assertTrue(restored.inventory().getAmountAsLong(0) == 0
+                        && restored.inventory().getResource(1).toStack(1).is(buildcraft.builders.BCBuildersItems.BLUEPRINT.get())
+                        && restored.entryCount() == baseline + 1 && restored.selectedName().equals(name),
+                "Library did not store and return used Blueprint");
+
+        restored.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), 1);
+        for (int tick = 0; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        ItemStack downloaded = restored.inventory().getResource(3).toStack(1);
+        helper.assertValueEqual(downloaded.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get()), snapshot,
+                "Library download lost exact typed Snapshot");
+
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.inventory().set(3, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(used), 1);
+        for (int tick = 0; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        helper.assertValueEqual(restored.entryCount(), baseline + 1, "Library duplicated identical content");
+
+        var templateData = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.TEMPLATE, new BlockPos(1, 1, 1), Direction.NORTH, BlockPos.ZERO,
+                java.util.List.of(Blocks.STONE.defaultBlockState()), java.util.List.of(0), name + " Template");
+        ItemStack template = new ItemStack(buildcraft.builders.BCBuildersItems.TEMPLATE.get());
+        template.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), templateData);
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(template), 1);
+        for (int tick = 0; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        helper.assertValueEqual(restored.entryCount(), baseline + 2, "Library did not store Template entry");
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.BlueprintLibraryMenu(48, player.getInventory(), libraryPos);
+        helper.assertTrue(menu.clickMenuButton(player, 0) && menu.clickMenuButton(player, 1)
+                        && menu.clickMenuButton(player, 2), "Library menu rejected navigation or deletion");
+        helper.assertValueEqual(restored.entryCount(), baseline + 1, "Library menu did not delete selected entry");
+
+        ItemStack writtenBook = new ItemStack(Items.WRITTEN_BOOK);
+        writtenBook.set(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT,
+                net.minecraft.world.item.component.WrittenBookContent.EMPTY);
+        restored.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        restored.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(writtenBook), 1);
+        for (int tick = 0; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        restored.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.WRITABLE_BOOK), 1);
+        for (int tick = 0; tick < buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.PROCESS_TIME; tick++)
+            buildcraft.builders.block.entity.BlueprintLibraryBlockEntity.tick(helper.getLevel(), libraryPos,
+                    helper.getLevel().getBlockState(libraryPos), restored);
+        ItemStack loadedBook = restored.inventory().getResource(3).toStack(1);
+        helper.assertTrue(loadedBook.is(Items.WRITTEN_BOOK)
+                        && loadedBook.has(net.minecraft.core.component.DataComponents.WRITTEN_BOOK_CONTENT),
+                "Library did not round-trip a written book through a writable book");
+        helper.assertTrue(restored.deleteSelected(), "Library did not remove test book entry");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.IRON_INGOT), new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.IRON_INGOT),
+                new ItemStack(Items.BOOKSHELF), new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get()), new ItemStack(Items.BOOKSHELF),
+                new ItemStack(Items.IRON_INGOT), new ItemStack(Items.REDSTONE), new ItemStack(Items.IRON_INGOT)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.BLUEPRINT_LIBRARY.get()),
+                "Blueprint Library recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(libraryPos), helper.getLevel(), libraryPos,
+                restored, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.BLUEPRINT_LIBRARY.get()),
+                "Blueprint Library loot output");
         helper.succeed();
     }
 
