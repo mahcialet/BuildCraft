@@ -77,6 +77,7 @@ public final class FillerMenu extends AbstractContainerMenu {
     public net.minecraft.core.Direction horizontalDirection() {
         return filler == null ? net.minecraft.core.Direction.EAST : filler.horizontalDirection();
     }
+    public int pyramidCenter() { return filler == null ? 4 : filler.pyramidCenter(); }
     public boolean hollow() { return filler != null && filler.hollow(); }
     public net.minecraft.core.Direction sphereFacing() {
         return filler == null ? net.minecraft.core.Direction.DOWN : filler.sphereFacing();
@@ -125,6 +126,10 @@ public final class FillerMenu extends AbstractContainerMenu {
         }
         if (id == 36) {
             filler.setShapeRotation(filler.shapeRotation() + 1);
+            return true;
+        }
+        if (id == 37) {
+            filler.setPyramidCenter(filler.pyramidCenter() + 1);
             return true;
         }
         return false;

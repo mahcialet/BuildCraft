@@ -19,6 +19,7 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
     private Button sphereRotationButton;
     private Button shapeAxisButton;
     private Button shapeRotationButton;
+    private Button pyramidCenterButton;
     public FillerScreen(FillerMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 168);
         titleLabelX = 8;
@@ -82,6 +83,11 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
                 minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 36);
             }
         }).bounds(leftPos + 96, topPos + 70, 18, 14).build());
+        pyramidCenterButton = addRenderableWidget(Button.builder(Component.literal("C"), button -> {
+            if (minecraft != null && minecraft.gameMode != null) {
+                minecraft.gameMode.handleInventoryButtonClick(menu.containerId, 37);
+            }
+        }).bounds(leftPos + 30, topPos + 70, 28, 14).build());
     }
 
     private static String patternLabel(FillerPattern pattern) {
@@ -123,6 +129,8 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
         horizontalButton.visible = menu.pattern() == FillerPattern.STAIRS;
         horizontalButton.setMessage(Component.literal(
                 menu.horizontalDirection().getName().substring(0, 1).toUpperCase(java.util.Locale.ROOT)));
+        pyramidCenterButton.visible = menu.pattern() == FillerPattern.PYRAMID;
+        pyramidCenterButton.setMessage(Component.literal(centerLabel(menu.pyramidCenter())));
         boolean sphere = menu.pattern().isSphere();
         hollowButton.visible = sphere;
         hollowButton.setMessage(Component.literal(menu.hollow() ? "H" : "O"));
@@ -137,6 +145,10 @@ public final class FillerScreen extends AbstractContainerScreen<FillerMenu> {
         shapeAxisButton.setMessage(Component.literal(menu.shapeAxis().getName().toUpperCase(java.util.Locale.ROOT)));
         shapeRotationButton.visible = shape2d;
         shapeRotationButton.setMessage(Component.literal(Integer.toString(menu.shapeRotation())));
+    }
+
+    private static String centerLabel(int center) {
+        return new String[] { "NW", "N", "NE", "W", "C", "E", "SW", "S", "SE" }[center];
     }
 
     @Override public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY,

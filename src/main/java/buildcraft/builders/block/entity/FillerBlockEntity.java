@@ -47,6 +47,9 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public static final long POWER_PER_BLOCK = 4 * MjAPI.MJ;
     private static final int MAX_AREA_VOLUME = 64 * 64 * 64;
     private static final int MAX_SCAN_PER_TICK = 256;
+    private static final int[] PYRAMID_MODIFIERS = {
+            0x0101, 0x1101, 0x1001, 0x0111, 0x1111, 0x1011, 0x0110, 0x1110, 0x1010
+    };
 
     private final MjBattery battery = new MjBattery(BATTERY_CAPACITY);
     private final MjBatteryReceiver receiver = new MjBatteryReceiver(battery);
@@ -66,6 +69,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private FillerPattern pattern = FillerPattern.FILL;
     private Direction verticalDirection = Direction.UP;
     private Direction horizontalDirection = Direction.EAST;
+    private int pyramidCenter = 4;
     private boolean hollow;
     private Direction sphereFacing = Direction.DOWN;
     private int sphereRotation;
@@ -87,6 +91,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public FillerPattern pattern() { return pattern; }
     public Direction verticalDirection() { return verticalDirection; }
     public Direction horizontalDirection() { return horizontalDirection; }
+    public int pyramidCenter() { return pyramidCenter; }
     public boolean hollow() { return hollow; }
     public Direction sphereFacing() { return sphereFacing; }
     public int sphereRotation() { return sphereRotation; }
@@ -212,10 +217,11 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         int layer = verticalDirection == Direction.UP
                 ? target.getY() - areaMin.getY() : areaMax.getY() - target.getY();
         if (pattern == FillerPattern.PYRAMID) {
-            return target.getX() >= areaMin.getX() + layer
-                    && target.getX() <= areaMax.getX() - layer
-                    && target.getZ() >= areaMin.getZ() + layer
-                    && target.getZ() <= areaMax.getZ() - layer;
+            int selected = PYRAMID_MODIFIERS[pyramidCenter];
+            return target.getX() >= areaMin.getX() + layer * ((selected >> 12) & 1)
+                    && target.getX() <= areaMax.getX() - layer * ((selected >> 8) & 1)
+                    && target.getZ() >= areaMin.getZ() + layer * ((selected >> 4) & 1)
+                    && target.getZ() <= areaMax.getZ() - layer * (selected & 1);
         }
         return switch (horizontalDirection) {
             case EAST -> target.getX() >= areaMin.getX() + layer;
@@ -391,6 +397,15 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         sync();
     }
 
+    public void setPyramidCenter(int center) {
+        int normalized = Math.floorMod(center, 9);
+        if (pyramidCenter == normalized) return;
+        pyramidCenter = normalized;
+        cursor = 0;
+        finished = false;
+        sync();
+    }
+
     public void setHollow(boolean hollow) {
         if (this.hollow == hollow) return;
         this.hollow = hollow;
@@ -457,6 +472,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (verticalDirection.getAxis() != Direction.Axis.Y) verticalDirection = Direction.UP;
         horizontalDirection = input.read("horizontal_direction", Direction.CODEC).orElse(Direction.EAST);
         if (horizontalDirection.getAxis().isVertical()) horizontalDirection = Direction.EAST;
+        pyramidCenter = Math.floorMod(input.getIntOr("pyramid_center", 4), 9);
         hollow = input.getBooleanOr("hollow", false);
         sphereFacing = input.read("sphere_facing", Direction.CODEC).orElse(Direction.DOWN);
         sphereRotation = Math.floorMod(input.getIntOr("sphere_rotation", 0), 4);
@@ -477,6 +493,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         output.store("pattern", FillerPattern.CODEC, pattern);
         output.store("vertical_direction", Direction.CODEC, verticalDirection);
         output.store("horizontal_direction", Direction.CODEC, horizontalDirection);
+        if (pyramidCenter != 4) output.putInt("pyramid_center", pyramidCenter);
         if (hollow) output.putBoolean("hollow", true);
         output.store("sphere_facing", Direction.CODEC, sphereFacing);
         if (sphereRotation != 0) output.putInt("sphere_rotation", sphereRotation);

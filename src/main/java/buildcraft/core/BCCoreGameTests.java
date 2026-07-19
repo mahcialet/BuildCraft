@@ -146,6 +146,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
+        registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
         registerTest(event, environment, "builders_filler_sphere_patterns", BCCoreGameTests::buildersFillerSpherePatterns);
         registerTest(event, environment, "builders_filler_2d_patterns", BCCoreGameTests::buildersFiller2dPatterns);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
@@ -2344,6 +2345,50 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(restored.verticalDirection() == Direction.DOWN
                         && restored.horizontalDirection() == Direction.SOUTH,
                 "reloaded Filler lost its Stairs directions");
+        helper.succeed();
+    }
+
+    private static void buildersFillerPyramidCentres(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos min = fillerPos.east();
+        BlockPos max = min.offset(4, 2, 4);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        helper.assertTrue(filler.configureArea(min, max), "Pyramid Filler rejected valid bounds");
+        filler.setPattern(buildcraft.builders.FillerPattern.PYRAMID);
+        filler.setVerticalDirection(Direction.UP);
+
+        int[] totals = { 50, 40, 50, 40, 35, 40, 50, 40, 50 };
+        for (int center = 0; center < totals.length; center++) {
+            filler.setPyramidCenter(center);
+            int expected = totals[center];
+            insertPipeItem(filler.resources(), Items.STONE, expected);
+            helper.assertValueEqual(0L, filler.mjReceiver().receivePower(expected * 4L * MjAPI.MJ, false),
+                    "Pyramid centre " + center + " rejected nominal MJ input");
+            tickFiller(helper, fillerPos, filler, expected + 1);
+            helper.assertValueEqual(countBlocks(helper, min, max, Blocks.STONE), expected,
+                    "Pyramid centre " + center + " placed the wrong layer total");
+            if (center == 0) {
+                helper.assertTrue(helper.getLevel().getBlockState(min.offset(0, 2, 0)).is(Blocks.STONE)
+                                && helper.getLevel().getBlockState(min.offset(2, 2, 2)).is(Blocks.STONE)
+                                && helper.getLevel().getBlockState(min.offset(3, 2, 2)).isAir(),
+                        "north-west Pyramid centre shrank toward the wrong corner");
+            }
+            clearTestArea(helper, min, max);
+        }
+
+        filler.setPyramidCenter(4);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(46, player.getInventory(), fillerPos);
+        helper.assertTrue(menu.clickMenuButton(player, 37), "Filler menu rejected Pyramid centre cycle");
+        helper.assertValueEqual(filler.pyramidCenter(), 5, "Filler menu selected the wrong Pyramid centre");
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.pattern() == buildcraft.builders.FillerPattern.PYRAMID
+                        && restored.verticalDirection() == Direction.UP
+                        && restored.pyramidCenter() == 5,
+                "reloaded Filler lost its Pyramid centre");
         helper.succeed();
     }
 
