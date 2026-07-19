@@ -2200,6 +2200,23 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 assembledGate.get(buildcraft.silicon.BCSiliconDataComponents.GATE_LOGIC.get()),
                 "gold gate assembly ignored OR selection");
 
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            table.inventory().set(slot, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        }
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.CLOCK), 1);
+        helper.assertValueEqual(500L * MjAPI.MJ, table.getRequiredLaserPower(),
+                "timer plug requested wrong assembly power");
+        table.receiveLaserPower(table.getRequiredLaserPower());
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        boolean timerFound = false;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()) {
+                timerFound = true;
+            }
+        }
+        helper.assertTrue(timerFound, "assembly table did not produce timer plug");
+
         var laserRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
             new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN),
             new ItemStack(Items.REDSTONE), new ItemStack(Items.DIAMOND), new ItemStack(Items.DIAMOND),

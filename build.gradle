@@ -256,6 +256,10 @@ tasks.named('processResources', ProcessResources) {
         include 'gate_logic_*.png'
         into 'assets/buildcraftsilicon/textures/item/gates'
     }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/plugs') {
+        include 'timer.png', 'daylight_sensor.png', 'pulsar_static.png'
+        into 'assets/buildcraftsilicon/textures/item/plugs'
+    }
     from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/laser') {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/block/laser'

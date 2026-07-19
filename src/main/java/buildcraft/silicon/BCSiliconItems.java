@@ -5,6 +5,7 @@ import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.item.GateItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -20,6 +21,9 @@ public final class BCSiliconItems {
                     .component(BCSiliconDataComponents.GATE_MATERIAL.get(), GateMaterial.CLAY_BRICK)
                     .component(BCSiliconDataComponents.GATE_LOGIC.get(), GateLogic.AND)
                     .component(BCSiliconDataComponents.GATE_MODIFIER.get(), GateModifier.NO_MODIFIER)));
+    public static final DeferredItem<Item> PLUG_PULSAR = ITEMS.registerSimpleItem("plug_pulsar");
+    public static final DeferredItem<Item> PLUG_LIGHT_SENSOR = ITEMS.registerSimpleItem("plug_light_sensor");
+    public static final DeferredItem<Item> PLUG_TIMER = ITEMS.registerSimpleItem("plug_timer");
     public static final DeferredItem<?> LASER = ITEMS.registerSimpleBlockItem("laser", BCSiliconBlocks.LASER);
     public static final DeferredItem<?> ASSEMBLY_TABLE =
         ITEMS.registerSimpleBlockItem("assembly_table", BCSiliconBlocks.ASSEMBLY_TABLE);
