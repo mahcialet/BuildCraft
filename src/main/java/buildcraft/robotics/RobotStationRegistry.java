@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.WeakHashMap;
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -44,6 +45,13 @@ public final class RobotStationRegistry {
                 .filter(station -> station.state == RobotStationState.AVAILABLE)
                 .filter(station -> station.dockingPosition().distanceToSqr(position) <= maximumDistanceSquared)
                 .min(Comparator.comparingDouble(station -> station.dockingPosition().distanceToSqr(position)));
+    }
+
+    public static List<Station> loadedStations(ServerLevel level) {
+        Map<Address, Station> stations = LEVELS.get(level);
+        if (stations == null) return List.of();
+        long now = level.getGameTime();
+        return stations.values().stream().filter(station -> station.lastSeen + 1 >= now).toList();
     }
 
     public record Address(BlockPos pipePos, Direction side) {}

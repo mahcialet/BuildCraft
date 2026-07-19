@@ -156,6 +156,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
         registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
         registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
+        registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -6695,6 +6696,66 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 .orElseThrow().value().assemble(recipeInput);
         helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()),
                 "Robot Station recipe output");
+        helper.succeed();
+    }
+
+    private static void roboticsDeliveryRobot(GameTestHelper helper) {
+        BlockPos pipeRelative = new BlockPos(1, 2, 1);
+        BlockPos chestRelative = pipeRelative.above();
+        BlockPos requesterRelative = new BlockPos(6, 2, 1);
+        helper.setBlock(pipeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(chestRelative, Blocks.CHEST);
+        helper.setBlock(requesterRelative, buildcraft.robotics.BCRoboticsBlocks.REQUESTER.get());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+                (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                        helper.getLevel().getBlockEntity(helper.absolutePos(pipeRelative));
+        helper.assertTrue(holder.installAttachment(Direction.UP,
+                        new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "delivery test rejected Robot Station attachment");
+        net.minecraft.world.Container chest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(chestRelative));
+        chest.setItem(0, new ItemStack(Items.COBBLESTONE, 32));
+        buildcraft.robotics.block.entity.RequesterBlockEntity requester =
+                (buildcraft.robotics.block.entity.RequesterBlockEntity)
+                        helper.getLevel().getBlockEntity(helper.absolutePos(requesterRelative));
+        requester.setRequest(0, new ItemStack(Items.COBBLESTONE, 16));
+
+        java.util.UUID auditOwner = java.util.UUID.randomUUID();
+        buildcraft.robotics.RequesterRegistry.Reservation auditReservation =
+                buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
+                        Vec3.atCenterOf(holder.getBlockPos()), auditOwner, 128).orElseThrow();
+        helper.assertTrue(buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
+                        Vec3.atCenterOf(holder.getBlockPos()), java.util.UUID.randomUUID(), 128).isEmpty(),
+                "Requester accepted two Delivery reservations for one slot");
+        buildcraft.robotics.RequesterRegistry.release(helper.getLevel(), auditReservation);
+
+        buildcraft.robotics.RobotStationRegistry.Station station =
+                buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), holder.getBlockPos(), Direction.UP);
+        buildcraft.robotics.entity.RobotEntity robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.DELIVERY);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(station.reserve(robot.getUUID()) && robot.dock(station),
+                "Delivery robot could not claim its home station");
+        helper.getLevel().addFreshEntity(robot);
+
+        for (int tick = 0; tick < 300 && (!requester.fulfilled(0)
+                || robot.deliveryPhase() != buildcraft.robotics.DeliveryPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), holder.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(requester.fulfilled(0), "Delivery robot did not fulfill the Requester slot");
+        helper.assertValueEqual(16, requester.stored(0).getCount(),
+                "Delivery robot offered the wrong item quantity");
+        helper.assertValueEqual(16, chest.getItem(0).getCount(),
+                "Delivery robot extracted the wrong source quantity");
+        helper.assertTrue(robot.isEmpty(), "Delivery robot retained cargo after a successful offer");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Delivery robot did not return home");
+        helper.assertValueEqual(buildcraft.robotics.DeliveryPhase.NONE, robot.deliveryPhase(),
+                "Delivery scheduler did not finish its task");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Delivery flight consumed no battery energy");
         helper.succeed();
     }
 

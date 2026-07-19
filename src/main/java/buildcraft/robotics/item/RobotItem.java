@@ -19,12 +19,15 @@ import net.minecraft.world.item.context.UseOnContext;
 
 public final class RobotItem extends Item {
     public RobotItem(Properties properties) {
-        super(properties.stacksTo(16).component(BCRoboticsDataComponents.ROBOT.get(), RobotItemData.EMPTY));
+        super(properties.stacksTo(16)
+                .component(BCRoboticsDataComponents.ROBOT.get(), RobotItemData.EMPTY)
+                .component(BCRoboticsDataComponents.BOARD_TYPE.get(), RobotBoardType.EMPTY));
     }
 
     public static ItemStack create(RobotBoardType board, long energy) {
         ItemStack stack = new ItemStack(BCRoboticsItems.ROBOT.get());
         stack.set(BCRoboticsDataComponents.ROBOT.get(), new RobotItemData(board, energy));
+        stack.set(BCRoboticsDataComponents.BOARD_TYPE.get(), board);
         if (board != RobotBoardType.EMPTY) stack.set(DataComponents.MAX_STACK_SIZE, 1);
         return stack;
     }

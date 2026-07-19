@@ -119,4 +119,20 @@ public final class RequesterBlockEntity extends BlockEntity implements IRequestP
             return super.insert(index, resource, Math.min(amount, remaining), transaction);
         }
     }
+
+    @Override
+    public void setLevel(net.minecraft.world.level.Level level) {
+        super.setLevel(level);
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            buildcraft.robotics.RequesterRegistry.register(serverLevel, this);
+        }
+    }
+
+    @Override
+    public void setRemoved() {
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            buildcraft.robotics.RequesterRegistry.unregister(serverLevel, getBlockPos());
+        }
+        super.setRemoved();
+    }
 }

@@ -5,6 +5,8 @@ import buildcraft.robotics.item.RobotItem;
 import buildcraft.robotics.RobotItemData;
 import buildcraft.robotics.RobotStationRegistry;
 import buildcraft.robotics.RobotTaskState;
+import buildcraft.robotics.DeliveryPhase;
+import buildcraft.robotics.RequesterRegistry;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -27,6 +29,10 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.transfer.ResourceHandler;
+import net.neoforged.neoforge.transfer.item.ItemResource;
+import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 public final class RobotEntity extends Entity implements Container, ItemSupplier {
     public static final int INVENTORY_SIZE = 4;
@@ -41,10 +47,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private final NonNullList<ItemStack> inventory = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
     private RobotStationRegistry.Address stationAddress;
+    private RequesterRegistry.Reservation deliveryReservation;
+    private RobotStationRegistry.Address deliverySource;
+    private DeliveryPhase deliveryPhase = DeliveryPhase.NONE;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
         setNoGravity(true);
+        noPhysics = true;
     }
 
     @Override
@@ -79,6 +89,10 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     public void setTaskState(RobotTaskState state) { entityData.set(TASK, state.ordinal()); }
     public Optional<RobotStationRegistry.Address> stationAddress() { return Optional.ofNullable(stationAddress); }
+    public DeliveryPhase deliveryPhase() { return deliveryPhase; }
+    public Optional<RequesterRegistry.Reservation> deliveryReservation() {
+        return Optional.ofNullable(deliveryReservation);
+    }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -117,6 +131,10 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             station.link(getUUID());
             setPos(station.dockingPosition());
             setDeltaMovement(Vec3.ZERO);
+            if (board() == RobotBoardType.DELIVERY && deliveryPhase == DeliveryPhase.NONE
+                    && tickCount % 20 == 0 && isEmpty()) {
+                beginDelivery(serverLevel);
+            }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
             if (difference.lengthSqr() <= 0.04) {
@@ -130,9 +148,198 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             move(net.minecraft.world.entity.MoverType.SELF, getDeltaMovement());
             if (position().distanceToSqr(station.dockingPosition()) >= 2.25) {
                 setDeltaMovement(Vec3.ZERO);
-                setTaskState(RobotTaskState.IDLE);
+                setTaskState(deliveryPhase == DeliveryPhase.NONE
+                        ? RobotTaskState.IDLE : RobotTaskState.WORKING);
             }
         }
+        if (deliveryPhase != DeliveryPhase.NONE) tickDelivery(serverLevel);
+    }
+
+    private void beginDelivery(ServerLevel level) {
+        Optional<RequesterRegistry.Reservation> reservation =
+                RequesterRegistry.reserveClosest(level, position(), getUUID(), 128);
+        if (reservation.isEmpty()) return;
+        Optional<RobotStationRegistry.Address> source = findDeliverySource(level, reservation.get().request());
+        if (source.isEmpty()) {
+            RequesterRegistry.release(level, reservation.get());
+            return;
+        }
+        deliveryReservation = reservation.get();
+        deliverySource = source.get();
+        deliveryPhase = DeliveryPhase.TO_SOURCE;
+        leaveStation();
+    }
+
+    private Optional<RobotStationRegistry.Address> findDeliverySource(ServerLevel level, ItemStack requested) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> sourceContains(level, address, requested))
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private boolean sourceContains(ServerLevel level, RobotStationRegistry.Address address, ItemStack requested) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+        if (handler == null) return false;
+        ItemResource resource = ItemResource.of(requested);
+        for (int slot = 0; slot < handler.size(); slot++) {
+            if (handler.getResource(slot).equals(resource) && handler.getAmountAsLong(slot) > 0) return true;
+        }
+        return false;
+    }
+
+    private ResourceHandler<ItemResource> sourceHandler(ServerLevel level, RobotStationRegistry.Address address) {
+        Direction side = address.side();
+        return level.getCapability(Capabilities.Item.BLOCK,
+                address.pipePos().relative(side), side.getOpposite());
+    }
+
+    private Vec3 sourcePosition(RobotStationRegistry.Address address) {
+        Direction side = address.side();
+        return Vec3.atCenterOf(address.pipePos()).add(
+                side.getStepX() * 0.75, side.getStepY() * 0.75, side.getStepZ() * 0.75);
+    }
+
+    private void tickDelivery(ServerLevel level) {
+        if (deliveryReservation == null || deliverySource == null) {
+            abortDelivery(level);
+            return;
+        }
+        if (!RequesterRegistry.reclaim(level, deliveryReservation)) {
+            deliveryPhase = isEmpty() ? DeliveryPhase.RETURN_HOME : DeliveryPhase.RETURN_LEFTOVERS;
+        }
+        if (deliveryPhase == DeliveryPhase.TO_SOURCE) {
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(deliverySource))) {
+                if (loadRequestedItems(level)) deliveryPhase = DeliveryPhase.TO_REQUESTER;
+                else abortDelivery(level);
+            }
+        } else if (deliveryPhase == DeliveryPhase.TO_REQUESTER) {
+            if (flyToward(Vec3.atCenterOf(deliveryReservation.position()))) deliverRequestedItems(level);
+        } else if (deliveryPhase == DeliveryPhase.RETURN_LEFTOVERS) {
+            if (flyToward(sourcePosition(deliverySource))) {
+                returnLeftovers(level);
+                deliveryPhase = DeliveryPhase.RETURN_HOME;
+            }
+        } else if (deliveryPhase == DeliveryPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) finishDelivery(level);
+        }
+    }
+
+    private boolean flyToward(Vec3 target) {
+        Vec3 difference = target.subtract(position());
+        if (difference.lengthSqr() <= 0.04) {
+            setDeltaMovement(Vec3.ZERO);
+            return true;
+        }
+        if (energy() <= 0) return false;
+        Vec3 movement = difference.normalize().scale(Math.min(0.15, difference.length()));
+        setDeltaMovement(movement);
+        move(net.minecraft.world.entity.MoverType.SELF, movement);
+        setEnergy(energy() - 1_000);
+        return false;
+    }
+
+    private boolean loadRequestedItems(ServerLevel level) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, deliverySource);
+        if (handler == null) return false;
+        ItemStack request = deliveryReservation.request();
+        ItemResource resource = ItemResource.of(request);
+        int remaining = request.getCount();
+        for (int sourceSlot = 0; sourceSlot < handler.size() && remaining > 0; sourceSlot++) {
+            if (!handler.getResource(sourceSlot).equals(resource)) continue;
+            int capacity = inventoryCapacity(request);
+            if (capacity <= 0) break;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int extracted = handler.extract(sourceSlot, resource, Math.min(remaining, capacity), transaction);
+                if (extracted <= 0) continue;
+                int inserted = insertIntoRobot(resource.toStack(extracted));
+                if (inserted != extracted) throw new IllegalStateException("Robot inventory capacity changed during extraction");
+                transaction.commit();
+                remaining -= extracted;
+            }
+        }
+        return remaining < request.getCount();
+    }
+
+    private int inventoryCapacity(ItemStack incoming) {
+        int capacity = 0;
+        for (ItemStack existing : inventory) {
+            if (existing.isEmpty()) capacity += incoming.getMaxStackSize();
+            else if (ItemStack.isSameItemSameComponents(existing, incoming)) {
+                capacity += existing.getMaxStackSize() - existing.getCount();
+            }
+        }
+        return capacity;
+    }
+
+    /** @return number inserted. */
+    private int insertIntoRobot(ItemStack incoming) {
+        int original = incoming.getCount();
+        for (int slot = 0; slot < inventory.size() && !incoming.isEmpty(); slot++) {
+            ItemStack existing = inventory.get(slot);
+            if (existing.isEmpty()) {
+                inventory.set(slot, incoming.copy());
+                incoming = ItemStack.EMPTY;
+            } else if (ItemStack.isSameItemSameComponents(existing, incoming)) {
+                int moved = Math.min(incoming.getCount(), existing.getMaxStackSize() - existing.getCount());
+                existing.grow(moved);
+                incoming.shrink(moved);
+            }
+        }
+        return original - incoming.getCount();
+    }
+
+    private void deliverRequestedItems(ServerLevel level) {
+        Optional<buildcraft.robotics.block.entity.RequesterBlockEntity> requester =
+                RequesterRegistry.requester(level, deliveryReservation);
+        if (requester.isPresent()) {
+            for (int slot = 0; slot < inventory.size(); slot++) {
+                ItemStack carried = inventory.get(slot);
+                if (carried.isEmpty() || !ItemStack.isSameItemSameComponents(
+                        carried, deliveryReservation.request())) continue;
+                inventory.set(slot, requester.get().offerItem(deliveryReservation.slot(), carried.copy()));
+            }
+        }
+        RequesterRegistry.release(level, deliveryReservation);
+        deliveryPhase = isEmpty() ? DeliveryPhase.RETURN_HOME : DeliveryPhase.RETURN_LEFTOVERS;
+    }
+
+    private void returnLeftovers(ServerLevel level) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, deliverySource);
+        if (handler == null) return;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack remaining = inventory.get(slot);
+            if (remaining.isEmpty()) continue;
+            ItemResource resource = ItemResource.of(remaining);
+            try (Transaction transaction = Transaction.openRoot()) {
+                int inserted = handler.insert(resource, remaining.getCount(), transaction);
+                if (inserted > 0) {
+                    remaining.shrink(inserted);
+                    transaction.commit();
+                }
+            }
+            inventory.set(slot, remaining);
+        }
+    }
+
+    private void abortDelivery(ServerLevel level) {
+        if (deliveryReservation != null) RequesterRegistry.release(level, deliveryReservation);
+        if (isEmpty()) {
+            deliveryPhase = DeliveryPhase.RETURN_HOME;
+        } else if (deliverySource != null) {
+            deliveryPhase = DeliveryPhase.RETURN_LEFTOVERS;
+        } else {
+            deliveryPhase = DeliveryPhase.RETURN_HOME;
+        }
+    }
+
+    private void finishDelivery(ServerLevel level) {
+        if (deliveryReservation != null) RequesterRegistry.release(level, deliveryReservation);
+        deliveryReservation = null;
+        deliverySource = null;
+        deliveryPhase = DeliveryPhase.NONE;
     }
 
     public RobotItemData itemData() { return new RobotItemData(board(), energy()); }
@@ -185,6 +392,16 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             output.putLong("StationPos", stationAddress.pipePos().asLong());
             output.putInt("StationSide", stationAddress.side().get3DDataValue());
         }
+        output.putInt("DeliveryPhase", deliveryPhase.ordinal());
+        if (deliveryReservation != null) {
+            output.putLong("DeliveryRequestPos", deliveryReservation.position().asLong());
+            output.putInt("DeliveryRequestSlot", deliveryReservation.slot());
+            output.store("DeliveryRequest", ItemStack.CODEC, deliveryReservation.request());
+        }
+        if (deliverySource != null) {
+            output.putLong("DeliverySourcePos", deliverySource.pipePos().asLong());
+            output.putInt("DeliverySourceSide", deliverySource.side().get3DDataValue());
+        }
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -202,6 +419,25 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             BlockPos pos = BlockPos.of(input.getLongOr("StationPos", 0));
             Direction side = Direction.from3DDataValue(input.getIntOr("StationSide", Direction.UP.get3DDataValue()));
             stationAddress = new RobotStationRegistry.Address(pos, side);
+        }
+        int deliveryOrdinal = input.getIntOr("DeliveryPhase", DeliveryPhase.NONE.ordinal());
+        DeliveryPhase[] deliveryPhases = DeliveryPhase.values();
+        deliveryPhase = deliveryOrdinal >= 0 && deliveryOrdinal < deliveryPhases.length
+                ? deliveryPhases[deliveryOrdinal] : DeliveryPhase.NONE;
+        Optional<ItemStack> request = input.read("DeliveryRequest", ItemStack.CODEC);
+        if (input.getLong("DeliveryRequestPos").isPresent() && request.isPresent()) {
+            deliveryReservation = new RequesterRegistry.Reservation(
+                    BlockPos.of(input.getLongOr("DeliveryRequestPos", 0)),
+                    input.getIntOr("DeliveryRequestSlot", 0), request.get(), getUUID());
+        }
+        if (input.getLong("DeliverySourcePos").isPresent()) {
+            deliverySource = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("DeliverySourcePos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "DeliverySourceSide", Direction.UP.get3DDataValue())));
+        }
+        if (deliveryPhase != DeliveryPhase.NONE && (deliveryReservation == null || deliverySource == null)) {
+            deliveryPhase = DeliveryPhase.NONE;
         }
         ContainerHelper.loadAllItems(input, inventory);
     }
