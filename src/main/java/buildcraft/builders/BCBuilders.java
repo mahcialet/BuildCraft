@@ -28,6 +28,8 @@ public final class BCBuilders {
             event.accept(BCBuildersItems.ARCHITECT_TABLE.get());
             event.accept(BCBuildersItems.BUILDER.get());
             event.accept(BCBuildersItems.REPLACER.get());
+            event.accept(BCBuildersItems.QUARRY.get());
+            event.accept(BCBuildersItems.FRAME.get());
             event.accept(BCBuildersItems.BLUEPRINT.get());
             event.accept(BCBuildersItems.TEMPLATE.get());
             event.accept(BCBuildersItems.SINGLE_SCHEMATIC.get());

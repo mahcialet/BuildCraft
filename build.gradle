@@ -210,6 +210,14 @@ tasks.named('processResources', ProcessResources) {
         include 'top.png', 'bottom.png', 'front.png', 'side.png'
         into 'assets/buildcraftbuilders/textures/block/replacer'
     }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/blocks/quarry') {
+        include 'normal/top.png', 'normal/bottom.png', 'normal/front.png', 'normal/back.png', 'normal/side.png'
+        into 'assets/buildcraftbuilders/textures/block/quarry'
+    }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/blocks/frame') {
+        include 'default.png'
+        into 'assets/buildcraftbuilders/textures/block/frame'
+    }
     from('buildcraft_resources/assets/buildcraftbuilders/textures/items/schematic_single') {
         include 'clean.png', 'used.png'
         into 'assets/buildcraftbuilders/textures/item/single_schematic'

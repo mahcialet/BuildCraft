@@ -148,6 +148,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_architect_table", BCCoreGameTests::buildersArchitectTable);
         registerTest(event, environment, "builders_builder", BCCoreGameTests::buildersBuilder);
         registerTest(event, environment, "builders_replacer", BCCoreGameTests::buildersReplacer);
+        registerTest(event, environment, "builders_quarry", BCCoreGameTests::buildersQuarry);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2413,6 +2414,97 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 replacer, null, ItemStack.EMPTY);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.REPLACER.get()),
                 "Replacer loot output");
+        helper.succeed();
+    }
+
+    private static void buildersQuarry(GameTestHelper helper) {
+        BlockPos quarryPos = helper.absolutePos(new BlockPos(1, 3, 1));
+        BlockPos min = helper.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos max = helper.absolutePos(new BlockPos(5, 6, 5));
+        helper.getLevel().setBlock(quarryPos, buildcraft.builders.BCBuildersBlocks.QUARRY.get().defaultBlockState()
+                .setValue(buildcraft.builders.block.QuarryBlock.FACING, Direction.EAST), Block.UPDATE_ALL);
+        var quarry = (buildcraft.builders.block.entity.QuarryBlockEntity)
+                helper.getLevel().getBlockEntity(quarryPos);
+        helper.assertTrue(quarry.configureArea(min, max), "Quarry rejected valid 3x5x3 area");
+        BlockPos stone = new BlockPos(min.getX() + 1, max.getY() - 1, min.getZ() + 1);
+        BlockPos dirt = stone.below();
+        helper.getLevel().setBlock(stone, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(dirt, Blocks.DIRT.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(dirt.below(), Blocks.BEDROCK.defaultBlockState(), Block.UPDATE_ALL);
+        long frameEnergy = 28 * buildcraft.builders.block.entity.QuarryBlockEntity.FRAME_COST;
+        long stoneEnergy = 80 * MjAPI.MJ;
+        long dirtEnergy = 48 * MjAPI.MJ;
+        long required = frameEnergy + stoneEnergy + dirtEnergy;
+        helper.assertValueEqual(0L, quarry.mjReceiver().receivePower(required, false),
+                "Quarry rejected exact frame and mining MJ");
+
+        quarry.setControlMode(buildcraft.api.core.IControllable.ControlMode.OFF);
+        buildcraft.builders.block.entity.QuarryBlockEntity.tick(helper.getLevel(), quarryPos,
+                helper.getLevel().getBlockState(quarryPos), quarry);
+        helper.assertValueEqual(quarry.frameCursor(), 0, "disabled Quarry advanced frame construction");
+        quarry.setControlMode(buildcraft.api.core.IControllable.ControlMode.ON);
+        for (int tick = 0; tick < 10; tick++) buildcraft.builders.block.entity.QuarryBlockEntity.tick(
+                helper.getLevel(), quarryPos, helper.getLevel().getBlockState(quarryPos), quarry);
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(quarryPos, quarry.getBlockState(),
+                quarry.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.QuarryBlockEntity,
+                "Quarry block entity did not reload");
+        var restored = (buildcraft.builders.block.entity.QuarryBlockEntity) loaded;
+        helper.assertValueEqual(restored.frameCursor(), quarry.frameCursor(), "reloaded Quarry lost frame cursor");
+        helper.assertValueEqual(restored.storedMj(), quarry.storedMj(), "reloaded Quarry lost stored MJ");
+        helper.assertValueEqual(restored.areaMin(), min, "reloaded Quarry lost area minimum");
+        helper.assertValueEqual(restored.areaMax(), max, "reloaded Quarry lost area maximum");
+        helper.getLevel().setBlockEntity(restored);
+
+        for (int tick = 0; tick < 80 && restored.stage()
+                != buildcraft.builders.block.entity.QuarryBlockEntity.Stage.DONE; tick++) {
+            buildcraft.builders.block.entity.QuarryBlockEntity.tick(helper.getLevel(), quarryPos,
+                    helper.getLevel().getBlockState(quarryPos), restored);
+        }
+        long frames = BlockPos.betweenClosedStream(min, max)
+                .filter(pos -> helper.getLevel().getBlockState(pos).is(buildcraft.builders.BCBuildersBlocks.FRAME.get()))
+                .count();
+        helper.assertValueEqual(frames, 28L, "Quarry frame edge count");
+        BlockState corner = helper.getLevel().getBlockState(min);
+        helper.assertTrue(corner.getValue(buildcraft.builders.block.FrameBlock.UP)
+                        && corner.getValue(buildcraft.builders.block.FrameBlock.SOUTH)
+                        && corner.getValue(buildcraft.builders.block.FrameBlock.EAST),
+                "Quarry frame corner did not connect on all three axes");
+        helper.assertTrue(restored.stage() == buildcraft.builders.block.entity.QuarryBlockEntity.Stage.DONE
+                        && helper.getLevel().getBlockState(stone).isAir()
+                        && helper.getLevel().getBlockState(dirt).isAir(),
+                "Quarry did not finish its interior columns");
+        int stoneDrops = 0;
+        int dirtDrops = 0;
+        for (int slot = 0; slot < restored.internalDrops().size(); slot++) {
+            if (restored.internalDrops().getResource(slot).is(Items.COBBLESTONE))
+                stoneDrops += restored.internalDrops().getAmountAsInt(slot);
+            if (restored.internalDrops().getResource(slot).is(Items.DIRT))
+                dirtDrops += restored.internalDrops().getAmountAsInt(slot);
+        }
+        helper.assertTrue(stoneDrops == 1 && dirtDrops == 1, "Quarry did not retain exact mined drops");
+        helper.assertValueEqual(restored.storedMj(), 0L, "Quarry frame/mining MJ accounting");
+        helper.assertTrue(!restored.hasWork(), "completed Quarry still reports work");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.REDSTONE),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get()), new ItemStack(Items.DIAMOND_PICKAXE),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_DIAMOND.get())));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.QUARRY.get()), "Quarry recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(quarryPos), helper.getLevel(), quarryPos,
+                restored, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.QUARRY.get()),
+                "Quarry loot output");
+        restored.clearFrames();
+        helper.assertTrue(BlockPos.betweenClosedStream(min, max).noneMatch(pos ->
+                helper.getLevel().getBlockState(pos).is(buildcraft.builders.BCBuildersBlocks.FRAME.get())),
+                "Quarry did not remove its generated frame");
         helper.succeed();
     }
 
