@@ -3,7 +3,10 @@ package buildcraft.silicon.block.entity;
 import buildcraft.api.mj.ILaserTarget;
 import buildcraft.silicon.BCSiliconBlockEntities;
 import buildcraft.silicon.recipe.AssemblyRecipe;
-import java.util.List;
+import buildcraft.silicon.recipe.AssemblyRecipeInput;
+import buildcraft.silicon.ChipsetType;
+import buildcraft.silicon.BCSiliconRecipes;
+import java.util.ArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -16,15 +19,27 @@ import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
 public final class AssemblyTableBlockEntity extends BlockEntity implements ILaserTarget {
-    private static final List<AssemblyRecipe> RECIPES = AssemblyRecipe.chipsetRecipes();
     private final ItemStacksResourceHandler inventory = new ItemStacksResourceHandler(12);
     private long storedLaserPower;
+    private ChipsetType selectedType = ChipsetType.RED;
 
     public AssemblyTableBlockEntity(BlockPos pos, BlockState state) {
         super(BCSiliconBlockEntities.ASSEMBLY_TABLE.get(), pos, state);
     }
     public ItemStacksResourceHandler inventory() { return inventory; }
     public long storedLaserPower() { return storedLaserPower; }
+    public ChipsetType selectedType() { return selectedType; }
+    public void setSelectedType(ChipsetType type) {
+        if (type != selectedType) {
+            selectedType = type;
+            storedLaserPower = 0;
+            setChanged();
+        }
+    }
+    public long selectedRequiredPower() {
+        AssemblyRecipe recipe = activeRecipe();
+        return recipe == null ? 0 : recipe.requiredPower();
+    }
 
     public static void tick(Level level, BlockPos pos, BlockState state, AssemblyTableBlockEntity table) {
         if (level.isClientSide()) return;
@@ -50,8 +65,13 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
     }
 
     private AssemblyRecipe activeRecipe() {
-        for (AssemblyRecipe recipe : RECIPES) if (findSlots(recipe) != null && canAccept(recipe.output())) return recipe;
-        return null;
+        if (level == null || level.isClientSide()) return null;
+        var stacks = new ArrayList<ItemStack>(inventory.size());
+        for (int slot = 0; slot < inventory.size(); slot++) stacks.add(stack(slot));
+        AssemblyRecipeInput input = new AssemblyRecipeInput(stacks, selectedType);
+        return level.getServer().getRecipeManager().getRecipeFor(
+            BCSiliconRecipes.ASSEMBLY_TYPE.get(), input, level).map(holder -> holder.value())
+            .filter(recipe -> canAccept(recipe.result())).orElse(null);
     }
 
     private int[] findSlots(AssemblyRecipe recipe) {
@@ -90,8 +110,8 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
                 ItemResource resource = inventory.getResource(slot);
                 if (inventory.extract(slot, resource, 1, transaction) != 1) return false;
             }
-            if (inventory.insert(ItemResource.of(recipe.output()), recipe.output().getCount(), transaction)
-                != recipe.output().getCount()) return false;
+            if (inventory.insert(ItemResource.of(recipe.result()), recipe.result().getCount(), transaction)
+                != recipe.result().getCount()) return false;
             transaction.commit();
             return true;
         }
@@ -101,10 +121,12 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         super.loadAdditional(input);
         inventory.deserialize(input.childOrEmpty("inventory"));
         storedLaserPower = Math.max(0, input.getLongOr("laser_power", 0));
+        selectedType = input.read("selected_type", ChipsetType.CODEC).orElse(ChipsetType.RED);
     }
     @Override protected void saveAdditional(ValueOutput output) {
         super.saveAdditional(output);
         inventory.serialize(output.child("inventory"));
         if (storedLaserPower > 0) output.putLong("laser_power", storedLaserPower);
+        output.store("selected_type", ChipsetType.CODEC, selectedType);
     }
 }

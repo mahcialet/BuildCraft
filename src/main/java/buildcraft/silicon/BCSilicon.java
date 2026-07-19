@@ -4,6 +4,9 @@ import buildcraft.core.BCCreativeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.fml.loading.FMLEnvironment;
+import buildcraft.silicon.client.BCSiliconClient;
 
 @Mod(BCSilicon.MOD_ID)
 public final class BCSilicon {
@@ -11,9 +14,12 @@ public final class BCSilicon {
 
     public BCSilicon(IEventBus modBus) {
         BCSiliconDataComponents.register(modBus);
+        BCSiliconRecipes.register(modBus);
         BCSiliconBlocks.register(modBus);
         BCSiliconBlockEntities.register(modBus);
         BCSiliconItems.register(modBus);
+        BCSiliconMenus.register(modBus);
+        if (FMLEnvironment.getDist() == Dist.CLIENT) BCSiliconClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
     }
 

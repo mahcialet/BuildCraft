@@ -17,6 +17,11 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jspecify.annotations.Nullable;
+import buildcraft.silicon.menu.AssemblyTableMenu;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.phys.BlockHitResult;
 
 public final class AssemblyTableBlock extends BaseEntityBlock {
     public static final MapCodec<AssemblyTableBlock> CODEC = simpleCodec(AssemblyTableBlock::new);
@@ -31,6 +36,11 @@ public final class AssemblyTableBlock extends BaseEntityBlock {
                                              BlockPos pos, CollisionContext context) { return SHAPE; }
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return new AssemblyTableBlockEntity(pos, state);
+    }
+    @Override protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos,
+                                                          Player player, BlockHitResult hit) {
+        if (player instanceof ServerPlayer serverPlayer) AssemblyTableMenu.open(serverPlayer, pos);
+        return InteractionResult.SUCCESS;
     }
     @Override public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(
         Level level, BlockState state, BlockEntityType<T> type) {

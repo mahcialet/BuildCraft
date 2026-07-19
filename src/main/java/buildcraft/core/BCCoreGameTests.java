@@ -2049,6 +2049,26 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             chipset.get(buildcraft.silicon.BCSiliconDataComponents.CHIPSET_TYPE.get()),
             "assembly table produced wrong chipset subtype");
         helper.assertValueEqual(0L, table.storedLaserPower(), "assembly table did not debit completed recipe power");
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            table.inventory().set(slot, net.neoforged.neoforge.transfer.item.ItemResource.EMPTY, 0);
+        }
+        table.setSelectedType(buildcraft.silicon.ChipsetType.DIAMOND);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.REDSTONE), 1);
+        table.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.DIAMOND), 1);
+        helper.assertValueEqual(80_000L * MjAPI.MJ, table.getRequiredLaserPower(),
+            "assembly table ignored selected diamond recipe");
+        table.receiveLaserPower(table.getRequiredLaserPower());
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+            helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        ItemStack diamondChipset = ItemStack.EMPTY;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.REDSTONE_CHIPSET.get()) {
+                diamondChipset = table.inventory().getResource(slot).toStack(table.inventory().getAmountAsInt(slot));
+            }
+        }
+        helper.assertValueEqual(buildcraft.silicon.ChipsetType.DIAMOND,
+            diamondChipset.get(buildcraft.silicon.BCSiliconDataComponents.CHIPSET_TYPE.get()),
+            "assembly table selection fell back to red recipe");
 
         var laserRecipe = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
             new ItemStack(Items.REDSTONE), new ItemStack(Items.REDSTONE), new ItemStack(Items.OBSIDIAN),
