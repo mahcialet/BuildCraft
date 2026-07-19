@@ -168,6 +168,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_machine_triggers", BCCoreGameTests::siliconMachineTriggers);
         registerTest(event, environment, "silicon_engine_stage_triggers", BCCoreGameTests::siliconEngineStageTriggers);
         registerTest(event, environment, "silicon_fluids_traversing_trigger", BCCoreGameTests::siliconFluidsTraversingTrigger);
+        registerTest(event, environment, "silicon_power_requested_trigger", BCCoreGameTests::siliconPowerRequestedTrigger);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3493,6 +3494,40 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconPowerRequestedTrigger(GameTestHelper helper) {
+        BlockPos gatePipePos = helper.absolutePos(new BlockPos(2, 3, 3));
+        BlockPos networkPipePos = gatePipePos.east();
+        BlockPos wellPos = networkPipePos.east();
+        BlockState powerPipe = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.STONE_POWER);
+        helper.getLevel().setBlock(gatePipePos, powerPipe, 3);
+        helper.getLevel().setBlock(networkPipePos, powerPipe, 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(gatePipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "power requested trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_REQUESTED, false,
+                "power pipe network without a receiver matched POWER_REQUESTED");
+
+        helper.getLevel().setBlock(wellPos,
+                buildcraft.factory.BCFactoryBlocks.MINING_WELL.get().defaultBlockState(), 3);
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_REQUESTED, true,
+                "downstream mining well demand did not match POWER_REQUESTED");
+        helper.getLevel().removeBlock(wellPos, false);
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_REQUESTED, false,
+                "removed downstream receiver still matched POWER_REQUESTED");
         helper.succeed();
     }
 

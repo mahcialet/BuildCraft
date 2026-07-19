@@ -203,6 +203,27 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
     public boolean hasFluidInTransit() { return fluidBuffer.getAmountAsInt(0) > 0; }
+    public boolean hasPowerRequest() {
+        return level != null && hasPowerRequest(new java.util.HashSet<>());
+    }
+
+    private boolean hasPowerRequest(java.util.Set<BlockPos> visited) {
+        if (!pipeType().carriesPower() || !visited.add(worldPosition)) return false;
+        for (Direction direction : Direction.values()) {
+            if (!getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            BlockPos targetPos = worldPosition.relative(direction);
+            var targetEntity = level.getBlockEntity(targetPos);
+            if (targetEntity instanceof PipeHolderBlockEntity pipe
+                    && pipeType().connectsTo(pipe.pipeType())) {
+                if (pipe.hasPowerRequest(visited)) return true;
+            } else if (pipeType().connectsPowerHandlers()) {
+                IMjReceiver receiver = level.getCapability(MjAPI.CAP_RECEIVER, targetPos, direction.getOpposite());
+                if (receiver != null && receiver.canReceive() && receiver.canConnect(powerConnector)
+                        && receiver.getPowerRequested() > 0) return true;
+            }
+        }
+        return false;
+    }
     public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
     public PowerStatus adjacentPower(Direction side) {
         if (level == null) return PowerStatus.UNAVAILABLE;

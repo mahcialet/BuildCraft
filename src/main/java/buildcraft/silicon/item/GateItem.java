@@ -61,6 +61,7 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case REDSTONE_INACTIVE -> !pipe.hasExternalRedstoneSignal();
             case ITEMS_TRAVERSING -> pipe.hasTravellingItems();
             case FLUIDS_TRAVERSING -> pipe.hasFluidInTransit();
+            case POWER_REQUESTED -> pipe.hasPowerRequest();
             case TIMER_SHORT -> timer(pipe, 5);
             case TIMER_MEDIUM -> timer(pipe, 10);
             case TIMER_LONG -> timer(pipe, 15);
