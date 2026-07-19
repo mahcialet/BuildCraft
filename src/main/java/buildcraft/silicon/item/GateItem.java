@@ -73,6 +73,12 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case FLUID_CONTAINS -> pipe.adjacentFluid(gateSide).contains();
             case FLUID_SPACE -> pipe.adjacentFluid(gateSide).space();
             case FLUID_FULL -> pipe.adjacentFluid(gateSide).full();
+            case INVENTORY_BELOW_25 -> pipe.adjacentInventoryBelow(gateSide, 1, 4);
+            case INVENTORY_BELOW_50 -> pipe.adjacentInventoryBelow(gateSide, 1, 2);
+            case INVENTORY_BELOW_75 -> pipe.adjacentInventoryBelow(gateSide, 3, 4);
+            case FLUID_BELOW_25 -> pipe.adjacentFluidBelow(gateSide, 1, 4);
+            case FLUID_BELOW_50 -> pipe.adjacentFluidBelow(gateSide, 1, 2);
+            case FLUID_BELOW_75 -> pipe.adjacentFluidBelow(gateSide, 3, 4);
         };
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {

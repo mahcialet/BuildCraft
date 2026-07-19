@@ -3523,6 +3523,15 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.silicon.gate.GateTrigger.FLUID_SPACE, true, "empty tank did not trigger FLUID_SPACE");
         assertFluidTrigger(helper, holder, gate,
                 buildcraft.silicon.gate.GateTrigger.FLUID_FULL, false, "empty tank triggered FLUID_FULL");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_25, true,
+                "empty tank did not trigger FLUID_BELOW_25");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_50, true,
+                "empty tank did not trigger FLUID_BELOW_50");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_75, true,
+                "empty tank did not trigger FLUID_BELOW_75");
 
         try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
             helper.assertValueEqual(500, handler.insert(water, 500, transaction),
@@ -3537,6 +3546,44 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.silicon.gate.GateTrigger.FLUID_SPACE, true, "partial tank did not trigger FLUID_SPACE");
         assertFluidTrigger(helper, holder, gate,
                 buildcraft.silicon.gate.GateTrigger.FLUID_FULL, false, "partial tank triggered FLUID_FULL");
+
+        int tankCapacity = Math.toIntExact(handler.getCapacityAsLong(0, water));
+        int toQuarter = tankCapacity / 4 - Math.toIntExact(handler.getAmountAsLong(0));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(toQuarter, handler.insert(water, toQuarter, transaction),
+                    "tank rejected fill to 25 percent");
+            transaction.commit();
+        }
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_25, false,
+                "tank at exactly 25 percent triggered FLUID_BELOW_25");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_50, true,
+                "tank at 25 percent did not trigger FLUID_BELOW_50");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_75, true,
+                "tank at 25 percent did not trigger FLUID_BELOW_75");
+        int toHalf = tankCapacity / 2 - Math.toIntExact(handler.getAmountAsLong(0));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(toHalf, handler.insert(water, toHalf, transaction),
+                    "tank rejected fill to 50 percent");
+            transaction.commit();
+        }
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_50, false,
+                "tank at exactly 50 percent triggered FLUID_BELOW_50");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_75, true,
+                "tank at 50 percent did not trigger FLUID_BELOW_75");
+        int toThreeQuarters = tankCapacity * 3 / 4 - Math.toIntExact(handler.getAmountAsLong(0));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(toThreeQuarters, handler.insert(water, toThreeQuarters, transaction),
+                    "tank rejected fill to 75 percent");
+            transaction.commit();
+        }
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_BELOW_75, false,
+                "tank at exactly 75 percent triggered FLUID_BELOW_75");
 
         int remaining = Math.toIntExact(handler.getCapacityAsLong(0, water) - handler.getAmountAsLong(0));
         try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
@@ -3597,6 +3644,15 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.silicon.gate.GateTrigger.INVENTORY_SPACE, true, "empty inventory did not trigger SPACE");
         assertInventoryTrigger(helper, holder, gate,
                 buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, false, "empty inventory triggered FULL");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_25, true,
+                "empty inventory did not trigger BELOW_25");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_50, true,
+                "empty inventory did not trigger BELOW_50");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_75, true,
+                "empty inventory did not trigger BELOW_75");
 
         chest.setItem(0, new ItemStack(Items.COAL));
         assertInventoryTrigger(helper, holder, gate,
@@ -3607,6 +3663,28 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.silicon.gate.GateTrigger.INVENTORY_SPACE, true, "partial inventory did not trigger SPACE");
         assertInventoryTrigger(helper, holder, gate,
                 buildcraft.silicon.gate.GateTrigger.INVENTORY_FULL, false, "partial inventory triggered FULL");
+
+        setContainerItemCount(chest, Items.COAL, 432);
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_25, false,
+                "inventory at exactly 25 percent triggered BELOW_25");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_50, true,
+                "inventory at 25 percent did not trigger BELOW_50");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_75, true,
+                "inventory at 25 percent did not trigger BELOW_75");
+        setContainerItemCount(chest, Items.COAL, 864);
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_50, false,
+                "inventory at exactly 50 percent triggered BELOW_50");
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_75, true,
+                "inventory at 50 percent did not trigger BELOW_75");
+        setContainerItemCount(chest, Items.COAL, 1296);
+        assertInventoryTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.INVENTORY_BELOW_75, false,
+                "inventory at exactly 75 percent triggered BELOW_75");
 
         for (int slot = 0; slot < chest.getContainerSize(); slot++) {
             chest.setItem(slot, new ItemStack(Items.COAL, 64));
@@ -3637,6 +3715,16 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                                 buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
         tickPipes(helper, 1, holder.getBlockPos());
         helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
+    }
+
+    private static void setContainerItemCount(net.minecraft.world.Container container,
+            net.minecraft.world.item.Item item, int count) {
+        container.clearContent();
+        for (int slot = 0; slot < container.getContainerSize() && count > 0; slot++) {
+            int amount = Math.min(64, count);
+            container.setItem(slot, new ItemStack(item, amount));
+            count -= amount;
+        }
     }
 
     private static void siliconFacade(GameTestHelper helper) {

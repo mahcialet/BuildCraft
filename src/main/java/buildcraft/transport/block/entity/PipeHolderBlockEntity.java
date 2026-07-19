@@ -217,6 +217,22 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         return new InventoryStatus(true, !contains, contains, space, !space);
     }
+    public boolean adjacentInventoryBelow(Direction side, int numerator, int denominator) {
+        if (!(level instanceof ServerLevel serverLevel)) return false;
+        var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
+                worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return false;
+        long amount = 0;
+        long capacity = 0;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            long slotAmount = handler.getAmountAsLong(slot);
+            amount += slotAmount;
+            var resource = slotAmount > 0 ? handler.getResource(slot)
+                    : net.neoforged.neoforge.transfer.item.ItemResource.of(net.minecraft.world.item.Items.STONE);
+            capacity += handler.getCapacityAsLong(slot, resource);
+        }
+        return capacity > 0 && amount * (double) denominator < capacity * (double) numerator;
+    }
     public FluidStatus adjacentFluid(Direction side) {
         if (!(level instanceof ServerLevel serverLevel)) return FluidStatus.UNAVAILABLE;
         var handler = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
@@ -230,6 +246,19 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             space |= amount == 0 || amount < handler.getCapacityAsLong(tank, handler.getResource(tank));
         }
         return new FluidStatus(true, !contains, contains, space, !space);
+    }
+    public boolean adjacentFluidBelow(Direction side, int numerator, int denominator) {
+        if (!(level instanceof ServerLevel serverLevel)) return false;
+        var handler = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
+                worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return false;
+        long amount = 0;
+        long capacity = 0;
+        for (int tank = 0; tank < handler.size(); tank++) {
+            amount += handler.getAmountAsLong(tank);
+            capacity += handler.getCapacityAsLong(tank, handler.getResource(tank));
+        }
+        return capacity > 0 && amount * (double) denominator < capacity * (double) numerator;
     }
     public void activatePulsar(@Nullable Direction side) {
         if (side != null) {
