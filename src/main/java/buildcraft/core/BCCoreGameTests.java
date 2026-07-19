@@ -144,6 +144,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
+        registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
@@ -2176,6 +2177,103 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.FILLER.get()),
                 "Filler loot table did not return itself");
         helper.succeed();
+    }
+
+    private static void buildersFillerPatterns(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(1, 3, 3));
+        BlockPos min = fillerPos.east();
+        BlockPos max = min.offset(2, 2, 2);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        helper.assertTrue(filler.configureArea(min, max), "Filler rejected valid 3x3x3 bounds");
+
+        insertPipeItem(filler.resources(), Items.STONE, 26);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(104 * MjAPI.MJ, false),
+                "Box pattern rejected nominal MJ input");
+        filler.setPattern(buildcraft.builders.FillerPattern.BOX);
+        helper.assertValueEqual(filler.areaMin(), min,
+                "Filler did not copy the marker minimum");
+        helper.assertValueEqual(filler.areaMax(), max,
+                "Filler did not copy the marker maximum");
+        helper.assertValueEqual(26L, filler.resources().getAmountAsLong(0),
+                "Box pattern resources were not inserted");
+        helper.assertValueEqual(104 * MjAPI.MJ, filler.storedMj(),
+                "Box pattern MJ was not stored");
+        tickFiller(helper, fillerPos, filler, 27);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.STONE), 26,
+                "Box pattern did not place the six boundary planes");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(1, 1, 1)).isAir(),
+                "Box pattern filled its interior");
+        helper.assertValueEqual(0L, filler.storedMj(), "Box pattern used the wrong MJ total");
+
+        for (BlockPos target : BlockPos.betweenClosed(min, max)) {
+            helper.getLevel().setBlock(target, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        insertPipeItem(filler.resources(), Items.GLASS, 20);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(80 * MjAPI.MJ, false),
+                "Frame pattern rejected nominal MJ input");
+        filler.setPattern(buildcraft.builders.FillerPattern.FRAME);
+        tickFiller(helper, fillerPos, filler, 21);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.GLASS), 20,
+                "Frame pattern did not place exactly the twelve edges");
+        helper.assertTrue(helper.getLevel().getBlockState(min.offset(1, 1, 0)).isAir(),
+                "Frame pattern filled a face interior");
+
+        for (BlockPos target : BlockPos.betweenClosed(min, max)) {
+            helper.getLevel().setBlock(target, Blocks.COBBLESTONE.defaultBlockState(), Block.UPDATE_ALL);
+        }
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(108 * MjAPI.MJ, false),
+                "Clear pattern rejected nominal MJ input");
+        filler.setPattern(buildcraft.builders.FillerPattern.CLEAR);
+        tickFiller(helper, fillerPos, filler, 28);
+        helper.assertValueEqual(countBlocks(helper, min, max, Blocks.AIR), 27,
+                "Clear pattern did not excavate the full volume");
+        long recovered = 0;
+        for (int slot = 0; slot < filler.resources().size(); slot++) {
+            recovered += filler.resources().getAmountAsLong(slot);
+        }
+        helper.assertValueEqual(recovered, 27L, "Clear pattern did not recover block drops");
+        helper.assertValueEqual(0L, filler.storedMj(), "Clear pattern used the wrong MJ total");
+
+        BlockPos center = min.offset(1, 1, 1);
+        helper.getLevel().setBlock(center, Blocks.DIRT.defaultBlockState(), Block.UPDATE_ALL);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(4 * MjAPI.MJ, false),
+                "None pattern rejected stored MJ");
+        filler.setPattern(buildcraft.builders.FillerPattern.NONE);
+        tickFiller(helper, fillerPos, filler, 2);
+        helper.assertTrue(helper.getLevel().getBlockState(center).is(Blocks.DIRT),
+                "None pattern mutated the area");
+        helper.assertValueEqual(4 * MjAPI.MJ, filler.storedMj(), "None pattern consumed MJ");
+
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(42, menuPlayer.getInventory(), fillerPos);
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 13), "Filler menu rejected Box pattern");
+        helper.assertTrue(filler.pattern() == buildcraft.builders.FillerPattern.BOX,
+                "Filler menu selected the wrong pattern");
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.pattern() == buildcraft.builders.FillerPattern.BOX,
+                "reloaded Filler lost its selected pattern");
+        helper.assertTrue(min.equals(restored.areaMin()) && max.equals(restored.areaMax()),
+                "Filler lost its copied area bounds");
+        helper.succeed();
+    }
+
+    private static void tickFiller(GameTestHelper helper, BlockPos pos,
+            buildcraft.builders.block.entity.FillerBlockEntity filler, int ticks) {
+        for (int tick = 0; tick < ticks; tick++) {
+            buildcraft.builders.block.entity.FillerBlockEntity.tick(helper.getLevel(), pos,
+                    helper.getLevel().getBlockState(pos), filler);
+        }
+    }
+
+    private static int countBlocks(GameTestHelper helper, BlockPos min, BlockPos max, Block block) {
+        int count = 0;
+        for (BlockPos pos : BlockPos.betweenClosed(min, max)) {
+            if (helper.getLevel().getBlockState(pos).is(block)) count++;
+        }
+        return count;
     }
 
     private static buildcraft.builders.block.entity.FillerBlockEntity reloadBuildersFiller(

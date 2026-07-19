@@ -5,6 +5,7 @@ import buildcraft.api.core.IHasWork;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.builders.BCBuildersBlockEntities;
+import buildcraft.builders.FillerPattern;
 import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
 import buildcraft.core.marker.VolumeConnection;
@@ -17,17 +18,27 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
+import net.neoforged.neoforge.common.CommonHooks;
+import net.neoforged.neoforge.common.util.FakePlayerFactory;
 import org.jspecify.annotations.Nullable;
 
 public final class FillerBlockEntity extends BlockEntity implements IHasWork, IControllable {
@@ -51,6 +62,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private int cursor;
     private boolean finished;
     private ControlMode mode = ControlMode.ON;
+    private FillerPattern pattern = FillerPattern.FILL;
 
     public FillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.FILLER.get(), pos, state);
@@ -63,6 +75,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public @Nullable BlockPos areaMax() { return areaMax; }
     public int cursor() { return cursor; }
     public boolean finished() { return finished; }
+    public FillerPattern pattern() { return pattern; }
 
     public static void tick(Level level, BlockPos pos, BlockState state, FillerBlockEntity filler) {
         if (!(level instanceof ServerLevel serverLevel)) return;
@@ -72,6 +85,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     }
 
     private void refreshArea(ServerLevel level) {
+        if (areaMin != null && areaMax != null) return;
         BlockPos min = null;
         BlockPos max = null;
         VolumeSavedData markers = VolumeSavedData.get(level);
@@ -91,20 +105,27 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
                 break;
             }
         }
-        if (min != null && volume(min, max) > MAX_AREA_VOLUME) {
-            min = null;
-            max = null;
-        }
-        if (java.util.Objects.equals(areaMin, min) && java.util.Objects.equals(areaMax, max)) return;
-        areaMin = min == null ? null : min.immutable();
-        areaMax = max == null ? null : max.immutable();
+        if (min == null) return;
+        configureArea(min, max);
+    }
+
+    /** Accepts bounds copied from a marker graph, volume box, map, or another area provider. */
+    public boolean configureArea(BlockPos min, BlockPos max) {
+        int areaVolume = volume(min, max);
+        if (min.getX() > max.getX() || min.getY() > max.getY() || min.getZ() > max.getZ()
+                || areaVolume <= 0 || areaVolume > MAX_AREA_VOLUME) return false;
+        if (java.util.Objects.equals(areaMin, min) && java.util.Objects.equals(areaMax, max)) return true;
+        areaMin = min.immutable();
+        areaMax = max.immutable();
         cursor = 0;
         finished = false;
         sync();
+        return true;
     }
 
     private void fillNext(ServerLevel level) {
-        if (mode == ControlMode.OFF || areaMin == null || areaMax == null) return;
+        if (mode == ControlMode.OFF || pattern == FillerPattern.NONE
+                || areaMin == null || areaMax == null) return;
         int volume = volume(areaMin, areaMax);
         if (volume <= 0) return;
         if (cursor >= volume) {
@@ -118,22 +139,39 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
                 cursor++;
                 continue;
             }
+            if (!pattern.includes(target, areaMin, areaMax)) {
+                cursor++;
+                continue;
+            }
             BlockState existing = level.getBlockState(target);
+            if (pattern.clears()) {
+                if (existing.isAir()) {
+                    cursor++;
+                    continue;
+                }
+                if (!clear(level, target, existing)) return;
+                cursor++;
+                finished = false;
+                sync();
+                return;
+            }
             if (!existing.isAir() && !existing.canBeReplaced()) {
                 cursor++;
                 continue;
             }
             int slot = resourceSlot();
             if (slot < 0) return;
-            long used = battery.extractPower(POWER_PER_BLOCK, POWER_PER_BLOCK, false);
-            if (used < POWER_PER_BLOCK) return;
             ItemResource resource = resources.getResource(slot);
+            if (battery.extractPower(POWER_PER_BLOCK, POWER_PER_BLOCK, true) < POWER_PER_BLOCK) return;
+            if (!place(level, target, resource)) {
+                cursor++;
+                continue;
+            }
+            battery.extractPower(POWER_PER_BLOCK, POWER_PER_BLOCK, false);
             try (Transaction transaction = Transaction.openRoot()) {
                 if (resources.extract(slot, resource, 1, transaction) != 1) return;
                 transaction.commit();
             }
-            BlockItem blockItem = (BlockItem) resource.getItem();
-            level.setBlock(target, blockItem.getBlock().defaultBlockState(), Block.UPDATE_ALL);
             cursor++;
             finished = false;
             sync();
@@ -141,6 +179,50 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         }
         finished = cursor >= volume;
         sync();
+    }
+
+    private boolean place(ServerLevel level, BlockPos target, ItemResource resource) {
+        var fakePlayer = FakePlayerFactory.getMinecraft(level);
+        ItemStack held = resource.toStack(1);
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, held);
+        var hit = new BlockHitResult(Vec3.atCenterOf(target), Direction.UP, target, false);
+        return ((BlockItem) resource.getItem()).place(new BlockPlaceContext(
+                new UseOnContext(level, fakePlayer, InteractionHand.MAIN_HAND, held, hit))).consumesAction();
+    }
+
+    private boolean clear(ServerLevel level, BlockPos target, BlockState state) {
+        if (state.getDestroySpeed(level, target) < 0) {
+            return true;
+        }
+        var fakePlayer = FakePlayerFactory.getMinecraft(level);
+        ItemStack tool = new ItemStack(Items.DIAMOND_PICKAXE);
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, tool);
+        var event = CommonHooks.fireBlockBreak(level, GameType.SURVIVAL, fakePlayer, target, state);
+        if (event.isCanceled()) {
+            return true;
+        }
+        long used = battery.extractPower(POWER_PER_BLOCK, POWER_PER_BLOCK, false);
+        if (used < POWER_PER_BLOCK) return false;
+        var drops = Block.getDrops(state, level, target, level.getBlockEntity(target), fakePlayer, tool);
+        level.removeBlock(target, false);
+        for (ItemStack stack : drops) storeOrDrop(level, stack);
+        return true;
+    }
+
+    private void storeOrDrop(ServerLevel level, ItemStack stack) {
+        int remaining = stack.getCount();
+        try (Transaction transaction = Transaction.openRoot()) {
+            int inserted = resources.insert(ItemResource.of(stack), remaining, transaction);
+            if (inserted > 0) {
+                transaction.commit();
+                remaining -= inserted;
+            }
+        }
+        if (remaining > 0) {
+            level.addFreshEntity(new ItemEntity(level, worldPosition.getX() + .5,
+                    worldPosition.getY() + .75, worldPosition.getZ() + .5,
+                    stack.copyWithCount(remaining)));
+        }
     }
 
     private int resourceSlot() {
@@ -171,13 +253,22 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     }
 
     @Override public boolean hasWork() {
-        return mode != ControlMode.OFF && areaMin != null && (mode == ControlMode.LOOP || !finished);
+        return mode != ControlMode.OFF && pattern != FillerPattern.NONE && areaMin != null
+                && (mode == ControlMode.LOOP || !finished);
     }
     @Override public ControlMode controlMode() { return mode; }
     @Override public void setControlMode(ControlMode mode) {
         if (this.mode == mode) return;
         if (this.mode == ControlMode.OFF && mode != ControlMode.OFF) finished = false;
         this.mode = mode;
+        sync();
+    }
+
+    public void setPattern(FillerPattern pattern) {
+        if (this.pattern == pattern) return;
+        this.pattern = pattern;
+        cursor = 0;
+        finished = pattern == FillerPattern.NONE;
         sync();
     }
 
@@ -197,6 +288,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         cursor = Math.max(0, input.getIntOr("cursor", 0));
         finished = input.getBooleanOr("finished", false);
         mode = input.read("mode", ControlMode.CODEC).orElse(ControlMode.ON);
+        pattern = input.read("pattern", FillerPattern.CODEC).orElse(FillerPattern.FILL);
     }
 
     @Override protected void saveAdditional(ValueOutput output) {
@@ -208,6 +300,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (cursor > 0) output.putInt("cursor", cursor);
         if (finished) output.putBoolean("finished", true);
         output.store("mode", ControlMode.CODEC, mode);
+        output.store("pattern", FillerPattern.CODEC, pattern);
     }
 
     @Override public @Nullable Packet<ClientGamePacketListener> getUpdatePacket() {

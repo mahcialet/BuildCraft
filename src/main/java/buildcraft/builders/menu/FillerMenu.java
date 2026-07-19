@@ -3,6 +3,7 @@ package buildcraft.builders.menu;
 import buildcraft.api.core.IControllable.ControlMode;
 import buildcraft.builders.BCBuildersBlocks;
 import buildcraft.builders.BCBuildersMenus;
+import buildcraft.builders.FillerPattern;
 import buildcraft.builders.block.entity.FillerBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -68,10 +69,17 @@ public final class FillerMenu extends AbstractContainerMenu {
 
     public FillerBlockEntity filler() { return filler; }
     public ControlMode mode() { return filler == null ? ControlMode.ON : filler.controlMode(); }
+    public FillerPattern pattern() { return filler == null ? FillerPattern.FILL : filler.pattern(); }
 
     @Override public boolean clickMenuButton(Player player, int id) {
-        if (id < 0 || id >= ControlMode.values().length || filler == null) return false;
-        filler.setControlMode(ControlMode.values()[id]);
+        if (filler == null) return false;
+        if (id >= 0 && id < ControlMode.values().length) {
+            filler.setControlMode(ControlMode.values()[id]);
+            return true;
+        }
+        int pattern = id - 10;
+        if (pattern < 0 || pattern >= FillerPattern.values().length) return false;
+        filler.setPattern(FillerPattern.values()[pattern]);
         return true;
     }
 
