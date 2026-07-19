@@ -217,6 +217,20 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         return new InventoryStatus(true, !contains, contains, space, !space);
     }
+    public FluidStatus adjacentFluid(Direction side) {
+        if (!(level instanceof ServerLevel serverLevel)) return FluidStatus.UNAVAILABLE;
+        var handler = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
+                worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return FluidStatus.UNAVAILABLE;
+        boolean contains = false;
+        boolean space = false;
+        for (int tank = 0; tank < handler.size(); tank++) {
+            long amount = handler.getAmountAsLong(tank);
+            contains |= amount > 0;
+            space |= amount == 0 || amount < handler.getCapacityAsLong(tank, handler.getResource(tank));
+        }
+        return new FluidStatus(true, !contains, contains, space, !space);
+    }
     public void activatePulsar(@Nullable Direction side) {
         if (side != null) {
             pulsarRequests.add(side);
@@ -1484,5 +1498,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     public record InventoryStatus(boolean available, boolean empty, boolean contains, boolean space, boolean full) {
         public static final InventoryStatus UNAVAILABLE = new InventoryStatus(false, false, false, false, false);
+    }
+    public record FluidStatus(boolean available, boolean empty, boolean contains, boolean space, boolean full) {
+        public static final FluidStatus UNAVAILABLE = new FluidStatus(false, false, false, false, false);
     }
 }

@@ -163,6 +163,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_lens_routing", BCCoreGameTests::siliconLensRouting);
         registerTest(event, environment, "silicon_facade", BCCoreGameTests::siliconFacade);
         registerTest(event, environment, "silicon_inventory_triggers", BCCoreGameTests::siliconInventoryTriggers);
+        registerTest(event, environment, "silicon_fluid_triggers", BCCoreGameTests::siliconFluidTriggers);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3489,6 +3490,86 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
+    }
+
+    private static void siliconFluidTriggers(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos tankPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(tankPos,
+                buildcraft.factory.BCFactoryBlocks.TANK.get().defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "fluid trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                tankPos, Direction.SOUTH);
+        helper.assertTrue(handler != null, "adjacent tank exposed no fluid capability");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_EMPTY, true, "empty tank did not trigger FLUID_EMPTY");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_CONTAINS, false, "empty tank triggered FLUID_CONTAINS");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_SPACE, true, "empty tank did not trigger FLUID_SPACE");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_FULL, false, "empty tank triggered FLUID_FULL");
+
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(500, handler.insert(water, 500, transaction),
+                    "tank rejected partial trigger-test fill");
+            transaction.commit();
+        }
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_EMPTY, false, "partial tank triggered FLUID_EMPTY");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_CONTAINS, true, "partial tank did not trigger FLUID_CONTAINS");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_SPACE, true, "partial tank did not trigger FLUID_SPACE");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_FULL, false, "partial tank triggered FLUID_FULL");
+
+        int remaining = Math.toIntExact(handler.getCapacityAsLong(0, water) - handler.getAmountAsLong(0));
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(remaining, handler.insert(water, remaining, transaction),
+                    "tank rejected full trigger-test fill");
+            transaction.commit();
+        }
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_EMPTY, false, "full tank triggered FLUID_EMPTY");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_CONTAINS, true, "full tank did not trigger FLUID_CONTAINS");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_SPACE, false, "full tank triggered FLUID_SPACE");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_FULL, true, "full tank did not trigger FLUID_FULL");
+
+        helper.getLevel().removeBlock(tankPos, false);
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_EMPTY, false, "missing tank triggered FLUID_EMPTY");
+        assertFluidTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUID_FULL, false, "missing tank triggered FLUID_FULL");
+        helper.succeed();
+    }
+
+    private static void assertFluidTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(trigger,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
 
     private static void siliconInventoryTriggers(GameTestHelper helper) {
