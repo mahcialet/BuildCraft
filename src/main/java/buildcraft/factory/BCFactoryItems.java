@@ -15,6 +15,8 @@ public final class BCFactoryItems {
     public static final DeferredItem<?> CHUTE = ITEMS.registerSimpleBlockItem("chute", BCFactoryBlocks.CHUTE);
     public static final DeferredItem<?> DISTILLER =
             ITEMS.registerSimpleBlockItem("distiller", BCFactoryBlocks.DISTILLER);
+    public static final DeferredItem<?> HEAT_EXCHANGER =
+            ITEMS.registerSimpleBlockItem("heat_exchange", BCFactoryBlocks.HEAT_EXCHANGER);
 
     private BCFactoryItems() {}
 

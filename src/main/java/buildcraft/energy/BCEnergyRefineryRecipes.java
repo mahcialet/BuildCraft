@@ -59,6 +59,12 @@ public final class BCEnergyRefineryRecipes {
     public static DistillationRecipe distillation(Fluid input) { return DISTILLATION.get(input); }
     public static HeatExchangeRecipe heating(Fluid input) { return HEATING.get(input); }
     public static HeatExchangeRecipe cooling(Fluid input) { return COOLING.get(input); }
+    public static int heatLevel(Fluid fluid) {
+        for (var family : BCEnergyFluids.REFINERY_FLUIDS.values()) {
+            for (var variant : family.variants()) if (variant.source().get() == fluid) return variant.heat();
+        }
+        return -1;
+    }
     public static List<DistillationRecipe> distillationRecipes() {
         return List.copyOf(new ArrayList<>(DISTILLATION.values()));
     }

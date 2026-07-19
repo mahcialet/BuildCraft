@@ -24,6 +24,7 @@ public final class BCFactory {
             event.accept(BCFactoryItems.MINING_WELL.get());
             event.accept(BCFactoryItems.CHUTE.get());
             event.accept(BCFactoryItems.DISTILLER.get());
+            event.accept(BCFactoryItems.HEAT_EXCHANGER.get());
         }
     }
 }

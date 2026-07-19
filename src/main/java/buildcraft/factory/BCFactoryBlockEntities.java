@@ -6,6 +6,7 @@ import buildcraft.factory.block.entity.PumpBlockEntity;
 import buildcraft.factory.block.entity.MiningWellBlockEntity;
 import buildcraft.factory.block.entity.ChuteBlockEntity;
 import buildcraft.factory.block.entity.DistillerBlockEntity;
+import buildcraft.factory.block.entity.HeatExchangerBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -42,6 +43,10 @@ public final class BCFactoryBlockEntities {
             BLOCK_ENTITIES.register("distiller", () -> new BlockEntityType<>(
                     DistillerBlockEntity::new, BCFactoryBlocks.DISTILLER.get()
             ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<HeatExchangerBlockEntity>> HEAT_EXCHANGER =
+            BLOCK_ENTITIES.register("heat_exchange", () -> new BlockEntityType<>(
+                    HeatExchangerBlockEntity::new, BCFactoryBlocks.HEAT_EXCHANGER.get()
+            ));
 
     private BCFactoryBlockEntities() {}
 
@@ -77,5 +82,7 @@ public final class BCFactoryBlockEntities {
                 (distiller, side) -> distiller.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, DISTILLER.get(),
                 (distiller, side) -> distiller.mjReceiver());
+        event.registerBlockEntity(Capabilities.Fluid.BLOCK, HEAT_EXCHANGER.get(),
+                (exchanger, side) -> exchanger.fluidHandler(side));
     }
 }

@@ -212,6 +212,22 @@ tasks.named('processResources', ProcessResources) {
         include 'tank_sprite_a.png', 'tank_sprite_b.png'
         into 'assets/buildcraftfactory/textures/block/distiller'
     }
+    from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/heat_exchange') {
+        include 'sprite_a.png', 'sprite_b.png', 'sprite_c.png', 'sprite_d.png', 'sprite_e.png'
+        into 'assets/buildcraftfactory/textures/block/heat_exchange'
+    }
+    from('buildcraft_resources/assets/buildcraftfactory/models/item') {
+        include 'heat_exchange_start.json', 'heat_exchange_middle.json', 'heat_exchange_end.json'
+        filter { line ->
+            line.replace('buildcraftfactory:blocks/heat_exchange/',
+                         'buildcraftfactory:block/heat_exchange/')
+                .replace('"textures": {',
+                    '"textures": { "particle": "buildcraftfactory:block/heat_exchange/sprite_a",')
+                .replace('"textures":{',
+                    '"textures":{"particle":"buildcraftfactory:block/heat_exchange/sprite_a",')
+        }
+        into 'assets/buildcraftfactory/models/block'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/models/block') {
         include 'chute.json'
         filter { line -> line.replace('buildcraftfactory:blocks/chute/', 'buildcraftfactory:block/chute/') }

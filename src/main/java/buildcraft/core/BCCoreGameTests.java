@@ -139,6 +139,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_mining_well", BCCoreGameTests::factoryMiningWell);
         registerTest(event, environment, "factory_chute", BCCoreGameTests::factoryChute);
         registerTest(event, environment, "factory_distiller", BCCoreGameTests::factoryDistiller);
+        registerTest(event, environment, "factory_heat_exchanger", BCCoreGameTests::factoryHeatExchanger);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
         registerTest(event, environment, "transport_fast_isolated_fluid_pipes", BCCoreGameTests::transportFastIsolatedFluidPipes);
         registerTest(event, environment, "transport_iron_fluid_pipe", BCCoreGameTests::transportIronFluidPipe);
@@ -1733,6 +1734,121 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                     "distiller returned wrong drop");
             helper.succeed();
         });
+    }
+
+    private static void factoryHeatExchanger(GameTestHelper helper) {
+        BlockPos endPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos middlePos = helper.absolutePos(new BlockPos(2, 2, 1));
+        BlockPos startPos = helper.absolutePos(new BlockPos(3, 2, 1));
+        BlockState state = buildcraft.factory.BCFactoryBlocks.HEAT_EXCHANGER.get().defaultBlockState()
+                .setValue(buildcraft.factory.block.HeatExchangerBlock.FACING, Direction.NORTH);
+        for (BlockPos pos : java.util.List.of(endPos, middlePos, startPos)) {
+            helper.getLevel().setBlock(pos, state, Block.UPDATE_ALL);
+        }
+        var startEntity = (buildcraft.factory.block.entity.HeatExchangerBlockEntity)
+                helper.getLevel().getBlockEntity(startPos);
+        buildcraft.factory.block.entity.HeatExchangerBlockEntity.tick(
+                helper.getLevel(), startPos, helper.getLevel().getBlockState(startPos), startEntity);
+        helper.assertTrue(helper.getLevel().getBlockState(startPos).getValue(
+                        buildcraft.factory.block.HeatExchangerBlock.PART)
+                        == buildcraft.factory.block.HeatExchangerBlock.Part.START,
+                "heat exchanger did not form start section");
+        helper.assertTrue(helper.getLevel().getBlockState(middlePos).getValue(
+                        buildcraft.factory.block.HeatExchangerBlock.PART)
+                        == buildcraft.factory.block.HeatExchangerBlock.Part.MIDDLE,
+                "heat exchanger did not form middle section");
+        helper.assertTrue(helper.getLevel().getBlockState(endPos).getValue(
+                        buildcraft.factory.block.HeatExchangerBlock.PART)
+                        == buildcraft.factory.block.HeatExchangerBlock.Part.END,
+                "heat exchanger did not form end section");
+        var hotInput = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, startPos, Direction.DOWN);
+        var hotOutput = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, startPos, Direction.EAST);
+        var coldInput = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, endPos, Direction.UP);
+        helper.assertTrue(hotInput != null && hotOutput != null && coldInput != null,
+                "heat exchanger endpoint capabilities missing");
+        var coldOil = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(0).source().get());
+        var seethingOil = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(2).source().get());
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(10, hotInput.insert(coldOil, 10, transaction),
+                    "heat exchanger rejected heatant input");
+            helper.assertValueEqual(10, coldInput.insert(seethingOil, 10, transaction),
+                    "heat exchanger rejected coolant input");
+            helper.assertValueEqual(0, hotInput.extract(coldOil, 1, transaction),
+                    "heat exchanger exposed input extraction");
+            helper.assertValueEqual(0, hotOutput.insert(coldOil, 1, transaction),
+                    "heat exchanger output accepted insertion");
+            transaction.commit();
+        }
+        for (int tick = 0; tick < 122; tick++) {
+            buildcraft.factory.block.entity.HeatExchangerBlockEntity.tick(
+                    helper.getLevel(), startPos, helper.getLevel().getBlockState(startPos), startEntity);
+        }
+        {
+            var endEntity = (buildcraft.factory.block.entity.HeatExchangerBlockEntity)
+                    helper.getLevel().getBlockEntity(endPos);
+            var hot = buildcraft.energy.BCEnergyFluids.refineryFluid("oil").heat(1).source().get();
+            helper.assertValueEqual(0, startEntity.inputTank().getAmountAsInt(0),
+                    "heat exchanger left heatant input unprocessed");
+            helper.assertValueEqual(10, startEntity.outputTank().getAmountAsInt(0),
+                    "heat exchanger produced wrong heated amount");
+            helper.assertTrue(startEntity.outputTank().getResource(0).value() == hot,
+                    "heat exchanger produced wrong heated fluid");
+            helper.assertValueEqual(0, endEntity.inputTank().getAmountAsInt(0),
+                    "heat exchanger left coolant input unprocessed");
+            helper.assertValueEqual(10, endEntity.outputTank().getAmountAsInt(0),
+                    "heat exchanger produced wrong cooled amount");
+            helper.assertTrue(endEntity.outputTank().getResource(0).value() == hot,
+                    "heat exchanger produced wrong cooled fluid");
+            java.util.List<BlockPos> longColumn = java.util.List.of(
+                    helper.absolutePos(new BlockPos(1, 4, 4)), helper.absolutePos(new BlockPos(2, 4, 4)),
+                    helper.absolutePos(new BlockPos(3, 4, 4)), helper.absolutePos(new BlockPos(4, 4, 4)),
+                    helper.absolutePos(new BlockPos(5, 4, 4)));
+            for (BlockPos columnPos : longColumn) helper.getLevel().setBlock(columnPos, state, Block.UPDATE_ALL);
+            var longStart = (buildcraft.factory.block.entity.HeatExchangerBlockEntity)
+                    helper.getLevel().getBlockEntity(longColumn.getLast());
+            buildcraft.factory.block.entity.HeatExchangerBlockEntity.tick(helper.getLevel(), longColumn.getLast(),
+                    helper.getLevel().getBlockState(longColumn.getLast()), longStart);
+            var longEnd = (buildcraft.factory.block.entity.HeatExchangerBlockEntity)
+                    helper.getLevel().getBlockEntity(longColumn.getFirst());
+            try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                helper.assertValueEqual(20, longStart.inputTank().insert(coldOil, 20, transaction),
+                        "five-block exchanger rejected heatant");
+                helper.assertValueEqual(20, longEnd.inputTank().insert(seethingOil, 20, transaction),
+                        "five-block exchanger rejected coolant");
+                transaction.commit();
+            }
+            for (int tick = 0; tick < 120; tick++) {
+                buildcraft.factory.block.entity.HeatExchangerBlockEntity.tick(helper.getLevel(),
+                        longColumn.getLast(), helper.getLevel().getBlockState(longColumn.getLast()), longStart);
+            }
+            helper.assertValueEqual(20, longStart.outputTank().getAmountAsInt(0),
+                    "five-block exchanger did not apply 20 mB/t throughput");
+            helper.assertValueEqual(20, longEnd.outputTank().getAmountAsInt(0),
+                    "five-block exchanger cooled wrong throughput");
+            var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_IRON.get()),
+                    new ItemStack(Items.IRON_INGOT),
+                    new ItemStack(Items.GLASS), new ItemStack(Items.GLASS), new ItemStack(Items.GLASS),
+                    new ItemStack(Items.IRON_INGOT), new ItemStack(BCCoreItems.GEAR_IRON.get()),
+                    new ItemStack(Items.IRON_INGOT)
+            ));
+            ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                    net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                    .orElseThrow().value().assemble(recipeInput);
+            helper.assertTrue(crafted.is(buildcraft.factory.BCFactoryItems.HEAT_EXCHANGER.get()),
+                    "heat exchanger recipe returned wrong item");
+            var drops = Block.getDrops(helper.getLevel().getBlockState(middlePos), helper.getLevel(), middlePos,
+                    helper.getLevel().getBlockEntity(middlePos));
+            helper.assertValueEqual(1, drops.size(), "heat exchanger returned wrong drop count");
+            helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.HEAT_EXCHANGER.get()),
+                    "heat exchanger returned wrong drop");
+            helper.succeed();
+        }
     }
 
     private static void transportWoodFluidPipe(GameTestHelper helper) {
