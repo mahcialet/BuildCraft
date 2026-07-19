@@ -10,6 +10,8 @@ public final class BCRoboticsItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCRobotics.MOD_ID);
     public static final DeferredItem<RedstoneBoardItem> REDSTONE_BOARD =
             ITEMS.registerItem("redstone_board", RedstoneBoardItem::new);
+    public static final DeferredItem<?> REQUESTER =
+            ITEMS.registerSimpleBlockItem("requester", BCRoboticsBlocks.REQUESTER);
 
     private BCRoboticsItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

@@ -152,6 +152,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "builders_blueprint_library", BCCoreGameTests::buildersBlueprintLibrary);
         registerTest(event, environment, "builders_construction_marker", BCCoreGameTests::buildersConstructionMarker);
         registerTest(event, environment, "robotics_redstone_board", BCCoreGameTests::roboticsRedstoneBoard);
+        registerTest(event, environment, "robotics_requester", BCCoreGameTests::roboticsRequester);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -2675,6 +2676,66 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 .orElseThrow().value().assemble(input);
         helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.REDSTONE_BOARD.get()),
                 "Redstone Board recipe output");
+        helper.succeed();
+    }
+
+    private static void roboticsRequester(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(pos, buildcraft.robotics.BCRoboticsBlocks.REQUESTER.get().defaultBlockState(),
+                Block.UPDATE_ALL);
+        var requester = (buildcraft.robotics.block.entity.RequesterBlockEntity) helper.getLevel().getBlockEntity(pos);
+        requester.setRequest(0, new ItemStack(Items.STONE, 12));
+        requester.setRequest(1, new ItemStack(Items.DIRT, 5));
+        helper.assertValueEqual(requester.getRequest(0).getCount(), 12, "Requester initial remaining count");
+        ItemStack rejected = requester.offerItem(0, new ItemStack(Items.DIRT, 3));
+        helper.assertValueEqual(rejected.getCount(), 3, "Requester accepted a nonmatching delivery");
+        helper.assertTrue(requester.offerItem(0, new ItemStack(Items.STONE, 8)).isEmpty(),
+                "Requester rejected a matching partial delivery");
+        helper.assertValueEqual(requester.getRequest(0).getCount(), 4, "Requester partial remaining count");
+        ItemStack excess = requester.offerItem(0, new ItemStack(Items.STONE, 10));
+        helper.assertValueEqual(excess.getCount(), 6, "Requester did not cap delivery at requested count");
+        helper.assertTrue(requester.fulfilled(0) && !requester.fulfilled(1), "Requester fulfillment state");
+        helper.assertValueEqual(requester.comparatorLevel(), 10, "Requester comparator fulfillment ratio");
+
+        var capability = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, pos, Direction.NORTH);
+        helper.assertTrue(capability != null && capability.size() == 20, "Requester item capability");
+        try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
+                     net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            int rejectedInsert = capability.insert(1,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(Items.STONE), 2, transaction);
+            helper.assertValueEqual(rejectedInsert, 0, "Requester capability accepted wrong item");
+        }
+
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(pos, requester.getBlockState(),
+                requester.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.robotics.block.entity.RequesterBlockEntity,
+                "Requester block entity did not reload");
+        var restored = (buildcraft.robotics.block.entity.RequesterBlockEntity) loaded;
+        helper.assertValueEqual(restored.requestTemplate(0).getCount(), 12, "Requester lost request template");
+        helper.assertValueEqual(restored.stored(0).getCount(), 12, "Requester lost delivered inventory");
+        helper.getLevel().setBlockEntity(restored);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.robotics.menu.RequesterMenu(1, player.getInventory(), pos);
+        menu.setCarried(new ItemStack(Items.GOLD_INGOT, 7));
+        menu.clicked(2, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, player);
+        helper.assertTrue(restored.requestTemplate(2).is(Items.GOLD_INGOT)
+                        && restored.requestTemplate(2).getCount() == 7,
+                "Requester menu did not edit request template");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.IRON_INGOT), new ItemStack(Items.PISTON), new ItemStack(Items.IRON_INGOT),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.CHEST),
+                new ItemStack(buildcraft.core.BCCoreItems.GEAR_IRON.get()), new ItemStack(Items.IRON_INGOT),
+                new ItemStack(Items.REDSTONE), new ItemStack(Items.IRON_INGOT)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.REQUESTER.get()), "Requester recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos, requester,
+                null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.robotics.BCRoboticsItems.REQUESTER.get()),
+                "Requester block loot");
         helper.succeed();
     }
 
