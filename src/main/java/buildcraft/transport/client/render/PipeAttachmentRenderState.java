@@ -9,4 +9,8 @@ public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     final boolean[] connected = new boolean[6];
     int installedWires;
     int poweredWires;
+    long powerStored;
+    long powerCapacity;
+    int powerLimitShift;
+    boolean powerLimiter;
 }

@@ -133,6 +133,7 @@ registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTe
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
 registerTest(event, environment, "transport_general_power_pipes", BCCoreGameTests::transportGeneralPowerPipes);
 registerTest(event, environment, "transport_diamond_power_pipes", BCCoreGameTests::transportDiamondPowerPipes);
+registerTest(event, environment, "transport_branched_power_network", BCCoreGameTests::transportBranchedPowerNetwork);
 registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_flood_gate", BCCoreGameTests::factoryFloodGate);
         registerTest(event, environment, "factory_pump", BCCoreGameTests::factoryPump);
@@ -1313,6 +1314,63 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(1, drops.size(), "diamond power pipe returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_POWER.get()),
                 "diamond power pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportBranchedPowerNetwork(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos inputPos = helper.absolutePos(new BlockPos(1, 3, 2));
+        BlockPos junctionPos = helper.absolutePos(new BlockPos(2, 3, 2));
+        BlockPos eastPos = helper.absolutePos(new BlockPos(3, 3, 2));
+        BlockPos southPos = helper.absolutePos(new BlockPos(2, 3, 3));
+        helper.getLevel().setBlock(inputPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(junctionPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.IRON_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(eastPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_POWER), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(southPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_POWER), Block.UPDATE_ALL);
+        IMjReceiver input = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, inputPos, Direction.WEST);
+        helper.assertTrue(input != null, "branched network wooden input receiver missing");
+        helper.assertValueEqual(0L, input.receivePower(16 * MjAPI.MJ, false),
+                "branched network input rejected nominal power");
+        tickPipes(helper, 3, inputPos, junctionPos, eastPos, southPos);
+        var wood = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(inputPos);
+        var junction = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(junctionPos);
+        var east = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(eastPos);
+        var south = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(southPos);
+        helper.assertValueEqual(4 * MjAPI.MJ, east.powerStored(),
+                "branched network did not fill the east endpoint");
+        helper.assertValueEqual(4 * MjAPI.MJ, south.powerStored(),
+                "branched network did not rotate to the south endpoint");
+        helper.assertValueEqual(16 * MjAPI.MJ,
+                wood.powerStored() + junction.powerStored() + east.powerStored() + south.powerStored(),
+                "branched network did not conserve buffered power");
+        junction.activatePowerLimit(3);
+        helper.assertValueEqual(4 * MjAPI.MJ, junction.effectivePowerTransferPerTick(),
+                "branched junction limiter shift did not apply");
+        var tag = junction.saveWithFullMetadata(helper.getLevel().registryAccess());
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                junctionPos, junction.getBlockState(), tag, helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity,
+                "power pipe block entity did not reload from its saved tag");
+        var restored = (buildcraft.transport.block.entity.PipeHolderBlockEntity) loaded;
+        helper.assertValueEqual(junction.powerStored(), restored.powerStored(),
+                "power buffer did not survive block-entity reload");
+        helper.assertValueEqual(3, restored.powerLimitShift(),
+                "power limiter shift did not survive block-entity reload");
+        helper.assertValueEqual(32 * MjAPI.MJ, restored.powerCapacity(),
+                "power meter capacity did not survive block-entity reload");
+        helper.assertTrue(restored.isPowerLimiter(), "restored iron pipe lost limiter identity");
         helper.succeed();
     }
 

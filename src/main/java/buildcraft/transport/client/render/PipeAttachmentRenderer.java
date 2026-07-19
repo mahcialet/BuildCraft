@@ -42,6 +42,10 @@ public final class PipeAttachmentRenderer
         int seed = Long.hashCode(pipe.getBlockPos().asLong());
         state.installedWires = pipe.installedWireMask();
         state.poweredWires = pipe.poweredWireMask();
+        state.powerStored = pipe.powerStored();
+        state.powerCapacity = pipe.powerCapacity();
+        state.powerLimitShift = pipe.powerLimitShift();
+        state.powerLimiter = pipe.isPowerLimiter();
         for (Direction side : Direction.values()) {
             state.connected[side.ordinal()] = pipe.getBlockState().getValue(PipeHolderBlock.property(side));
             var stack = pipe.attachment(side);
@@ -65,6 +69,7 @@ public final class PipeAttachmentRenderer
     @Override public void submit(PipeAttachmentRenderState state, PoseStack poseStack,
                                  SubmitNodeCollector nodes, CameraRenderState camera) {
         submitWires(state, poseStack, nodes);
+        submitPowerMeter(state, poseStack, nodes);
         for (Direction side : Direction.values()) {
             ItemStackRenderState item = state.attachments[side.ordinal()];
             if (item == null) continue;
@@ -103,6 +108,33 @@ public final class PipeAttachmentRenderer
                         float y2 = state.connected[Direction.UP.ordinal()] ? 16 : 12;
                         wireQuad(vertices, pose, white, state.lightCoords, argb,
                                 lane, y1, 3.98F, lane + 0.7F, y2, 3.98F, Direction.NORTH);
+                    }
+                });
+    }
+
+    private void submitPowerMeter(PipeAttachmentRenderState state, PoseStack poseStack,
+                                  SubmitNodeCollector nodes) {
+        if (state.powerCapacity <= 0) return;
+        TextureAtlasSprite white = sprites.get(Sheets.BLOCKS_MAPPER.apply(
+                Identifier.withDefaultNamespace("block/white_concrete")));
+        nodes.submitCustomGeometry(poseStack, RenderTypes.entityCutout(Sheets.BLOCKS_MAPPER.sheet()),
+                (pose, vertices) -> {
+                    wireQuad(vertices, pose, white, state.lightCoords, 0xFF202020,
+                            4, 12.04F, 6.4F, 12, 12.04F, 9.6F, Direction.UP);
+                    float fraction = Math.clamp(state.powerStored / (float) state.powerCapacity, 0, 1);
+                    if (fraction > 0) {
+                        int color = fraction > 0.75F ? 0xFFFF3B20
+                                : fraction > 0.35F ? 0xFFFFB020 : 0xFFFFE86A;
+                        wireQuad(vertices, pose, white, state.lightCoords, color,
+                                4.15F, 12.06F, 6.55F, 4.15F + 7.7F * fraction,
+                                12.06F, 9.45F, Direction.UP);
+                    }
+                    if (!state.powerLimiter) return;
+                    for (int step = 0; step < 7; step++) {
+                        float x1 = 4.2F + step * 1.1F;
+                        int color = step == state.powerLimitShift ? 0xFF40E0FF : 0xFF30505A;
+                        wireQuad(vertices, pose, white, state.lightCoords, color,
+                                x1, 12.08F, 5.1F, x1 + 0.75F, 12.08F, 5.8F, Direction.UP);
                     }
                 });
     }

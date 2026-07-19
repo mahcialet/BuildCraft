@@ -910,6 +910,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
 
     public long powerStored() { return powerStored; }
+    public long powerCapacity() { return pipeType().carriesPower() ? pipeType().powerTransferPerTick() : 0; }
+    public boolean isPowerLimiter() { return pipeType().isPowerLimiter(); }
     public int powerLimitShift() { return powerLimitShift; }
     public long effectivePowerTransferPerTick() {
         if (!pipeType().carriesPower()) return 0;
