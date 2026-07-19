@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":[" I ","ICI"],"key":{"I":"minecraft:iron_ingot","C":{"neoforge:ingredient_type":"neoforge:components","items":"buildcraftsilicon:redstone_chipset","components":{"buildcraftsilicon:chipset_type":"gold"}}},"result":{"id":"buildcraftrobotics:robot_station"}}

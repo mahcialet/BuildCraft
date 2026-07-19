@@ -1,6 +1,7 @@
 package buildcraft.robotics;
 
 import buildcraft.robotics.item.RedstoneBoardItem;
+import buildcraft.robotics.item.RobotStationItem;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -14,6 +15,8 @@ public final class BCRoboticsItems {
             ITEMS.registerSimpleBlockItem("requester", BCRoboticsBlocks.REQUESTER);
     public static final DeferredItem<?> ZONE_PLANNER =
             ITEMS.registerSimpleBlockItem("zone_planner", BCRoboticsBlocks.ZONE_PLANNER);
+    public static final DeferredItem<RobotStationItem> ROBOT_STATION =
+            ITEMS.registerItem("robot_station", RobotStationItem::new);
 
     private BCRoboticsItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

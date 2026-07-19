@@ -155,6 +155,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_requester", BCCoreGameTests::roboticsRequester);
         registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
         registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
+        registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -6584,6 +6585,61 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         BlockPos absolutePos = helper.absolutePos(relativePos);
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), net.minecraft.core.Direction.UP, absolutePos, false);
         return new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, stack, hit);
+    }
+
+    private static void roboticsRobotStation(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(1, 2, 1);
+        helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        buildcraft.transport.block.entity.PipeHolderBlockEntity holder =
+                (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                        helper.getLevel().getBlockEntity(helper.absolutePos(relative));
+        helper.assertTrue(holder != null, "robot station test pipe did not create its block entity");
+
+        ItemStack stationStack = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        helper.assertTrue(holder.installAttachment(Direction.UP, stationStack),
+                "robot station was rejected by the pipe attachment slot");
+        buildcraft.robotics.item.RobotStationItem stationItem =
+                buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get();
+        stationItem.tickAttachment(holder, Direction.UP, holder.attachment(Direction.UP));
+
+        buildcraft.robotics.RobotStationRegistry.Address address =
+                new buildcraft.robotics.RobotStationRegistry.Address(holder.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.Station station =
+                buildcraft.robotics.RobotStationRegistry.get(helper.getLevel(), address).orElseThrow();
+        helper.assertValueEqual(buildcraft.robotics.RobotStationState.AVAILABLE, station.state(),
+                "new robot station was not available");
+        helper.assertTrue(buildcraft.robotics.RobotStationRegistry.closestAvailable(
+                        helper.getLevel(), station.dockingPosition(), 1.0).orElseThrow() == station,
+                "available robot station was not discoverable");
+
+        java.util.UUID robot = java.util.UUID.randomUUID();
+        helper.assertTrue(station.reserve(robot), "available robot station could not be reserved");
+        helper.assertFalse(station.reserve(java.util.UUID.randomUUID()),
+                "reserved robot station accepted a second robot");
+        helper.assertTrue(station.link(robot), "reserved robot station could not link its robot");
+        stationItem.tickAttachment(holder, Direction.UP, holder.attachment(Direction.UP));
+        buildcraft.robotics.RobotStationData data = holder.attachment(Direction.UP).getOrDefault(
+                buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION.get(),
+                buildcraft.robotics.RobotStationData.AVAILABLE);
+        helper.assertValueEqual(buildcraft.robotics.RobotStationState.LINKED, data.state(),
+                "linked station state was not synchronized to its attachment stack");
+        helper.assertValueEqual(robot, data.robot().orElseThrow(),
+                "linked robot identity was not synchronized");
+        station.release(robot);
+        helper.assertValueEqual(buildcraft.robotics.RobotStationState.AVAILABLE, station.state(),
+                "released station did not become available");
+        ItemStack goldChipset = buildcraft.silicon.BCSiliconItems.chipset(
+                buildcraft.silicon.ChipsetType.GOLD);
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                ItemStack.EMPTY, new ItemStack(Items.IRON_INGOT), ItemStack.EMPTY,
+                new ItemStack(Items.IRON_INGOT), goldChipset, new ItemStack(Items.IRON_INGOT),
+                ItemStack.EMPTY, ItemStack.EMPTY, ItemStack.EMPTY));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                        net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()),
+                "Robot Station recipe output");
+        helper.succeed();
     }
 
     private static Identifier id(String path) {
