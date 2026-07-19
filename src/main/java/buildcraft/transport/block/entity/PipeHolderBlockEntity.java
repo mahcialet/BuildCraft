@@ -851,6 +851,12 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return powerLimitShift >= 6 ? 0 : pipeType().powerTransferPerTick() >> powerLimitShift;
     }
 
+    public void activatePowerLimit(int shift) {
+        if (!pipeType().isPowerLimiter() || shift < 0 || shift > 6 || powerLimitShift == shift) return;
+        powerLimitShift = shift;
+        sync();
+    }
+
     public DyeColor pipeColor() {
         return pipeColor;
     }

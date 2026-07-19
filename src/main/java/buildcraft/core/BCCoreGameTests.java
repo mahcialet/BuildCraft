@@ -170,6 +170,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_fluids_traversing_trigger", BCCoreGameTests::siliconFluidsTraversingTrigger);
         registerTest(event, environment, "silicon_power_requested_trigger", BCCoreGameTests::siliconPowerRequestedTrigger);
         registerTest(event, environment, "silicon_pipe_direction_action", BCCoreGameTests::siliconPipeDirectionAction);
+        registerTest(event, environment, "silicon_power_limit_actions", BCCoreGameTests::siliconPowerLimitActions);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3495,6 +3496,43 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconPowerLimitActions(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState().setValue(
+                        buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.IRON_POWER), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.UP, gate),
+                "power limit action gate could not be installed");
+        gate = holder.attachment(Direction.UP);
+
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.POWER_LIMIT_3))));
+        tickPipes(helper, 1, pipePos);
+        helper.assertValueEqual(buildcraft.transport.PipeType.IRON_POWER.powerTransferPerTick() >> 3,
+                holder.effectivePowerTransferPerTick(),
+                "POWER_LIMIT_3 did not apply the expected limiter shift");
+
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.POWER_LIMIT_6))));
+        tickPipes(helper, 1, pipePos);
+        helper.assertValueEqual(0L, holder.effectivePowerTransferPerTick(),
+                "POWER_LIMIT_6 did not turn the limiter off");
         helper.succeed();
     }
 
