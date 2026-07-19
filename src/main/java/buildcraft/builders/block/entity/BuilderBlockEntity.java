@@ -72,7 +72,10 @@ public final class BuilderBlockEntity extends BlockEntity implements IHasWork, I
         int hash = snapshot.hashCode();
         if (activeHash != hash) {
             activeHash = hash;
+            rotation = Rotation.NONE;
+            canExcavate = snapshot.excavate();
             reset(true);
+            sync();
         }
         if (finished && mode != ControlMode.LOOP) return;
         if (finished) reset(true);
@@ -183,7 +186,11 @@ public final class BuilderBlockEntity extends BlockEntity implements IHasWork, I
         finished = false;
         if (!keepSnapshot) activeHash = 0;
     }
-    public void setRotation(Rotation rotation) { if (this.rotation != rotation) { this.rotation = rotation; reset(true); sync(); } }
+    public void setRotation(Rotation rotation) {
+        SnapshotData snapshot = snapshot();
+        Rotation allowed = snapshot != null && !snapshot.rotate() ? Rotation.NONE : rotation;
+        if (this.rotation != allowed) { this.rotation = allowed; reset(true); sync(); }
+    }
     public void setCanExcavate(boolean value) { if (canExcavate != value) { canExcavate = value; reset(true); sync(); } }
     @Override public boolean hasWork() { return mode != ControlMode.OFF && snapshot() != null && (mode == ControlMode.LOOP || !finished); }
     @Override public ControlMode controlMode() { return mode; }

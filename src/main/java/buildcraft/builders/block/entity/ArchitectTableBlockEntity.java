@@ -44,6 +44,10 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
     private List<BlockState> palette = new ArrayList<>();
     private List<Integer> blocks = new ArrayList<>();
     private List<BlockPos> linkedMarkers = new ArrayList<>();
+    private String blueprintName = "Blueprint";
+    private boolean rotate = true;
+    private boolean excavate = true;
+    private boolean allowCreative;
 
     public ArchitectTableBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.ARCHITECT_TABLE.get(), pos, state);
@@ -56,6 +60,18 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
     public SnapshotKind scanningKind() { return scanningKind; }
     public int volumeSize() { return areaMin == null || areaMax == null ? 0 : volume(); }
     public List<BlockPos> linkedMarkers() { return List.copyOf(linkedMarkers); }
+    public String blueprintName() { return blueprintName; }
+    public boolean rotate() { return rotate; }
+    public boolean excavate() { return excavate; }
+    public boolean allowCreative() { return allowCreative; }
+    public void setBlueprintName(String value) {
+        String sanitized = value == null ? "" : value.strip();
+        if (sanitized.length() > 32) sanitized = sanitized.substring(0, 32);
+        if (!blueprintName.equals(sanitized)) { blueprintName = sanitized; sync(); }
+    }
+    public void toggleRotate() { rotate = !rotate; resetScan(); sync(); }
+    public void toggleExcavate() { excavate = !excavate; resetScan(); sync(); }
+    public void toggleAllowCreative() { allowCreative = !allowCreative; resetScan(); sync(); }
     public boolean addLinkedMarker(BlockPos markerPos) {
         if (!(level != null && level.getBlockEntity(markerPos) instanceof ConstructionMarkerBlockEntity marker)
                 || marker.snapshot() == null || linkedMarkers.contains(markerPos)) return false;
@@ -142,8 +158,9 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
 
         Direction facing = machineState.hasProperty(ArchitectTableBlock.FACING)
                 ? machineState.getValue(ArchitectTableBlock.FACING) : Direction.NORTH;
+        String name = blueprintName.isBlank() ? (kind == SnapshotKind.BLUEPRINT ? "Blueprint" : "Template") : blueprintName;
         SnapshotData snapshot = new SnapshotData(kind, size(), facing, areaMin.subtract(worldPosition),
-                palette, blocks, kind == SnapshotKind.BLUEPRINT ? "Blueprint" : "Template");
+                palette, blocks, name, rotate, excavate, allowCreative);
         snapshot = composeLinked(snapshot);
         ItemStack output = BCBuildersItems.snapshotStack(snapshot);
         inventory.set(1, ItemResource.of(output), 1);
@@ -198,7 +215,8 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
                 compositeBlocks.add(paletteIndex);
             }
         return new SnapshotData(primary.kind(), compositeSize, primary.facing(), unionMin.subtract(worldPosition),
-                compositePalette, compositeBlocks, primary.name());
+                compositePalette, compositeBlocks, primary.name(), primary.rotate(), primary.excavate(),
+                primary.allowCreative());
     }
     private int volume() { BlockPos size = size(); return size.getX() * size.getY() * size.getZ(); }
     private BlockPos size() { return areaMax.subtract(areaMin).offset(1, 1, 1); }
@@ -230,6 +248,10 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         palette = new ArrayList<>(input.read("palette", BlockState.CODEC.listOf()).orElse(List.of()));
         blocks = new ArrayList<>(input.read("blocks", Codec.INT.listOf()).orElse(List.of()));
         linkedMarkers = new ArrayList<>(input.read("linked_markers", BlockPos.CODEC.listOf()).orElse(List.of()));
+        blueprintName = input.getStringOr("blueprint_name", "Blueprint");
+        rotate = input.getBooleanOr("rotate", true);
+        excavate = input.getBooleanOr("excavate", true);
+        allowCreative = input.getBooleanOr("allow_creative", false);
         if (scanningKind == null || cursor != blocks.size()) resetScan();
     }
 
@@ -247,6 +269,10 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
             output.store("blocks", Codec.INT.listOf(), blocks);
         }
         if (!linkedMarkers.isEmpty()) output.store("linked_markers", BlockPos.CODEC.listOf(), linkedMarkers);
+        if (!blueprintName.equals("Blueprint")) output.putString("blueprint_name", blueprintName);
+        if (!rotate) output.putBoolean("rotate", false);
+        if (!excavate) output.putBoolean("excavate", false);
+        if (allowCreative) output.putBoolean("allow_creative", true);
     }
 
     @Override public Packet<ClientGamePacketListener> getUpdatePacket() {

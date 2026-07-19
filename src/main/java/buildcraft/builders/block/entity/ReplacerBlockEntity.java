@@ -41,7 +41,8 @@ public final class ReplacerBlockEntity extends BlockEntity {
         }
         if (!changed) return;
         SnapshotData replaced = new SnapshotData(blueprint.kind(), blueprint.size(), blueprint.facing(),
-                blueprint.offset(), palette, blueprint.blocks(), blueprint.name());
+                blueprint.offset(), palette, blueprint.blocks(), blueprint.name(), blueprint.rotate(),
+                blueprint.excavate(), blueprint.allowCreative());
         blueprintStack.set(BCBuildersDataComponents.SNAPSHOT.get(), replaced);
         inventory.set(0, ItemResource.of(blueprintStack), 1);
         inventory.set(1, ItemResource.EMPTY, 0);

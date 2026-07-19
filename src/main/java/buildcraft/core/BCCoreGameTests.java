@@ -2163,6 +2163,10 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         var table = (buildcraft.builders.block.entity.ArchitectTableBlockEntity)
                 helper.getLevel().getBlockEntity(tablePos);
         helper.assertTrue(table.configureArea(min, max), "Architect rejected valid bounds");
+        table.setBlueprintName("West Wing");
+        table.toggleRotate();
+        table.toggleExcavate();
+        table.toggleAllowCreative();
         helper.getLevel().setBlock(min, Blocks.STONE.defaultBlockState(), Block.UPDATE_ALL);
         helper.getLevel().setBlock(min.offset(1, 0, 0), Blocks.OAK_STAIRS.defaultBlockState()
                 .setValue(net.minecraft.world.level.block.StairBlock.FACING, Direction.SOUTH), Block.UPDATE_ALL);
@@ -2181,6 +2185,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Architect block entity did not reload");
         var restored = (buildcraft.builders.block.entity.ArchitectTableBlockEntity) loaded;
         helper.assertValueEqual(restored.cursor(), 10, "reloaded Architect lost scan cursor");
+        helper.assertValueEqual(restored.blueprintName(), "West Wing", "Architect did not restore Blueprint name");
+        helper.assertTrue(!restored.rotate() && !restored.excavate() && restored.allowCreative(),
+                "Architect did not restore capture configuration");
         helper.getLevel().setBlockEntity(restored);
         buildcraft.builders.block.entity.ArchitectTableBlockEntity.tick(helper.getLevel(), tablePos,
                 helper.getLevel().getBlockState(tablePos), restored);
@@ -2196,6 +2203,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Architect did not emit a used Blueprint");
         helper.assertValueEqual(blueprint.size(), new BlockPos(3, 2, 2), "Architect Blueprint size");
         helper.assertValueEqual(blueprint.facing(), Direction.WEST, "Architect Blueprint facing");
+        helper.assertTrue(blueprint.name().equals("West Wing") && !blueprint.rotate() && !blueprint.excavate()
+                        && blueprint.allowCreative(),
+                "Architect did not write Blueprint metadata");
         helper.assertTrue(blueprint.stateAt(new BlockPos(1, 0, 0)).is(Blocks.OAK_STAIRS)
                         && blueprint.stateAt(new BlockPos(1, 0, 0))
                         .getValue(net.minecraft.world.level.block.StairBlock.FACING) == Direction.SOUTH,
@@ -2240,7 +2250,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 Blocks.GLASS.defaultBlockState());
         var blueprint = new buildcraft.builders.snapshot.SnapshotData(
                 buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT, new BlockPos(2, 1, 2), Direction.NORTH,
-                new BlockPos(2, 0, 0), palette, java.util.List.of(1, 2, 0, 3), "Builder GameTest");
+                new BlockPos(2, 0, 0), palette, java.util.List.of(1, 2, 0, 3), "Builder GameTest",
+                true, false, false);
         ItemStack blueprintStack = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
         blueprintStack.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), blueprint);
         builder.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(blueprintStack), 1);

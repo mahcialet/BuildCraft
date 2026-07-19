@@ -27,6 +27,7 @@ public final class BCBuilders {
         BCBuildersItems.register(modBus);
         BCBuildersDataComponents.register(modBus);
         BCBuildersMenus.register(modBus);
+        BCBuildersNetwork.register(modBus);
         modBus.addListener(BCBuilders::registerTicketControllers);
         if (FMLEnvironment.getDist() == Dist.CLIENT) BCBuildersClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);

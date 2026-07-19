@@ -14,7 +14,8 @@ import java.util.List;
 
 /** Portable inline representation shared by Architect, Builder, and Replacer. */
 public record SnapshotData(SnapshotKind kind, BlockPos size, Direction facing, BlockPos offset,
-                           List<BlockState> palette, List<Integer> blocks, String name) {
+                           List<BlockState> palette, List<Integer> blocks, String name,
+                           boolean rotate, boolean excavate, boolean allowCreative) {
     public static final int MAX_VOLUME = 64 * 64 * 64;
     public static final Codec<SnapshotData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             SnapshotKind.CODEC.fieldOf("kind").forGetter(SnapshotData::kind),
@@ -23,8 +24,16 @@ public record SnapshotData(SnapshotKind kind, BlockPos size, Direction facing, B
             BlockPos.CODEC.fieldOf("offset").forGetter(SnapshotData::offset),
             BlockState.CODEC.listOf().fieldOf("palette").forGetter(SnapshotData::palette),
             Codec.INT.listOf().fieldOf("blocks").forGetter(SnapshotData::blocks),
-            Codec.STRING.fieldOf("name").forGetter(SnapshotData::name)
-    ).apply(instance, SnapshotData::new));
+            Codec.STRING.fieldOf("name").forGetter(SnapshotData::name),
+            Codec.BOOL.optionalFieldOf("rotate", true).forGetter(SnapshotData::rotate),
+            Codec.BOOL.optionalFieldOf("excavate", true).forGetter(SnapshotData::excavate),
+            Codec.BOOL.optionalFieldOf("allow_creative", false).forGetter(SnapshotData::allowCreative)
+        ).apply(instance, SnapshotData::new));
+
+    public SnapshotData(SnapshotKind kind, BlockPos size, Direction facing, BlockPos offset,
+                        List<BlockState> palette, List<Integer> blocks, String name) {
+        this(kind, size, facing, offset, palette, blocks, name, true, true, false);
+    }
 
     public SnapshotData {
         palette = List.copyOf(palette);
@@ -59,7 +68,8 @@ public record SnapshotData(SnapshotKind kind, BlockPos size, Direction facing, B
                 }
             }
         }
-        return new SnapshotData(kind, size, facing, min.subtract(machinePos), palette, blocks, name);
+        return new SnapshotData(kind, size, facing, min.subtract(machinePos), palette, blocks, name,
+                true, true, false);
     }
 
     public boolean valid() {
