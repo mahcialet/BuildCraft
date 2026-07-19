@@ -203,6 +203,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
     public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
+    public PowerStatus adjacentPower(Direction side) {
+        if (level == null) return PowerStatus.UNAVAILABLE;
+        var readable = level.getCapability(MjAPI.CAP_READABLE,
+                worldPosition.relative(side), side.getOpposite());
+        if (readable == null || readable.getCapacity() <= 0) return PowerStatus.UNAVAILABLE;
+        double level = readable.getStored() / (double) readable.getCapacity();
+        return new PowerStatus(true, level < 0.05, level > 0.95);
+    }
     public InventoryStatus adjacentInventory(Direction side) {
         if (!(level instanceof ServerLevel serverLevel)) return InventoryStatus.UNAVAILABLE;
         var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
@@ -1530,5 +1538,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     }
     public record FluidStatus(boolean available, boolean empty, boolean contains, boolean space, boolean full) {
         public static final FluidStatus UNAVAILABLE = new FluidStatus(false, false, false, false, false);
+    }
+    public record PowerStatus(boolean available, boolean low, boolean high) {
+        public static final PowerStatus UNAVAILABLE = new PowerStatus(false, false, false);
     }
 }

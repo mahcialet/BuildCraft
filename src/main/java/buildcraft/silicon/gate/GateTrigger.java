@@ -10,7 +10,8 @@ public enum GateTrigger implements StringRepresentable {
     INVENTORY_EMPTY, INVENTORY_CONTAINS, INVENTORY_SPACE, INVENTORY_FULL,
     FLUID_EMPTY, FLUID_CONTAINS, FLUID_SPACE, FLUID_FULL,
     INVENTORY_BELOW_25, INVENTORY_BELOW_50, INVENTORY_BELOW_75,
-    FLUID_BELOW_25, FLUID_BELOW_50, FLUID_BELOW_75;
+    FLUID_BELOW_25, FLUID_BELOW_50, FLUID_BELOW_75,
+    POWER_LOW, POWER_HIGH;
     public static final Codec<GateTrigger> CODEC = StringRepresentable.fromEnum(GateTrigger::values);
     @Override public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
 }

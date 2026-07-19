@@ -164,6 +164,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_facade", BCCoreGameTests::siliconFacade);
         registerTest(event, environment, "silicon_inventory_triggers", BCCoreGameTests::siliconInventoryTriggers);
         registerTest(event, environment, "silicon_fluid_triggers", BCCoreGameTests::siliconFluidTriggers);
+        registerTest(event, environment, "silicon_power_triggers", BCCoreGameTests::siliconPowerTriggers);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3490,6 +3491,81 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
         helper.succeed();
+    }
+
+    private static void siliconPowerTriggers(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 2, 3));
+        BlockPos laserPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(laserPos,
+                buildcraft.silicon.BCSiliconBlocks.LASER.get().defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "power trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        var receiver = helper.getLevel().getCapability(buildcraft.api.mj.MjAPI.CAP_RECEIVER,
+                laserPos, Direction.SOUTH);
+        var readable = helper.getLevel().getCapability(buildcraft.api.mj.MjAPI.CAP_READABLE,
+                laserPos, Direction.SOUTH);
+        helper.assertTrue(receiver != null && readable != null,
+                "adjacent laser exposed no MJ receiver/readable capability");
+        long capacity = readable.getCapacity();
+        helper.assertTrue(capacity > 20, "laser battery capacity was too small for boundary test");
+
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_LOW, true, "empty laser did not trigger POWER_LOW");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_HIGH, false, "empty laser triggered POWER_HIGH");
+        long fivePercent = capacity / 20;
+        receiver.receivePower(fivePercent, false);
+        helper.assertValueEqual(fivePercent, readable.getStored(), "laser did not store exact five-percent charge");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_LOW, false,
+                "laser at exactly five percent triggered POWER_LOW");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_HIGH, false,
+                "laser at five percent triggered POWER_HIGH");
+
+        long ninetyFivePercent = capacity * 95 / 100;
+        receiver.receivePower(ninetyFivePercent - readable.getStored(), false);
+        helper.assertValueEqual(ninetyFivePercent, readable.getStored(),
+                "laser did not store exact ninety-five-percent charge");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_HIGH, false,
+                "laser at exactly ninety-five percent triggered POWER_HIGH");
+        receiver.receivePower(1, false);
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_HIGH, true,
+                "laser above ninety-five percent did not trigger POWER_HIGH");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_LOW, false,
+                "charged laser triggered POWER_LOW");
+
+        helper.getLevel().removeBlock(laserPos, false);
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_LOW, false,
+                "missing MJ target triggered POWER_LOW");
+        assertPowerTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.POWER_HIGH, false,
+                "missing MJ target triggered POWER_HIGH");
+        helper.succeed();
+    }
+
+    private static void assertPowerTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(trigger,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
 
     private static void siliconFluidTriggers(GameTestHelper helper) {
