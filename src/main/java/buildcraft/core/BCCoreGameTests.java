@@ -173,6 +173,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_power_limit_actions", BCCoreGameTests::siliconPowerLimitActions);
         registerTest(event, environment, "silicon_extraction_preset_actions", BCCoreGameTests::siliconExtractionPresetActions);
         registerTest(event, environment, "silicon_pipe_color_actions", BCCoreGameTests::siliconPipeColorActions);
+        registerTest(event, environment, "silicon_pipe_wire_signals", BCCoreGameTests::siliconPipeWireSignals);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3498,6 +3499,75 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconPipeWireSignals(GameTestHelper helper) {
+        BlockPos sourcePos = helper.absolutePos(new BlockPos(2, 3, 3));
+        BlockPos relayPos = helper.absolutePos(new BlockPos(3, 3, 3));
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        var sourceState = block.defaultBlockState()
+                .setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_ITEM)
+                .setValue(buildcraft.transport.block.PipeHolderBlock.EAST, true);
+        var relayState = block.defaultBlockState()
+                .setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_ITEM)
+                .setValue(buildcraft.transport.block.PipeHolderBlock.WEST, true);
+        helper.getLevel().setBlock(sourcePos, sourceState, 3);
+        helper.getLevel().setBlock(relayPos, relayState, 3);
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(sourcePos);
+        var relay = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(relayPos);
+        for (buildcraft.transport.PipeWireColor color : java.util.List.of(
+                buildcraft.transport.PipeWireColor.RED, buildcraft.transport.PipeWireColor.BLUE)) {
+            helper.assertTrue(source.installWire(color), "source pipe wire could not be installed");
+            helper.assertTrue(relay.installWire(color), "relay pipe wire could not be installed");
+        }
+        ItemStack sourceGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        ItemStack relayGate = sourceGate.copy();
+        helper.assertTrue(source.installAttachment(Direction.UP, sourceGate),
+                "source wire Gate could not be installed");
+        helper.assertTrue(relay.installAttachment(Direction.UP, relayGate),
+                "relay wire Gate could not be installed");
+        source.attachment(Direction.UP).set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PIPE_SIGNAL_RED))));
+        relay.attachment(Direction.UP).set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.PIPE_SIGNAL_RED_ACTIVE,
+                                buildcraft.silicon.gate.GateAction.PIPE_SIGNAL_BLUE))));
+        tickPipes(helper, 2, sourcePos, relayPos);
+        helper.assertTrue(source.isWirePowered(buildcraft.transport.PipeWireColor.RED)
+                        && relay.isWirePowered(buildcraft.transport.PipeWireColor.RED),
+                "red signal did not propagate across the connected wire network");
+        helper.assertTrue(source.isWirePowered(buildcraft.transport.PipeWireColor.BLUE)
+                        && relay.isWirePowered(buildcraft.transport.PipeWireColor.BLUE),
+                "red signal trigger did not drive the blue wire network");
+        source.takeAttachment(Direction.UP);
+        tickPipes(helper, 2, sourcePos, relayPos);
+        helper.assertTrue(!source.isWirePowered(buildcraft.transport.PipeWireColor.RED)
+                        && !relay.isWirePowered(buildcraft.transport.PipeWireColor.RED)
+                        && !source.isWirePowered(buildcraft.transport.PipeWireColor.BLUE)
+                        && !relay.isWirePowered(buildcraft.transport.PipeWireColor.BLUE),
+                "wire networks remained powered after their Gate sources were removed");
+        net.minecraft.world.item.crafting.CraftingInput wireRecipeInput =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                        new ItemStack(Items.RED_DYE), new ItemStack(Items.REDSTONE),
+                        new ItemStack(Items.IRON_INGOT)));
+        ItemStack wireOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, wireRecipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(wireRecipeInput);
+        helper.assertTrue(wireOutput.is(buildcraft.transport.BCTransportItems.PIPE_WIRE_RED.get()),
+                "pipe wire recipe returned wrong item");
+        helper.assertValueEqual(wireOutput.getCount(), 8, "pipe wire recipe returned wrong count");
         helper.succeed();
     }
 

@@ -35,7 +35,11 @@ public enum GateAction implements StringRepresentable {
     PIPE_COLOR_BROWN(-1, -1, 12),
     PIPE_COLOR_GREEN(-1, -1, 13),
     PIPE_COLOR_RED(-1, -1, 14),
-    PIPE_COLOR_BLACK(-1, -1, 15);
+    PIPE_COLOR_BLACK(-1, -1, 15),
+    PIPE_SIGNAL_RED,
+    PIPE_SIGNAL_BLUE,
+    PIPE_SIGNAL_GREEN,
+    PIPE_SIGNAL_YELLOW;
 
     private final int powerLimitShift;
     private final int extractionPresetIndex;

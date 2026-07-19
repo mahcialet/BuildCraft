@@ -1,6 +1,7 @@
 package buildcraft.transport;
 
 import buildcraft.transport.item.PipeItem;
+import buildcraft.transport.item.PipeWireItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -44,6 +45,10 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_GOLD_POWER = pipe(PipeType.GOLD_POWER);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_POWER = pipe(PipeType.DIAMOND_POWER);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_POWER = pipe(PipeType.DIAMOND_WOOD_POWER);
+    public static final DeferredItem<PipeWireItem> PIPE_WIRE_RED = wire(PipeWireColor.RED);
+    public static final DeferredItem<PipeWireItem> PIPE_WIRE_BLUE = wire(PipeWireColor.BLUE);
+    public static final DeferredItem<PipeWireItem> PIPE_WIRE_GREEN = wire(PipeWireColor.GREEN);
+    public static final DeferredItem<PipeWireItem> PIPE_WIRE_YELLOW = wire(PipeWireColor.YELLOW);
 
     private BCTransportItems() {
     }
@@ -51,6 +56,11 @@ public final class BCTransportItems {
     private static DeferredItem<PipeItem> pipe(PipeType type) {
         return ITEMS.registerItem(type.itemId(), properties ->
             new PipeItem(BCTransportBlocks.PIPE_HOLDER.get(), type, properties.useBlockDescriptionPrefix()));
+    }
+
+    private static DeferredItem<PipeWireItem> wire(PipeWireColor color) {
+        return ITEMS.registerItem("pipe_wire_" + color.name().toLowerCase(java.util.Locale.ROOT),
+                properties -> new PipeWireItem(color, properties));
     }
 
     public static void register(IEventBus bus) {

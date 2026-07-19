@@ -8,6 +8,7 @@ import buildcraft.silicon.gate.GateMaterial;
 import buildcraft.silicon.gate.GateModifier;
 import buildcraft.silicon.gate.GateProgram;
 import buildcraft.silicon.gate.GateRule;
+import buildcraft.transport.PipeWireColor;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeAttachmentMenu;
 import buildcraft.silicon.menu.GateMenu;
@@ -61,6 +62,10 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                             PIPE_COLOR_CYAN, PIPE_COLOR_PURPLE, PIPE_COLOR_BLUE,
                             PIPE_COLOR_BROWN, PIPE_COLOR_GREEN, PIPE_COLOR_RED,
                             PIPE_COLOR_BLACK -> pipe.activatePipeColor(rule.action().pipeColorIndex());
+                    case PIPE_SIGNAL_RED -> pipe.activateWireSignal(PipeWireColor.RED);
+                    case PIPE_SIGNAL_BLUE -> pipe.activateWireSignal(PipeWireColor.BLUE);
+                    case PIPE_SIGNAL_GREEN -> pipe.activateWireSignal(PipeWireColor.GREEN);
+                    case PIPE_SIGNAL_YELLOW -> pipe.activateWireSignal(PipeWireColor.YELLOW);
                 }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);
@@ -100,6 +105,14 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case MACHINE_INACTIVE -> pipe.adjacentMachine(gateSide).inactive();
             case ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED ->
                     rule.trigger().matchesEngineStage(pipe.adjacentEngineStage(gateSide));
+            case PIPE_SIGNAL_RED_ACTIVE -> pipe.isWirePowered(PipeWireColor.RED);
+            case PIPE_SIGNAL_RED_INACTIVE -> !pipe.isWirePowered(PipeWireColor.RED);
+            case PIPE_SIGNAL_BLUE_ACTIVE -> pipe.isWirePowered(PipeWireColor.BLUE);
+            case PIPE_SIGNAL_BLUE_INACTIVE -> !pipe.isWirePowered(PipeWireColor.BLUE);
+            case PIPE_SIGNAL_GREEN_ACTIVE -> pipe.isWirePowered(PipeWireColor.GREEN);
+            case PIPE_SIGNAL_GREEN_INACTIVE -> !pipe.isWirePowered(PipeWireColor.GREEN);
+            case PIPE_SIGNAL_YELLOW_ACTIVE -> pipe.isWirePowered(PipeWireColor.YELLOW);
+            case PIPE_SIGNAL_YELLOW_INACTIVE -> !pipe.isWirePowered(PipeWireColor.YELLOW);
         };
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {

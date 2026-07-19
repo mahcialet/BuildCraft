@@ -5,6 +5,7 @@ import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
+import buildcraft.transport.PipeWireColor;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
 import buildcraft.transport.item.PipeAttachment;
@@ -73,6 +74,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private @Nullable Direction extractionDirection;
     private @Nullable Direction routingDirection;
     private DyeColor pipeColor = DyeColor.WHITE;
+    private int installedWires;
+    private int wireSources;
+    private int poweredWires;
     private int obsidianWaitTicks;
     private final List<ItemStack> diamondFilters = new ArrayList<>();
     private DiamondFilterMode diamondFilterMode = DiamondFilterMode.WHITE_LIST;
@@ -184,6 +188,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private void evaluateAttachments() {
         boolean previous = gateRedstoneOutput;
         gateRedstoneOutput = false;
+        wireSources = 0;
         nextSinglePulsarRules.clear();
         for (Direction side : Direction.values()) {
             ItemStack stack = attachment(side);
@@ -198,9 +203,70 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (level != null) level.updateNeighborsAt(worldPosition, getBlockState().getBlock());
         }
         tickPulsars();
+        refreshWireSignals();
     }
     public void activateGateRedstoneOutput() { gateRedstoneOutput = true; }
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
+    public boolean installWire(PipeWireColor color) {
+        if ((installedWires & color.bit()) != 0) return false;
+        installedWires |= color.bit();
+        sync();
+        return true;
+    }
+    public boolean removeWire(PipeWireColor color) {
+        if ((installedWires & color.bit()) == 0) return false;
+        installedWires &= ~color.bit();
+        wireSources &= ~color.bit();
+        poweredWires &= ~color.bit();
+        sync();
+        return true;
+    }
+    public boolean hasWire(PipeWireColor color) {
+        return (installedWires & color.bit()) != 0;
+    }
+    public boolean isWirePowered(PipeWireColor color) {
+        return (poweredWires & color.bit()) != 0;
+    }
+    public int installedWireMask() { return installedWires; }
+    public int poweredWireMask() { return poweredWires; }
+    public void activateWireSignal(PipeWireColor color) {
+        if (hasWire(color)) wireSources |= color.bit();
+    }
+
+    private void refreshWireSignals() {
+        if (level == null) return;
+        for (PipeWireColor color : PipeWireColor.values()) {
+            if (!hasWire(color)) continue;
+            java.util.ArrayDeque<PipeHolderBlockEntity> pending = new java.util.ArrayDeque<>();
+            java.util.Set<BlockPos> visited = new java.util.HashSet<>();
+            java.util.List<PipeHolderBlockEntity> network = new java.util.ArrayList<>();
+            boolean powered = false;
+            pending.add(this);
+            while (!pending.isEmpty()) {
+                PipeHolderBlockEntity pipe = pending.removeFirst();
+                if (!visited.add(pipe.worldPosition) || !pipe.hasWire(color)) continue;
+                network.add(pipe);
+                powered |= (pipe.wireSources & color.bit()) != 0;
+                for (Direction direction : Direction.values()) {
+                    if (!pipe.getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+                    BlockEntity neighbour = level.getBlockEntity(pipe.worldPosition.relative(direction));
+                    if (neighbour instanceof PipeHolderBlockEntity other
+                            && other.getBlockState().getValue(PipeHolderBlock.property(direction.getOpposite()))
+                            && other.hasWire(color)) {
+                        pending.add(other);
+                    }
+                }
+            }
+            for (PipeHolderBlockEntity pipe : network) pipe.setWirePowered(color, powered);
+        }
+    }
+
+    private void setWirePowered(PipeWireColor color, boolean powered) {
+        int next = powered ? poweredWires | color.bit() : poweredWires & ~color.bit();
+        if (next == poweredWires) return;
+        poweredWires = next;
+        sync();
+    }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
     public boolean hasFluidInTransit() { return fluidBuffer.getAmountAsInt(0) > 0; }
     public boolean hasPowerRequest() {
@@ -1346,6 +1412,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         extractionDirection = input.read("extraction_direction", Direction.CODEC).orElse(null);
         routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
         pipeColor = input.read("pipe_color", DyeColor.CODEC).orElse(DyeColor.WHITE);
+        installedWires = input.getIntOr("installed_wires", 0) & 0xF;
+        poweredWires = input.getIntOr("powered_wires", 0) & installedWires;
+        wireSources = 0;
         obsidianWaitTicks = pipeType() == PipeType.OBSIDIAN_ITEM ? 20 : 0;
         List<ItemStack> savedAttachments = input.read("attachments", ItemStack.OPTIONAL_CODEC.listOf()).orElse(List.of());
         for (int index = 0; index < attachments.size(); index++) {
@@ -1397,6 +1466,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
         output.store("pipe_color", DyeColor.CODEC, pipeColor);
+        if (installedWires != 0) output.putInt("installed_wires", installedWires);
+        if (poweredWires != 0) output.putInt("powered_wires", poweredWires);
         output.store("attachments", ItemStack.OPTIONAL_CODEC.listOf(), attachments);
         output.store("diamond_filters", ItemStack.OPTIONAL_CODEC.listOf(), diamondFilters);
         output.store("diamond_filter_mode", DiamondFilterMode.CODEC, diamondFilterMode);

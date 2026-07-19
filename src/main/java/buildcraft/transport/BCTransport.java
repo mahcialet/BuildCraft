@@ -39,5 +39,9 @@ public final class BCTransport {
         event.accept(BCTransportItems.PIPE_EMZULI_ITEM.get());
         event.accept(BCTransportItems.PIPE_DIAMOND_ITEM.get());
         event.accept(BCTransportItems.PIPE_STRIPES_ITEM.get());
+        event.accept(BCTransportItems.PIPE_WIRE_RED.get());
+        event.accept(BCTransportItems.PIPE_WIRE_BLUE.get());
+        event.accept(BCTransportItems.PIPE_WIRE_GREEN.get());
+        event.accept(BCTransportItems.PIPE_WIRE_YELLOW.get());
     }
 }
