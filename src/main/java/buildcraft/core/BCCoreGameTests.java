@@ -158,6 +158,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "transport_diamond_wood_fluid_pipe", BCCoreGameTests::transportDiamondWoodFluidPipe);
         registerTest(event, environment, "transport_item_flow", BCCoreGameTests::transportItemFlow);
         registerTest(event, environment, "transport_partial_item_bounce", BCCoreGameTests::transportPartialItemBounce);
+        registerTest(event, environment, "transport_pipe_visual_state", BCCoreGameTests::transportPipeVisualState);
         registerTest(event, environment, "transport_special_item_pipes", BCCoreGameTests::transportSpecialItemPipes);
         registerTest(event, environment, "transport_routing_item_pipes", BCCoreGameTests::transportRoutingItemPipes);
         registerTest(event, environment, "transport_terminal_item_pipes", BCCoreGameTests::transportTerminalItemPipes);
@@ -3273,6 +3274,68 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertValueEqual(pendingLoaded.input(net.minecraft.core.Direction.WEST).getAmountAsInt(0), 5,
             "pending pipe capability input did not survive codec reload");
         helper.succeed();
+    }
+
+    private static void transportPipeVisualState(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos woodPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos daizuliPos = helper.absolutePos(new BlockPos(4, 2, 1));
+        BlockPos stripesPos = helper.absolutePos(new BlockPos(7, 2, 1));
+        helper.getLevel().setBlock(woodPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_ITEM), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(woodPos.west(), Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(daizuliPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.DAIZULI_ITEM), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(daizuliPos.east(), Blocks.CHEST.defaultBlockState(), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(stripesPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.STRIPES_ITEM), Block.UPDATE_ALL);
+
+        var wood = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(woodPos);
+        var daizuli = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(daizuliPos);
+        var stripes = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(stripesPos);
+        tickPipes(helper, 1, woodPos);
+        daizuli.activatePipeDirection(Direction.EAST);
+        daizuli.cycleDaizuliColor(false);
+        stripes.activatePipeDirection(Direction.UP);
+        helper.assertTrue(wood.extractionDirection() == Direction.WEST,
+                "wood pipe did not expose its synchronized extraction face");
+        helper.assertTrue(daizuli.routingDirection() == Direction.EAST,
+                "Daizuli pipe did not expose its synchronized route face");
+        helper.assertTrue(daizuli.pipeColor() == net.minecraft.world.item.DyeColor.ORANGE,
+                "Daizuli pipe did not expose its synchronized colour");
+        helper.assertTrue(stripes.stripesDirection() == Direction.UP,
+                "Stripes pipe did not expose its synchronized working face");
+
+        var restoredWood = reloadPipeEntity(helper, woodPos, wood);
+        var restoredDaizuli = reloadPipeEntity(helper, daizuliPos, daizuli);
+        var restoredStripes = reloadPipeEntity(helper, stripesPos, stripes);
+        helper.assertTrue(restoredWood.extractionDirection() == Direction.WEST,
+                "reloaded wood pipe lost its extraction face");
+        helper.assertTrue(restoredDaizuli.routingDirection() == Direction.EAST,
+                "reloaded Daizuli pipe lost its route face");
+        helper.assertTrue(restoredDaizuli.pipeColor() == net.minecraft.world.item.DyeColor.ORANGE,
+                "reloaded Daizuli pipe lost its colour");
+        helper.assertTrue(restoredStripes.stripesDirection() == Direction.UP,
+                "reloaded Stripes pipe lost its working face");
+        helper.succeed();
+    }
+
+    private static buildcraft.transport.block.entity.PipeHolderBlockEntity reloadPipeEntity(
+            GameTestHelper helper, BlockPos pos,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder) {
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                pos, holder.getBlockState(), holder.saveWithFullMetadata(helper.getLevel().registryAccess()),
+                helper.getLevel().registryAccess());
+        if (!(loaded instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity pipe)) {
+            throw new IllegalStateException("pipe block entity did not reload from its saved tag");
+        }
+        return pipe;
     }
 
     private static void transportPartialItemBounce(GameTestHelper helper) {

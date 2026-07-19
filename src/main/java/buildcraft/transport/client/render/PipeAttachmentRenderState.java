@@ -2,6 +2,7 @@ package buildcraft.transport.client.render;
 
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayList;
@@ -19,4 +20,9 @@ public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     boolean powerLimiter;
     final List<ItemStackRenderState> travellingItems = new ArrayList<>();
     final List<Vec3> travellingPositions = new ArrayList<>();
+    Direction extractionDirection;
+    Direction routingDirection;
+    Direction stripesDirection;
+    int pipeColor;
+    boolean showPipeColor;
 }

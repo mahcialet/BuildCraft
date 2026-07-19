@@ -2,6 +2,7 @@ package buildcraft.transport.client.render;
 
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.PipeWireColor;
+import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
 import buildcraft.transport.item.FacadeAttachment;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -46,6 +47,12 @@ public final class PipeAttachmentRenderer
         state.powerCapacity = pipe.powerCapacity();
         state.powerLimitShift = pipe.powerLimitShift();
         state.powerLimiter = pipe.isPowerLimiter();
+        state.extractionDirection = pipe.extractionDirection();
+        state.routingDirection = pipe.routingDirection();
+        state.stripesDirection = pipe.stripesDirection();
+        state.pipeColor = dyeColor(pipe.pipeColor());
+        state.showPipeColor = pipe.pipeType() == PipeType.LAPIS_ITEM
+                || pipe.pipeType() == PipeType.DAIZULI_ITEM;
         state.travellingItems.clear();
         state.travellingPositions.clear();
         int transitIndex = 0;
@@ -87,6 +94,7 @@ public final class PipeAttachmentRenderer
                                  SubmitNodeCollector nodes, CameraRenderState camera) {
         submitWires(state, poseStack, nodes);
         submitPowerMeter(state, poseStack, nodes);
+        submitPipeStateIndicators(state, poseStack, nodes);
         for (int index = 0; index < state.travellingItems.size(); index++) {
             Vec3 position = state.travellingPositions.get(index);
             poseStack.pushPose();
@@ -163,6 +171,73 @@ public final class PipeAttachmentRenderer
                                 x1, 12.08F, 5.1F, x1 + 0.75F, 12.08F, 5.8F, Direction.UP);
                     }
                 });
+    }
+
+    private void submitPipeStateIndicators(PipeAttachmentRenderState state, PoseStack poseStack,
+                                           SubmitNodeCollector nodes) {
+        if (!state.showPipeColor && state.extractionDirection == null
+                && state.routingDirection == null && state.stripesDirection == null) return;
+        TextureAtlasSprite white = sprites.get(Sheets.BLOCKS_MAPPER.apply(
+                Identifier.withDefaultNamespace("block/white_concrete")));
+        nodes.submitCustomGeometry(poseStack, RenderTypes.entityCutout(Sheets.BLOCKS_MAPPER.sheet()),
+                (pose, vertices) -> {
+                    if (state.showPipeColor) {
+                        wireQuad(vertices, pose, white, state.lightCoords, state.pipeColor,
+                                6.1F, 12.1F, 6.1F, 9.9F, 12.1F, 9.9F, Direction.UP);
+                    }
+                    if (state.extractionDirection != null) {
+                        directionIndicator(vertices, pose, white, state.lightCoords,
+                                state.extractionDirection, 0xFFFF9D32);
+                    }
+                    if (state.routingDirection != null) {
+                        directionIndicator(vertices, pose, white, state.lightCoords,
+                                state.routingDirection, 0xFF40E0FF);
+                    }
+                    if (state.stripesDirection != null) {
+                        directionIndicator(vertices, pose, white, state.lightCoords,
+                                state.stripesDirection, 0xFFFF4FD8);
+                    }
+                });
+    }
+
+    private static void directionIndicator(VertexConsumer vertices, PoseStack.Pose pose,
+                                           TextureAtlasSprite sprite, int light,
+                                           Direction direction, int color) {
+        switch (direction) {
+            case DOWN -> wireQuad(vertices, pose, sprite, light, color,
+                    10, 0.02F, 6, 6, 0.02F, 10, direction);
+            case UP -> wireQuad(vertices, pose, sprite, light, color,
+                    6, 15.98F, 6, 10, 15.98F, 10, direction);
+            case NORTH -> wireQuad(vertices, pose, sprite, light, color,
+                    10, 6, 0.02F, 6, 10, 0.02F, direction);
+            case SOUTH -> wireQuad(vertices, pose, sprite, light, color,
+                    6, 6, 15.98F, 10, 10, 15.98F, direction);
+            case WEST -> wireQuad(vertices, pose, sprite, light, color,
+                    0.02F, 10, 6, 0.02F, 6, 10, direction);
+            case EAST -> wireQuad(vertices, pose, sprite, light, color,
+                    15.98F, 6, 6, 15.98F, 10, 10, direction);
+        }
+    }
+
+    private static int dyeColor(net.minecraft.world.item.DyeColor color) {
+        return switch (color) {
+            case WHITE -> 0xFFF9FFFE;
+            case ORANGE -> 0xFFF9801D;
+            case MAGENTA -> 0xFFC74EBD;
+            case LIGHT_BLUE -> 0xFF3AB3DA;
+            case YELLOW -> 0xFFFED83D;
+            case LIME -> 0xFF80C71F;
+            case PINK -> 0xFFF38BAA;
+            case GRAY -> 0xFF474F52;
+            case LIGHT_GRAY -> 0xFF9D9D97;
+            case CYAN -> 0xFF169C9C;
+            case PURPLE -> 0xFF8932B8;
+            case BLUE -> 0xFF3C44AA;
+            case BROWN -> 0xFF835432;
+            case GREEN -> 0xFF5E7C16;
+            case RED -> 0xFFB02E26;
+            case BLACK -> 0xFF1D1D21;
+        };
     }
 
     private static void wireQuad(VertexConsumer vertices, PoseStack.Pose pose, TextureAtlasSprite sprite,
