@@ -861,6 +861,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return pipeColor;
     }
 
+    public void activatePipeColor(int colorIndex) {
+        if (pipeType() != PipeType.LAPIS_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return;
+        DyeColor[] colors = DyeColor.values();
+        if (colorIndex < 0 || colorIndex >= colors.length || pipeColor == colors[colorIndex]) return;
+        pipeColor = colors[colorIndex];
+        sync();
+    }
+
     public boolean cycleLapisColor(boolean reverse) {
         if (pipeType() != PipeType.LAPIS_ITEM) return false;
         DyeColor[] colors = DyeColor.values();

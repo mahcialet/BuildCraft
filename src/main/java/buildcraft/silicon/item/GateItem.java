@@ -55,6 +55,12 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                     case EXTRACTION_PRESET_SQUARE, EXTRACTION_PRESET_CIRCLE,
                             EXTRACTION_PRESET_TRIANGLE, EXTRACTION_PRESET_CROSS ->
                             pipe.activateEmzuliPreset(rule.action().extractionPresetIndex());
+                    case PIPE_COLOR_WHITE, PIPE_COLOR_ORANGE, PIPE_COLOR_MAGENTA,
+                            PIPE_COLOR_LIGHT_BLUE, PIPE_COLOR_YELLOW, PIPE_COLOR_LIME,
+                            PIPE_COLOR_PINK, PIPE_COLOR_GRAY, PIPE_COLOR_LIGHT_GRAY,
+                            PIPE_COLOR_CYAN, PIPE_COLOR_PURPLE, PIPE_COLOR_BLUE,
+                            PIPE_COLOR_BROWN, PIPE_COLOR_GREEN, PIPE_COLOR_RED,
+                            PIPE_COLOR_BLACK -> pipe.activatePipeColor(rule.action().pipeColorIndex());
                 }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);

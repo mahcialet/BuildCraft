@@ -172,6 +172,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_pipe_direction_action", BCCoreGameTests::siliconPipeDirectionAction);
         registerTest(event, environment, "silicon_power_limit_actions", BCCoreGameTests::siliconPowerLimitActions);
         registerTest(event, environment, "silicon_extraction_preset_actions", BCCoreGameTests::siliconExtractionPresetActions);
+        registerTest(event, environment, "silicon_pipe_color_actions", BCCoreGameTests::siliconPipeColorActions);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3497,6 +3498,49 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconPipeColorActions(GameTestHelper helper) {
+        BlockPos lapisPos = helper.absolutePos(new BlockPos(2, 3, 3));
+        BlockPos daizuliPos = helper.absolutePos(new BlockPos(4, 3, 3));
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        helper.getLevel().setBlock(lapisPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.LAPIS_ITEM), 3);
+        helper.getLevel().setBlock(daizuliPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.DAIZULI_ITEM), 3);
+        var lapis = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(lapisPos);
+        var daizuli = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(daizuliPos);
+        ItemStack lapisGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        ItemStack daizuliGate = lapisGate.copy();
+        helper.assertTrue(lapis.installAttachment(Direction.UP, lapisGate),
+                "lapis pipe color gate could not be installed");
+        helper.assertTrue(daizuli.installAttachment(Direction.UP, daizuliGate),
+                "daizuli pipe color gate could not be installed");
+        lapisGate = lapis.attachment(Direction.UP);
+        daizuliGate = daizuli.attachment(Direction.UP);
+        lapisGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PIPE_COLOR_RED))));
+        daizuliGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PIPE_COLOR_BLUE))));
+        tickPipes(helper, 1, lapisPos, daizuliPos);
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.RED, lapis.pipeColor(),
+                "red Gate action did not recolor the Lapis pipe");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.BLUE, daizuli.pipeColor(),
+                "blue Gate action did not recolor the Daizuli pipe");
         helper.succeed();
     }
 
