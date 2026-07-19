@@ -1655,7 +1655,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
             helper.getLevel(), chutePos, helper.getLevel().getBlockState(chutePos), chuteNow);
         helper.runAfterDelay(2, () -> {
             var chute = (buildcraft.factory.block.entity.ChuteBlockEntity)
-                    helper.getLevel().getBlockEntity(chutePos);
+                helper.getLevel().getBlockEntity(chutePos);
+            buildcraft.factory.block.entity.ChuteBlockEntity.tick(
+                    helper.getLevel(), chutePos, helper.getLevel().getBlockState(chutePos), chute);
             int cobblestone = 0;
             for (int slot = 0; slot < chute.inventory().size(); slot++) {
                 if (chute.inventory().getResource(slot).is(Items.COBBLESTONE)) {
