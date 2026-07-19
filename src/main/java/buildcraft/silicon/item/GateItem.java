@@ -65,7 +65,13 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                     case PIPE_SIGNAL_RED -> pipe.activateWireSignal(PipeWireColor.RED);
                     case PIPE_SIGNAL_BLUE -> pipe.activateWireSignal(PipeWireColor.BLUE);
                     case PIPE_SIGNAL_GREEN -> pipe.activateWireSignal(PipeWireColor.GREEN);
-                    case PIPE_SIGNAL_YELLOW -> pipe.activateWireSignal(PipeWireColor.YELLOW);
+                        case PIPE_SIGNAL_YELLOW -> pipe.activateWireSignal(PipeWireColor.YELLOW);
+                        case MACHINE_CONTROL_ON -> pipe.activateMachineControl(
+                                side, buildcraft.api.core.IControllable.ControlMode.ON);
+                        case MACHINE_CONTROL_OFF -> pipe.activateMachineControl(
+                                side, buildcraft.api.core.IControllable.ControlMode.OFF);
+                        case MACHINE_CONTROL_LOOP -> pipe.activateMachineControl(
+                                side, buildcraft.api.core.IControllable.ControlMode.LOOP);
                 }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);

@@ -62,6 +62,9 @@ neoForge {
         buildcraftfactory {
             sourceSet sourceSets.main
         }
+        buildcraftbuilders {
+            sourceSet sourceSets.main
+        }
         buildcraftsilicon {
             sourceSet sourceSets.main
         }
@@ -190,6 +193,10 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tank') {
         include 'end.png', 'side.png', 'side_joined_below.png'
         into 'assets/buildcraftfactory/textures/block/tank'
+    }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/blocks/filler') {
+        include 'top.png', 'bottom.png', 'side.png', 'front.png'
+        into 'assets/buildcraftbuilders/textures/block/filler'
     }
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/flood_gate') {
         include 'top.png', 'open.png', 'closed.png'

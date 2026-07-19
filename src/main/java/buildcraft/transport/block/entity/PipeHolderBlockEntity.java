@@ -937,6 +937,16 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         sync();
     }
 
+    public void activateMachineControl(Direction side,
+                                       buildcraft.api.core.IControllable.ControlMode mode) {
+        if (level == null) return;
+        var controllable = level.getCapability(buildcraft.api.core.MachineAPI.CAP_CONTROLLABLE,
+                worldPosition.relative(side), side.getOpposite());
+        if (controllable != null && controllable.acceptsControlMode(mode)) {
+            controllable.setControlMode(mode);
+        }
+    }
+
     public boolean cycleLapisColor(boolean reverse) {
         if (pipeType() != PipeType.LAPIS_ITEM) return false;
         DyeColor[] colors = DyeColor.values();

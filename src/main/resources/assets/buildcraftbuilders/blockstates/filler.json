@@ -1,0 +1,1 @@
+{"variants":{"facing=north":{"model":"buildcraftbuilders:block/filler"},"facing=east":{"model":"buildcraftbuilders:block/filler","y":90},"facing=south":{"model":"buildcraftbuilders:block/filler","y":180},"facing=west":{"model":"buildcraftbuilders:block/filler","y":270}}}

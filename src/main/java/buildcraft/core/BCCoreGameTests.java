@@ -143,6 +143,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_heat_exchanger", BCCoreGameTests::factoryHeatExchanger);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
+        registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
         registerTest(event, environment, "silicon_chipsets", BCCoreGameTests::siliconChipsets);
         registerTest(event, environment, "silicon_gate_items", BCCoreGameTests::siliconGateItems);
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
@@ -2076,6 +2077,117 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(drops.getFirst().is(buildcraft.factory.BCFactoryItems.AUTO_WORKBENCH.get()),
             "auto workbench returned wrong drop");
         helper.succeed();
+    }
+
+    private static void buildersFiller(GameTestHelper helper) {
+        BlockPos fillerPos = helper.absolutePos(new BlockPos(4, 3, 4));
+        BlockPos first = fillerPos.north();
+        BlockPos last = first.east(2);
+        var volumeData = buildcraft.core.marker.VolumeSavedData.get(helper.getLevel());
+        volumeData.addMarker(first);
+        volumeData.addMarker(last);
+        helper.assertTrue(volumeData.connect(first, last), "filler test volume markers did not connect");
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        insertPipeItem(filler.resources(), Items.COBBLESTONE, 3);
+        helper.assertValueEqual(0L, filler.mjReceiver().receivePower(12 * MjAPI.MJ, false),
+                "filler rejected nominal MJ input");
+
+        BlockPos pipePos = fillerPos.south();
+        var pipeBlock = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        helper.getLevel().setBlock(pipePos, pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_ITEM), Block.UPDATE_ALL);
+        var pipe = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.MACHINE_CONTROL_OFF))));
+        filler.setControlMode(buildcraft.api.core.IControllable.ControlMode.ON);
+        pipe.setAttachment(Direction.NORTH, gate);
+        tickPipes(helper, 1, pipePos);
+        helper.assertTrue(filler.controlMode() == buildcraft.api.core.IControllable.ControlMode.OFF,
+                "Gate Machine Off action did not control the Filler");
+        buildcraft.builders.block.entity.FillerBlockEntity.tick(helper.getLevel(), fillerPos,
+                helper.getLevel().getBlockState(fillerPos), filler);
+        helper.assertTrue(helper.getLevel().getBlockState(first).isAir(),
+                "disabled Filler placed a block");
+
+        pipe.attachment(Direction.NORTH).set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.MACHINE_CONTROL_ON))));
+        tickPipes(helper, 1, pipePos);
+        helper.assertTrue(filler.controlMode() == buildcraft.api.core.IControllable.ControlMode.ON,
+                "Gate Machine On action did not control the Filler");
+        for (int tick = 0; tick < 4; tick++) {
+            buildcraft.builders.block.entity.FillerBlockEntity.tick(helper.getLevel(), fillerPos,
+                    helper.getLevel().getBlockState(fillerPos), filler);
+        }
+        for (BlockPos target : BlockPos.betweenClosed(first, last)) {
+            helper.assertTrue(helper.getLevel().getBlockState(target).is(Blocks.COBBLESTONE),
+                    "Filler did not fill the complete marker volume");
+        }
+        helper.assertValueEqual(0L, filler.resources().getAmountAsLong(0),
+                "Filler did not consume exactly three resources");
+        helper.assertValueEqual(0L, filler.storedMj(), "Filler did not consume 4 MJ per block");
+        helper.assertTrue(filler.finished() && !filler.hasWork(),
+                "Filler did not report completed On-mode work");
+
+        var menuPlayer = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.builders.menu.FillerMenu(41, menuPlayer.getInventory(), fillerPos);
+        helper.assertTrue(menu.clickMenuButton(menuPlayer, 2), "Filler menu rejected Loop mode");
+        helper.assertTrue(filler.controlMode() == buildcraft.api.core.IControllable.ControlMode.LOOP
+                        && filler.hasWork(),
+                "Filler Loop mode did not remain active after completion");
+
+        var restored = reloadBuildersFiller(helper, fillerPos, filler);
+        helper.assertTrue(restored.areaMin() != null && restored.areaMin().equals(first),
+                "reloaded Filler lost its area minimum");
+        helper.assertTrue(restored.areaMax() != null && restored.areaMax().equals(last),
+                "reloaded Filler lost its area maximum");
+        helper.assertTrue(restored.controlMode() == buildcraft.api.core.IControllable.ControlMode.LOOP,
+                "reloaded Filler lost its control mode");
+        helper.assertTrue(restored.finished(), "reloaded Filler lost its completion state");
+
+        net.minecraft.world.item.crafting.CraftingInput recipeInput =
+                net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(Items.CRAFTING_TABLE), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get()), new ItemStack(Items.IRON_INGOT),
+                        new ItemStack(buildcraft.core.BCCoreItems.GEAR_GOLD.get())));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.builders.BCBuildersItems.FILLER.get()),
+                "Filler recipe returned the wrong item");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(fillerPos), helper.getLevel(), fillerPos,
+                filler, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1 && drops.getFirst().is(buildcraft.builders.BCBuildersItems.FILLER.get()),
+                "Filler loot table did not return itself");
+        helper.succeed();
+    }
+
+    private static buildcraft.builders.block.entity.FillerBlockEntity reloadBuildersFiller(
+            GameTestHelper helper, BlockPos pos,
+            buildcraft.builders.block.entity.FillerBlockEntity filler) {
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+                pos, filler.getBlockState(), filler.saveWithFullMetadata(helper.getLevel().registryAccess()),
+                helper.getLevel().registryAccess());
+        if (!(loaded instanceof buildcraft.builders.block.entity.FillerBlockEntity restored)) {
+            throw new IllegalStateException("Filler block entity did not reload from its saved tag");
+        }
+        return restored;
     }
 
     private static void siliconChipsets(GameTestHelper helper) {

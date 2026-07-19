@@ -39,7 +39,10 @@ public enum GateAction implements StringRepresentable {
     PIPE_SIGNAL_RED,
     PIPE_SIGNAL_BLUE,
     PIPE_SIGNAL_GREEN,
-    PIPE_SIGNAL_YELLOW;
+    PIPE_SIGNAL_YELLOW,
+    MACHINE_CONTROL_ON,
+    MACHINE_CONTROL_OFF,
+    MACHINE_CONTROL_LOOP;
 
     private final int powerLimitShift;
     private final int extractionPresetIndex;
