@@ -795,6 +795,28 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return false;
     }
 
+    public void activatePipeDirection(Direction direction) {
+        if (!(level instanceof ServerLevel serverLevel)) return;
+        if (pipeType() == PipeType.STRIPES_ITEM) {
+            if (!getBlockState().getValue(PipeHolderBlock.property(direction))
+                    && stripesDirection != direction) {
+                stripesDirection = direction;
+                stripesProgress = 0;
+                sync();
+            }
+            return;
+        }
+        if (pipeType() != PipeType.IRON_ITEM && pipeType() != PipeType.DAIZULI_ITEM
+                && pipeType() != PipeType.IRON_FLUID) return;
+        boolean valid = pipeType() == PipeType.IRON_FLUID
+                ? getBlockState().getValue(PipeHolderBlock.property(direction))
+                : canExit(serverLevel, direction);
+        if (valid && routingDirection != direction) {
+            routingDirection = direction;
+            sync();
+        }
+    }
+
     public @Nullable Direction extractionDirection() {
         return extractionDirection;
     }

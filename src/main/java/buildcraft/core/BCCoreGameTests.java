@@ -169,6 +169,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_engine_stage_triggers", BCCoreGameTests::siliconEngineStageTriggers);
         registerTest(event, environment, "silicon_fluids_traversing_trigger", BCCoreGameTests::siliconFluidsTraversingTrigger);
         registerTest(event, environment, "silicon_power_requested_trigger", BCCoreGameTests::siliconPowerRequestedTrigger);
+        registerTest(event, environment, "silicon_pipe_direction_action", BCCoreGameTests::siliconPipeDirectionAction);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3494,6 +3495,52 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconPipeDirectionAction(GameTestHelper helper) {
+        BlockPos ironPos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos westPos = ironPos.west();
+        BlockPos eastPos = ironPos.east();
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockState iron = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.IRON_ITEM);
+        BlockState cobble = block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        helper.getLevel().setBlock(ironPos, iron, 3);
+        helper.getLevel().setBlock(westPos, cobble, 3);
+        helper.getLevel().setBlock(eastPos, cobble, 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(ironPos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.UP, gate),
+                "pipe direction action gate could not be installed");
+        gate = holder.attachment(Direction.UP);
+
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PIPE_DIRECTION,
+                                java.util.Optional.of(Direction.EAST)))));
+        tickPipes(helper, 1, ironPos);
+        helper.assertValueEqual(Direction.EAST, holder.routingDirection(),
+                "PIPE_DIRECTION did not select the east iron-pipe output");
+
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.PIPE_DIRECTION,
+                                java.util.Optional.of(Direction.WEST)))));
+        tickPipes(helper, 1, ironPos);
+        helper.assertValueEqual(Direction.WEST, holder.routingDirection(),
+                "PIPE_DIRECTION did not replace the iron-pipe output");
         helper.succeed();
     }
 

@@ -48,6 +48,7 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                     case REDSTONE_OUTPUT -> pipe.activateGateRedstoneOutput();
                     case PULSAR_CONSTANT -> pipe.activatePulsar(rule.actionSide().orElse(null));
                     case PULSAR_SINGLE -> pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), true);
+                    case PIPE_DIRECTION -> rule.actionSide().ifPresent(pipe::activatePipeDirection);
                 }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);
