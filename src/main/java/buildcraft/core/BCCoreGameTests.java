@@ -158,6 +158,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
         registerTest(event, environment, "robotics_carrier_robot", BCCoreGameTests::roboticsCarrierRobot);
+        registerTest(event, environment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, environment, "builders_filler_patterns", BCCoreGameTests::buildersFillerPatterns);
         registerTest(event, environment, "builders_filler_advanced_patterns", BCCoreGameTests::buildersFillerAdvancedPatterns);
         registerTest(event, environment, "builders_filler_pyramid_centres", BCCoreGameTests::buildersFillerPyramidCentres);
@@ -6847,6 +6848,79 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.robotics.RobotStationConfig.DEFAULT);
         helper.assertTrue(filtered.matches(new ItemStack(Items.DIAMOND)) && filtered.filters().size() == 1,
                 "held-item station filter was not added");
+        helper.succeed();
+    }
+
+    private static void roboticsPickerRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 2, 1);
+        BlockPos receiverRelative = new BlockPos(8, 2, 1);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(receiverRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        ItemStack homeStationStack = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStationStack.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.BOTH,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        helper.assertTrue(home.installAttachment(Direction.UP, homeStationStack),
+                "Picker home station installation failed");
+        ItemStack receiverStationStack = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStationStack.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        helper.assertTrue(receiver.installAttachment(Direction.UP, receiverStationStack),
+                "Picker receiver station installation failed");
+        net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+
+        Vec3 dropPosition = Vec3.atCenterOf(helper.absolutePos(new BlockPos(4, 2, 1)));
+        var cobblestoneDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
+                dropPosition.x, dropPosition.y, dropPosition.z, new ItemStack(Items.COBBLESTONE, 20));
+        var dirtDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
+                dropPosition.x, dropPosition.y, dropPosition.z + 1, new ItemStack(Items.DIRT, 9));
+        helper.getLevel().addFreshEntity(cobblestoneDrop);
+        helper.getLevel().addFreshEntity(dirtDrop);
+        java.util.UUID auditRobot = java.util.UUID.randomUUID();
+        var auditTarget = buildcraft.robotics.DroppedItemRegistry.reserveClosest(helper.getLevel(),
+                dropPosition, 250, auditRobot, item -> item.getItem().is(Items.COBBLESTONE)).orElseThrow();
+        helper.assertFalse(buildcraft.robotics.DroppedItemRegistry.reclaim(helper.getLevel(),
+                        auditTarget.getUUID(), java.util.UUID.randomUUID()),
+                "two Picker robots reserved the same dropped item");
+        buildcraft.robotics.DroppedItemRegistry.release(
+                helper.getLevel(), auditTarget.getUUID(), auditRobot);
+
+        var homeStation = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.PICKER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeStation.reserve(robot.getUUID()) && robot.dock(homeStation),
+                "Picker could not dock at home");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 500 && (receiverChest.getItem(0).getCount() != 20
+                || robot.pickerPhase() != buildcraft.robotics.PickerPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(cobblestoneDrop.isRemoved(), "Picker did not consume the selected drop");
+        helper.assertTrue(dirtDrop.isAlive() && dirtDrop.getItem().getCount() == 9,
+                "Picker ignored its home station item filter");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.COBBLESTONE)
+                        && receiverChest.getItem(0).getCount() == 20,
+                "Picker did not unload collected items");
+        helper.assertTrue(robot.isEmpty(), "Picker retained unloaded items");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Picker did not return home");
+        helper.assertValueEqual(buildcraft.robotics.PickerPhase.NONE, robot.pickerPhase(),
+                "Picker scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Picker flight consumed no battery energy");
         helper.succeed();
     }
 

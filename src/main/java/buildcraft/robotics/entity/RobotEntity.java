@@ -10,7 +10,10 @@ import buildcraft.robotics.RequesterRegistry;
 import buildcraft.robotics.CarrierPhase;
 import buildcraft.robotics.RobotStationConfig;
 import buildcraft.robotics.BCRoboticsDataComponents;
+import buildcraft.robotics.DroppedItemRegistry;
+import buildcraft.robotics.PickerPhase;
 import java.util.Optional;
+import java.util.UUID;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.NonNullList;
@@ -55,6 +58,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private DeliveryPhase deliveryPhase = DeliveryPhase.NONE;
     private RobotStationRegistry.Address carrierTarget;
     private CarrierPhase carrierPhase = CarrierPhase.NONE;
+    private UUID pickerTarget;
+    private RobotStationRegistry.Address pickerUnloadTarget;
+    private PickerPhase pickerPhase = PickerPhase.NONE;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -99,6 +105,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         return Optional.ofNullable(deliveryReservation);
     }
     public CarrierPhase carrierPhase() { return carrierPhase; }
+    public PickerPhase pickerPhase() { return pickerPhase; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -143,6 +150,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.CARRIER && carrierPhase == CarrierPhase.NONE
                     && tickCount % 20 == 0) {
                 beginCarrier(serverLevel);
+            } else if (board() == RobotBoardType.PICKER && pickerPhase == PickerPhase.NONE
+                    && tickCount % 20 == 0) {
+                beginPicker(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -163,6 +173,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (deliveryPhase != DeliveryPhase.NONE) tickDelivery(serverLevel);
         if (carrierPhase != CarrierPhase.NONE) tickCarrier(serverLevel);
+        if (pickerPhase != PickerPhase.NONE) tickPicker(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -355,6 +366,88 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         insertInventoryAt(level, source);
     }
 
+    private void beginPicker(ServerLevel level) {
+        if (!isEmpty()) {
+            Optional<RobotStationRegistry.Address> unload = findCarrierUnloadStation(level, null);
+            if (unload.isPresent()) {
+                pickerUnloadTarget = unload.get();
+                pickerPhase = PickerPhase.TO_UNLOAD;
+                leaveStation();
+            }
+            return;
+        }
+        RobotStationConfig homeConfig = stationConfig(level, stationAddress);
+        Optional<net.minecraft.world.entity.item.ItemEntity> target = DroppedItemRegistry.reserveClosest(
+                level, position(), 250, getUUID(), item ->
+                        homeConfig.matches(item.getItem()) && inventoryCapacity(item.getItem()) > 0);
+        if (target.isEmpty()) return;
+        pickerTarget = target.get().getUUID();
+        pickerPhase = PickerPhase.TO_ITEM;
+        leaveStation();
+    }
+
+    private void tickPicker(ServerLevel level) {
+        if (pickerPhase == PickerPhase.TO_ITEM) {
+            if (pickerTarget == null || !DroppedItemRegistry.reclaim(level, pickerTarget, getUUID())) {
+                releasePickerTarget(level);
+                pickerPhase = PickerPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            net.minecraft.world.entity.item.ItemEntity item =
+                    (net.minecraft.world.entity.item.ItemEntity) level.getEntity(pickerTarget);
+            if (item == null || !item.isAlive()) {
+                releasePickerTarget(level);
+                pickerPhase = PickerPhase.RETURN_HOME;
+            } else if (flyToward(item.position())) {
+                pickUpItem(item);
+                releasePickerTarget(level);
+                Optional<RobotStationRegistry.Address> unload = findCarrierUnloadStation(level, null);
+                if (unload.isPresent()) {
+                    pickerUnloadTarget = unload.get();
+                    pickerPhase = PickerPhase.TO_UNLOAD;
+                } else {
+                    pickerPhase = PickerPhase.RETURN_HOME;
+                }
+            }
+        } else if (pickerPhase == PickerPhase.TO_UNLOAD) {
+            if (pickerUnloadTarget == null) {
+                pickerPhase = PickerPhase.RETURN_HOME;
+            } else if (flyToward(sourcePosition(pickerUnloadTarget))) {
+                RobotStationRegistry.Address attempted = pickerUnloadTarget;
+                unloadCarrier(level, attempted);
+                if (isEmpty()) {
+                    pickerPhase = PickerPhase.RETURN_HOME;
+                } else {
+                    Optional<RobotStationRegistry.Address> next = findCarrierUnloadStation(level, attempted);
+                    if (next.isPresent()) pickerUnloadTarget = next.get();
+                    else pickerPhase = PickerPhase.RETURN_HOME;
+                }
+            }
+        } else if (pickerPhase == PickerPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                pickerUnloadTarget = null;
+                pickerPhase = PickerPhase.NONE;
+            }
+        }
+    }
+
+    private void pickUpItem(net.minecraft.world.entity.item.ItemEntity item) {
+        ItemStack dropped = item.getItem();
+        int amount = Math.min(dropped.getCount(), inventoryCapacity(dropped));
+        if (amount <= 0) return;
+        int inserted = insertIntoRobot(dropped.copyWithCount(amount));
+        dropped.shrink(inserted);
+        if (dropped.isEmpty()) item.discard();
+        else item.setItem(dropped);
+    }
+
+    private void releasePickerTarget(ServerLevel level) {
+        if (pickerTarget != null) DroppedItemRegistry.release(level, pickerTarget, getUUID());
+        pickerTarget = null;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -513,6 +606,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (stationAddress != null) {
             RobotStationRegistry.get(serverLevel, stationAddress).ifPresent(station -> station.release(getUUID()));
         }
+        releasePickerTarget(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -532,6 +626,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (stationAddress != null) {
                 RobotStationRegistry.get(level, stationAddress).ifPresent(station -> station.release(getUUID()));
             }
+            releasePickerTarget(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -565,6 +660,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (carrierTarget != null) {
             output.putLong("CarrierTargetPos", carrierTarget.pipePos().asLong());
             output.putInt("CarrierTargetSide", carrierTarget.side().get3DDataValue());
+        }
+        output.putInt("PickerPhase", pickerPhase.ordinal());
+        if (pickerTarget != null) output.store("PickerTarget", net.minecraft.core.UUIDUtil.CODEC, pickerTarget);
+        if (pickerUnloadTarget != null) {
+            output.putLong("PickerUnloadPos", pickerUnloadTarget.pipePos().asLong());
+            output.putInt("PickerUnloadSide", pickerUnloadTarget.side().get3DDataValue());
         }
         ContainerHelper.saveAllItems(output, inventory);
     }
@@ -614,6 +715,19 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                             "CarrierTargetSide", Direction.UP.get3DDataValue())));
         }
         if (carrierPhase != CarrierPhase.NONE && carrierTarget == null) carrierPhase = CarrierPhase.NONE;
+        int pickerOrdinal = input.getIntOr("PickerPhase", PickerPhase.NONE.ordinal());
+        PickerPhase[] pickerPhases = PickerPhase.values();
+        pickerPhase = pickerOrdinal >= 0 && pickerOrdinal < pickerPhases.length
+                ? pickerPhases[pickerOrdinal] : PickerPhase.NONE;
+        pickerTarget = input.read("PickerTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+        if (input.getLong("PickerUnloadPos").isPresent()) {
+            pickerUnloadTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("PickerUnloadPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "PickerUnloadSide", Direction.UP.get3DDataValue())));
+        }
+        if (pickerPhase == PickerPhase.TO_ITEM && pickerTarget == null) pickerPhase = PickerPhase.RETURN_HOME;
+        if (pickerPhase == PickerPhase.TO_UNLOAD && pickerUnloadTarget == null) pickerPhase = PickerPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 
