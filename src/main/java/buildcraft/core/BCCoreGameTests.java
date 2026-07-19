@@ -167,6 +167,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "silicon_power_triggers", BCCoreGameTests::siliconPowerTriggers);
         registerTest(event, environment, "silicon_machine_triggers", BCCoreGameTests::siliconMachineTriggers);
         registerTest(event, environment, "silicon_engine_stage_triggers", BCCoreGameTests::siliconEngineStageTriggers);
+        registerTest(event, environment, "silicon_fluids_traversing_trigger", BCCoreGameTests::siliconFluidsTraversingTrigger);
         registerTest(event, environment, "transport_daizuli_item_pipe", BCCoreGameTests::transportDaizuliItemPipe);
         registerTest(event, environment, "transport_diamond_wood_item_pipe", BCCoreGameTests::transportDiamondWoodItemPipe);
         registerTest(event, environment, "transport_emzuli_item_pipe", BCCoreGameTests::transportEmzuliItemPipe);
@@ -3492,6 +3493,42 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(voidOutput.is(buildcraft.transport.BCTransportItems.PIPE_VOID_ITEM.get()),
             "void pipe recipe returned wrong item");
         helper.assertValueEqual(voidOutput.getCount(), 8, "void pipe recipe returned wrong count");
+        helper.succeed();
+    }
+
+    private static void siliconFluidsTraversingTrigger(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState().setValue(
+                        buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_FLUID), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "fluids traversing trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUIDS_TRAVERSING, false,
+                "empty fluid pipe matched FLUIDS_TRAVERSING");
+
+        var handler = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK,
+                pipePos, Direction.WEST);
+        helper.assertTrue(handler != null, "fluid pipe sided capability missing");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(handler.insert(water, 200, transaction), 200,
+                    "fluid pipe rejected trigger test fluid");
+            transaction.commit();
+        }
+        assertEngineStageTrigger(helper, holder, gate,
+                buildcraft.silicon.gate.GateTrigger.FLUIDS_TRAVERSING, true,
+                "buffered fluid did not match FLUIDS_TRAVERSING");
         helper.succeed();
     }
 

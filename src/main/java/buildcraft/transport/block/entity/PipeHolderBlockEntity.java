@@ -202,6 +202,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     public void activateGateRedstoneOutput() { gateRedstoneOutput = true; }
     public boolean gateRedstoneOutput() { return gateRedstoneOutput; }
     public boolean hasTravellingItems() { return !travelling.isEmpty(); }
+    public boolean hasFluidInTransit() { return fluidBuffer.getAmountAsInt(0) > 0; }
     public boolean hasExternalRedstoneSignal() { return level != null && level.hasNeighborSignal(worldPosition); }
     public PowerStatus adjacentPower(Direction side) {
         if (level == null) return PowerStatus.UNAVAILABLE;
