@@ -992,6 +992,15 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
                         buildcraft.energy.BCEnergyItems.GLOB_OF_OIL.get()).toString(),
                 "Glob of Oil compatibility identifier");
+        net.minecraft.world.item.crafting.CraftingInput sealantInput =
+                net.minecraft.world.item.crafting.CraftingInput.of(1, 1, java.util.List.of(
+                        new ItemStack(buildcraft.energy.BCEnergyFluids.refineryFluid("oil_residue").heat(0).bucket().get())));
+        ItemStack sealant = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, sealantInput, helper.getLevel())
+                .orElseThrow().value().assemble(sealantInput);
+        helper.assertTrue(sealant.is(buildcraft.transport.BCTransportItems.WATERPROOF),
+                "Oil Residue recipe returned wrong Pipe Sealant item");
+        helper.assertValueEqual(sealant.getCount(), 8, "Oil Residue Pipe Sealant recipe output count");
         helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getDensity(), 900,
             "oil density");
         helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getViscosity(), 2_000,
