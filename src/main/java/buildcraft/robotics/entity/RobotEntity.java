@@ -29,6 +29,7 @@ import buildcraft.robotics.KnightPhase;
 import buildcraft.robotics.BomberPhase;
 import buildcraft.robotics.StripesPhase;
 import buildcraft.robotics.BuilderPhase;
+import buildcraft.robotics.RoboticsGateActions;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -397,7 +398,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private boolean sourceContains(ServerLevel level, RobotStationRegistry.Address address, ItemStack requested) {
         RobotStationConfig config = stationConfig(level, address);
-        if (!config.mode().provides() || !config.matches(requested)) return false;
+        if (!RoboticsGateActions.providesItem(level, address, config, requested)) return false;
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         if (handler == null) return false;
         ItemResource resource = ItemResource.of(requested);
@@ -457,13 +458,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemResource resource = handler.getResource(slot);
                         if (!resource.isEmpty() && handler.getAmountAsLong(slot) > 0
-                                && config.matches(resource.toStack())) return true;
+                        && RoboticsGateActions.providesItem(
+                                level, address, config, resource.toStack())) return true;
                     }
                     return false;
                 })
@@ -484,11 +485,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private boolean canUnloadAt(ServerLevel level, RobotStationRegistry.Address address) {
         RobotStationConfig config = stationConfig(level, address);
-        if (!config.mode().receives()) return false;
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         if (handler == null) return false;
         for (ItemStack stack : inventory) {
-            if (stack.isEmpty() || !config.matches(stack)) continue;
+            if (stack.isEmpty() || !RoboticsGateActions.acceptsItem(
+                    level, address, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.insert(ItemResource.of(stack), stack.getCount(), transaction) > 0) return true;
             }
@@ -537,10 +538,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadCarrier(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int sourceSlot = 0; sourceSlot < handler.size(); sourceSlot++) {
             ItemResource resource = handler.getResource(sourceSlot);
-            if (resource.isEmpty() || !config.matches(resource.toStack())) continue;
+            if (resource.isEmpty() || !RoboticsGateActions.providesItem(
+                    level, source, config, resource.toStack())) continue;
             ItemStack template = resource.toStack();
             int capacity = inventoryCapacity(template);
             if (capacity <= 0) break;
@@ -557,10 +559,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void unloadCarrier(ServerLevel level, RobotStationRegistry.Address destination) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < inventory.size(); slot++) {
             ItemStack stack = inventory.get(slot);
-            if (stack.isEmpty() || !config.matches(stack)) continue;
+            if (stack.isEmpty() || !RoboticsGateActions.acceptsItem(
+                    level, destination, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 int inserted = handler.insert(ItemResource.of(stack), stack.getCount(), transaction);
                 if (inserted > 0) {
@@ -683,13 +686,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<FluidResource> handler = fluidSourceHandler(level, address);
+            ResourceHandler<FluidResource> handler = fluidSourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         FluidResource fluid = handler.getResource(slot);
                         if (!fluid.isEmpty() && handler.getAmountAsLong(slot) > 0
-                                && config.matches(fluid)) return true;
+                        && RoboticsGateActions.providesFluid(level, address, config, fluid)) return true;
                     }
                     return false;
                 })
@@ -707,7 +709,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().receives() || !config.matches(carried)) return false;
+            if (!RoboticsGateActions.acceptsFluid(level, address, config, carried)) return false;
                     ResourceHandler<FluidResource> handler = fluidSourceHandler(level, address);
                     if (handler == null) return false;
                     try (Transaction transaction = Transaction.openRoot()) {
@@ -757,10 +759,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadFluidCarrier(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<FluidResource> handler = fluidSourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size() && fluidTank.getAmountAsLong(0) < FLUID_CAPACITY; slot++) {
             FluidResource fluid = handler.getResource(slot);
-            if (fluid.isEmpty() || !config.matches(fluid)) continue;
+            if (fluid.isEmpty() || !RoboticsGateActions.providesFluid(
+                    level, source, config, fluid)) continue;
             int capacity = FLUID_CAPACITY - fluidTank.getAmountAsInt(0);
             try (Transaction transaction = Transaction.openRoot()) {
                 int extracted = handler.extract(slot, fluid,
@@ -776,7 +779,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         ResourceHandler<FluidResource> handler = fluidSourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
         FluidResource fluid = fluidTank.getResource(0);
-        if (handler == null || !config.mode().receives() || !config.matches(fluid)) return;
+        if (handler == null || !RoboticsGateActions.acceptsFluid(
+                level, destination, config, fluid)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             int inserted = handler.insert(fluid, fluidTank.getAmountAsInt(0), transaction);
             int extracted = fluidTank.extract(0, fluid, inserted, transaction);
@@ -826,13 +830,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.AXES)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -847,7 +851,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().receives() || !config.matches(lumberjackTool)) return false;
+            if (!RoboticsGateActions.acceptsItem(level, address, config, lumberjackTool)) return false;
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     try (Transaction transaction = Transaction.openRoot()) {
@@ -861,11 +865,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadLumberjackTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.AXES) || !config.matches(stack)) continue;
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.AXES)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     lumberjackTool = resource.toStack(1);
@@ -880,7 +885,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (lumberjackTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives() || !config.matches(lumberjackTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, destination, config, lumberjackTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(lumberjackTool), 1, transaction) == 1) {
                 lumberjackTool = ItemStack.EMPTY;
@@ -1183,11 +1189,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
-                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
-                        return false;
-                    }
+            if (handler == null) return false;
                     if (!provider) {
-                        if (!config.matches(minerTool)) return false;
+                if (!RoboticsGateActions.acceptsItem(level, address, config, minerTool)) return false;
                         try (Transaction transaction = Transaction.openRoot()) {
                             return handler.insert(ItemResource.of(minerTool), 1, transaction) == 1;
                         }
@@ -1195,7 +1199,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.PICKAXES)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -1206,12 +1211,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadMinerTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
             if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.PICKAXES)
-                    || !config.matches(stack)) continue;
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     minerTool = resource.toStack(1);
@@ -1226,7 +1231,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (minerTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives() || !config.matches(minerTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, destination, config, minerTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(minerTool), 1, transaction) == 1) {
                 minerTool = ItemStack.EMPTY;
@@ -1389,13 +1395,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (RobotCropHandlerRegistry.isSeed(stack)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -1406,11 +1412,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadPlanterSeed(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!RobotCropHandlerRegistry.isSeed(stack) || !config.matches(stack)) continue;
+            if (!RobotCropHandlerRegistry.isSeed(stack)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     planterSeed = resource.toStack(1);
@@ -1539,13 +1546,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.HOES)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -1556,11 +1563,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadFarmerTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.HOES) || !config.matches(stack)) continue;
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.HOES)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     farmerTool = resource.toStack(1);
@@ -1716,11 +1724,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
-                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
-                        return false;
-                    }
+            if (handler == null) return false;
                     if (!provider) {
-                        if (!config.matches(leafCutterTool)) return false;
+                if (!RoboticsGateActions.acceptsItem(level, address, config, leafCutterTool)) return false;
                         try (Transaction transaction = Transaction.openRoot()) {
                             return handler.insert(ItemResource.of(leafCutterTool), 1, transaction) == 1;
                         }
@@ -1728,7 +1734,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.world.item.Items.SHEARS)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -1739,11 +1746,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadLeafCutterTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.world.item.Items.SHEARS) || !config.matches(stack)) continue;
+            if (!stack.is(net.minecraft.world.item.Items.SHEARS)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     leafCutterTool = resource.toStack(1);
@@ -1758,7 +1766,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (leafCutterTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives() || !config.matches(leafCutterTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, destination, config, leafCutterTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(leafCutterTool), 1, transaction) == 1) {
                 leafCutterTool = ItemStack.EMPTY;
@@ -1913,9 +1922,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
-                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) return false;
+        if (handler == null) return false;
                     if (!provider) {
-                        if (!config.matches(shovelmanTool)) return false;
+            if (!RoboticsGateActions.acceptsItem(level, address, config, shovelmanTool)) return false;
                         try (Transaction transaction = Transaction.openRoot()) {
                             return handler.insert(ItemResource.of(shovelmanTool), 1, transaction) == 1;
                         }
@@ -1923,7 +1932,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.tags.ItemTags.SHOVELS)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    && handler.getAmountAsLong(slot) > 0
+                    && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -1933,11 +1943,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadShovelmanTool(ServerLevel level, RobotStationRegistry.Address address) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         RobotStationConfig config = stationConfig(level, address);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SHOVELS) || !config.matches(stack)) continue;
+            if (!stack.is(net.minecraft.tags.ItemTags.SHOVELS)
+                    || !RoboticsGateActions.providesItem(level, address, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     shovelmanTool = resource.toStack(1);
@@ -1952,7 +1963,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (shovelmanTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         RobotStationConfig config = stationConfig(level, address);
-        if (handler == null || !config.mode().receives() || !config.matches(shovelmanTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, address, config, shovelmanTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(shovelmanTool), 1, transaction) == 1) {
                 shovelmanTool = ItemStack.EMPTY;
@@ -2122,11 +2134,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
-                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
-                        return false;
-                    }
+        if (handler == null) return false;
                     if (!provider) {
-                        if (!config.matches(butcherTool)) return false;
+            if (!RoboticsGateActions.acceptsItem(level, address, config, butcherTool)) return false;
                         try (Transaction transaction = Transaction.openRoot()) {
                             return handler.insert(ItemResource.of(butcherTool), 1, transaction) == 1;
                         }
@@ -2134,7 +2144,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    && handler.getAmountAsLong(slot) > 0
+                    && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -2144,11 +2155,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadButcherTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !config.matches(stack)) continue;
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     butcherTool = resource.toStack(1);
@@ -2163,7 +2175,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (butcherTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives() || !config.matches(butcherTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, destination, config, butcherTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(butcherTool), 1, transaction) == 1) {
                 butcherTool = ItemStack.EMPTY;
@@ -2441,11 +2454,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     ResourceHandler<ItemResource> handler = sourceHandler(level, address);
-                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
-                        return false;
-                    }
+        if (handler == null) return false;
                     if (!provider) {
-                        if (!config.matches(knightTool)) return false;
+            if (!RoboticsGateActions.acceptsItem(level, address, config, knightTool)) return false;
                         try (Transaction transaction = Transaction.openRoot()) {
                             return handler.insert(ItemResource.of(knightTool), 1, transaction) == 1;
                         }
@@ -2453,7 +2464,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    && handler.getAmountAsLong(slot) > 0
+                    && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -2463,11 +2475,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadKnightTool(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !config.matches(stack)) continue;
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     knightTool = resource.toStack(1);
@@ -2482,7 +2495,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (knightTool.isEmpty()) return;
         ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
         RobotStationConfig config = stationConfig(level, destination);
-        if (handler == null || !config.mode().receives() || !config.matches(knightTool)) return;
+        if (handler == null || !RoboticsGateActions.acceptsItem(
+                level, destination, config, knightTool)) return;
         try (Transaction transaction = Transaction.openRoot()) {
             if (handler.insert(ItemResource.of(knightTool), 1, transaction) == 1) {
                 knightTool = ItemStack.EMPTY;
@@ -2578,13 +2592,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -2594,11 +2608,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadBomberTnt(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem()) || !config.matches(stack)) continue;
+            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             int accepted = bomberInventoryCapacity(stack);
             if (accepted <= 0) return;
             try (Transaction transaction = Transaction.openRoot()) {
@@ -2744,12 +2759,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (!stack.isEmpty() && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                if (!stack.isEmpty() && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -2759,11 +2774,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private void loadStripesItem(ServerLevel level, RobotStationRegistry.Address source) {
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !config.matches(stack)) continue;
+            if (stack.isEmpty() || !RoboticsGateActions.providesItem(
+                    level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
                     stripesItem = resource.toStack(1);
@@ -3050,13 +3066,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
-                    if (!config.mode().provides()) return false;
-                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+            ResourceHandler<ItemResource> handler = sourceHandler(level, address);
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (builderMaterialMatches(snapshot, desired, stack)
-                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                        && handler.getAmountAsLong(slot) > 0
+                        && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
                 })
@@ -3077,11 +3093,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         var desired = snapshot.stateAt(builderLocal(snapshot, builderSlotIndex));
         ResourceHandler<ItemResource> handler = sourceHandler(level, source);
         RobotStationConfig config = stationConfig(level, source);
-        if (handler == null || !config.mode().provides()) return;
+        if (handler == null) return;
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!builderMaterialMatches(snapshot, desired, stack) || !config.matches(stack)) continue;
+            if (!builderMaterialMatches(snapshot, desired, stack)
+                    || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             int targetSlot = firstEmptyRobotSlot();
             if (targetSlot < 0) return;
             try (Transaction transaction = Transaction.openRoot()) {

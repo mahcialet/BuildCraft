@@ -75,16 +75,32 @@ public final class GateMenu extends AbstractContainerMenu {
     }
     @Override public boolean clickMenuButton(Player player, int id) {
         ItemStack gate = gate();
-        boolean actionButton = id >= 16;
-        int row = actionButton ? id - 16 : id / 2;
+        boolean parameterButton = id >= 24;
+        boolean actionButton = id >= 16 && !parameterButton;
+        int row = parameterButton ? (id - 24) / GateRule.MAX_PARAMETERS
+                : actionButton ? id - 16 : id / 2;
         if (gate.isEmpty() || row < 0 || row >= GateItem.slots(gate)) return false;
         var rules = new ArrayList<>(gate.getOrDefault(
                 BCSiliconDataComponents.GATE_PROGRAM.get(), GateProgram.EMPTY).rules());
-        if (actionButton) {
+        if (parameterButton) {
+            while (rules.size() <= row) rules.add(new GateRule(GateTrigger.TRUE, GateAction.REDSTONE_OUTPUT));
+            GateRule old = rules.get(row);
+            int parameter = (id - 24) % GateRule.MAX_PARAMETERS;
+            var parameters = new ArrayList<>(old.parameters());
+            ItemStack carried = getCarried();
+            if (carried.isEmpty()) {
+                if (parameter < parameters.size()) parameters.remove(parameter);
+            } else if (parameter < parameters.size()) {
+                parameters.set(parameter, carried.copyWithCount(1));
+            } else {
+                parameters.add(carried.copyWithCount(1));
+            }
+            rules.set(row, new GateRule(old.trigger(), old.action(), old.actionSide(), parameters));
+        } else if (actionButton) {
             while (rules.size() <= row) rules.add(new GateRule(GateTrigger.TRUE, GateAction.REDSTONE_OUTPUT));
             GateRule old = rules.get(row);
             GateAction next = GateAction.values()[(old.action().ordinal() + 1) % GateAction.values().length];
-            rules.set(row, new GateRule(old.trigger(), next, old.actionSide()));
+            rules.set(row, new GateRule(old.trigger(), next, old.actionSide(), old.parameters()));
         } else if ((id & 1) == 1) {
             if (row >= rules.size()) return false;
             rules.remove(row);
@@ -92,7 +108,7 @@ public final class GateMenu extends AbstractContainerMenu {
             while (rules.size() <= row) rules.add(new GateRule(GateTrigger.TRUE, GateAction.REDSTONE_OUTPUT));
             GateRule old = rules.get(row);
             GateTrigger next = GateTrigger.values()[(old.trigger().ordinal() + 1) % GateTrigger.values().length];
-            rules.set(row, new GateRule(next, old.action(), old.actionSide()));
+            rules.set(row, new GateRule(next, old.action(), old.actionSide(), old.parameters()));
         }
         ItemStack updated = gate.copy();
         updated.set(BCSiliconDataComponents.GATE_PROGRAM.get(), new GateProgram(rules));

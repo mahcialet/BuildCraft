@@ -72,7 +72,15 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                                 side, buildcraft.api.core.IControllable.ControlMode.OFF);
                         case MACHINE_CONTROL_LOOP -> pipe.activateMachineControl(
                                 side, buildcraft.api.core.IControllable.ControlMode.LOOP);
-                }
+                        case ROBOT_GOTO_STATION, ROBOT_WAKE_UP, ROBOT_WORK_AREA,
+                                ROBOT_LOAD_UNLOAD_AREA, ROBOT_FILTER, ROBOT_FILTER_TOOL,
+                                STATION_REQUEST_ITEMS, STATION_PROVIDE_ITEMS,
+                                STATION_ACCEPT_FLUIDS, STATION_PROVIDE_FLUIDS,
+                                STATION_FORCE_ROBOT, STATION_FORBID_ROBOT,
+                                STATION_ACCEPT_ITEMS, STATION_MACHINE_REQUEST_ITEMS ->
+                                buildcraft.robotics.RoboticsGateActions.activate(
+                                        pipe, rule.action(), rule.parameters());
+                    }
             } else if (rule.action() == GateAction.PULSAR_SINGLE) {
                 pipe.updateSinglePulsar(side, index, rule.actionSide().orElse(null), false);
             }

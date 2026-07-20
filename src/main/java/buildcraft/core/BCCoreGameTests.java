@@ -6714,6 +6714,91 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 holder.attachment(Direction.UP)
                         .get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
                         .rules().getFirst().action(), "Gate editor did not persist action cycle");
+        menu.setCarried(new ItemStack(Items.COBBLESTONE, 32));
+        helper.assertTrue(menu.clickMenuButton(player, 24), "Gate editor rejected first parameter");
+        ItemStack parameter = holder.attachment(Direction.UP)
+                .get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
+                .rules().getFirst().parameters().getFirst();
+        helper.assertTrue(parameter.is(Items.COBBLESTONE) && parameter.getCount() == 1,
+                "Gate editor did not preserve a normalized item parameter");
+
+        ItemStack actionGate = holder.attachment(Direction.UP).copy();
+        actionGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_PROVIDE_ITEMS,
+                                java.util.Optional.empty(), java.util.List.of(parameter)))));
+        holder.setAttachment(Direction.UP, actionGate);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pos, Direction.NORTH);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+        var disabled = buildcraft.robotics.RobotStationConfig.DEFAULT;
+        var address = new buildcraft.robotics.RobotStationRegistry.Address(pos, Direction.NORTH);
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.providesItem(
+                helper.getLevel(), address, disabled, new ItemStack(Items.COBBLESTONE)),
+                "Provide Items action did not enable its filtered item");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesItem(
+                helper.getLevel(), address, disabled, new ItemStack(Items.DIRT)),
+                "Provide Items action ignored its item parameter");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesFluid(
+                helper.getLevel(), address, disabled,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                        net.minecraft.world.level.material.Fluids.WATER)),
+                "Provide Items action incorrectly enabled fluid output");
+        ItemStack unrestrictedGate = holder.attachment(Direction.UP).copy();
+        unrestrictedGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_PROVIDE_ITEMS,
+                                java.util.Optional.empty(), java.util.List.of(new ItemStack(Items.DIRT))),
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_PROVIDE_ITEMS))));
+        holder.setAttachment(Direction.UP, unrestrictedGate);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.providesItem(
+                helper.getLevel(), address, disabled, new ItemStack(Items.DIAMOND)),
+                "Unfiltered Provide Items rule did not override a parallel filtered rule");
+
+        BlockPos fluidRelative = new BlockPos(5, 2, 2);
+        BlockPos fluidPos = helper.absolutePos(fluidRelative);
+        helper.setBlock(fluidRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        var fluidHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(fluidPos);
+        helper.assertTrue(fluidHolder != null && fluidHolder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Fluid Gate test rejected Robot Station");
+        ItemStack fluidGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        fluidGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_PROVIDE_FLUIDS,
+                                java.util.Optional.empty(),
+                                java.util.List.of(new ItemStack(Items.WATER_BUCKET))))));
+        helper.assertTrue(fluidHolder.installAttachment(Direction.UP, fluidGate),
+                "Fluid Gate test rejected Gate");
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), fluidPos, Direction.NORTH);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), fluidPos,
+                helper.getLevel().getBlockState(fluidPos), fluidHolder);
+        var fluidAddress = new buildcraft.robotics.RobotStationRegistry.Address(fluidPos, Direction.NORTH);
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.providesFluid(
+                helper.getLevel(), fluidAddress, disabled,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                        net.minecraft.world.level.material.Fluids.WATER)),
+                "Provide Fluids action did not enable its filtered fluid");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesFluid(
+                helper.getLevel(), fluidAddress, disabled,
+                net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                        net.minecraft.world.level.material.Fluids.LAVA)),
+                "Provide Fluids action ignored its bucket parameter");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesItem(
+                helper.getLevel(), fluidAddress, disabled, new ItemStack(Items.WATER_BUCKET)),
+                "Provide Fluids action incorrectly enabled item output");
         helper.succeed();
     }
 

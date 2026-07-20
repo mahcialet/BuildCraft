@@ -12,6 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public final class GateScreen extends AbstractContainerScreen<GateMenu> {
     private final Button[] triggerButtons = new Button[8];
     private final Button[] actionButtons = new Button[8];
+    private final Button[][] parameterButtons = new Button[8][3];
     private final Button[] clearButtons = new Button[8];
     public GateScreen(GateMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 222);
@@ -22,9 +23,16 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
         for (int row = 0; row < 8; row++) {
             int index = row;
             triggerButtons[row] = addRenderableWidget(Button.builder(Component.literal("+"), button ->
-                    click(index * 2)).bounds(leftPos + 12, topPos + 20 + row * 12, 68, 11).build());
+                    click(index * 2)).bounds(leftPos + 8, topPos + 20 + row * 12, 52, 11).build());
             actionButtons[row] = addRenderableWidget(Button.builder(Component.literal("→"), button ->
-                    click(16 + index)).bounds(leftPos + 82, topPos + 20 + row * 12, 62, 11).build());
+                    click(16 + index)).bounds(leftPos + 62, topPos + 20 + row * 12, 48, 11).build());
+            for (int parameter = 0; parameter < 3; parameter++) {
+                int parameterIndex = parameter;
+                parameterButtons[row][parameter] = addRenderableWidget(Button.builder(
+                        Component.literal(Integer.toString(parameter + 1)), button ->
+                                click(24 + index * 3 + parameterIndex))
+                        .bounds(leftPos + 112 + parameter * 12, topPos + 20 + row * 12, 11, 11).build());
+            }
             clearButtons[row] = addRenderableWidget(Button.builder(Component.literal("×"), button ->
                     click(index * 2 + 1)).bounds(leftPos + 148, topPos + 20 + row * 12, 16, 11).build());
         }
@@ -39,6 +47,7 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
             boolean visible = row < menu.ruleSlots();
             triggerButtons[row].visible = visible;
             actionButtons[row].visible = visible;
+            for (Button parameter : parameterButtons[row]) parameter.visible = visible;
             clearButtons[row].visible = visible;
             if (!visible) continue;
             GateTrigger trigger = menu.trigger(row);
@@ -46,6 +55,7 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
             triggerButtons[row].setMessage(Component.literal(trigger == null ? "+" : trigger.getSerializedName()));
             actionButtons[row].setMessage(Component.literal(action == null ? "→" : action.getSerializedName()));
             actionButtons[row].active = trigger != null;
+            for (Button parameter : parameterButtons[row]) parameter.active = trigger != null;
             clearButtons[row].active = trigger != null;
         }
     }
