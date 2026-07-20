@@ -102,6 +102,7 @@ public final class BCCoreGameTests {
     private static void registerTests(RegisterGameTestsEvent event) {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(id("core"));
         Holder<TestEnvironmentDefinition<?>> diagnosticsEnvironment = event.registerEnvironment(id("core_diagnostics"));
+        Holder<TestEnvironmentDefinition<?>> siliconPlaceholderEnvironment = event.registerEnvironment(id("silicon_placeholders"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -235,6 +236,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, environment, "silicon_laser_assembly", BCCoreGameTests::siliconLaserAssembly);
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
+        registerTest(event, siliconPlaceholderEnvironment, "silicon_placeholder_tables", BCCoreGameTests::siliconPlaceholderTables);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -4070,6 +4072,37 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         tickPipes(helper, 40, woodPos);
         helper.assertValueEqual(1, containerCount(source, Items.COAL),
                 "manually disabled pulsar continued feeding the wood pipe");
+        helper.succeed();
+    }
+
+    private static void siliconPlaceholderTables(GameTestHelper helper) {
+        BlockPos chargingRelative = new BlockPos(2, 8, 2);
+        BlockPos programmingRelative = chargingRelative.east(2);
+        helper.setBlock(chargingRelative, buildcraft.silicon.BCSiliconBlocks.CHARGING_TABLE.get());
+        helper.setBlock(programmingRelative, buildcraft.silicon.BCSiliconBlocks.PROGRAMMING_TABLE.get());
+        var charging = helper.getLevel().getBlockEntity(helper.absolutePos(chargingRelative));
+        var programming = helper.getLevel().getBlockEntity(helper.absolutePos(programmingRelative));
+        helper.assertTrue(charging instanceof buildcraft.silicon.block.entity.ChargingTableBlockEntity,
+                "Charging Table created wrong block entity");
+        helper.assertTrue(programming instanceof buildcraft.silicon.block.entity.ProgrammingTableBlockEntity,
+                "Programming Table created wrong block entity");
+        var chargingTarget = (buildcraft.api.mj.ILaserTarget) charging;
+        var programmingTarget = (buildcraft.api.mj.ILaserTarget) programming;
+        helper.assertValueEqual(0L, chargingTarget.getRequiredLaserPower(), "Charging Table placeholder requested power");
+        helper.assertValueEqual(0L, programmingTarget.getRequiredLaserPower(), "Programming Table placeholder requested power");
+        helper.assertValueEqual(3 * MjAPI.MJ, chargingTarget.receiveLaserPower(3 * MjAPI.MJ),
+                "Charging Table placeholder consumed laser power");
+        helper.assertValueEqual(3 * MjAPI.MJ, programmingTarget.receiveLaserPower(3 * MjAPI.MJ),
+                "Programming Table placeholder consumed laser power");
+        for (BlockPos relative : java.util.List.of(chargingRelative, programmingRelative)) {
+            BlockPos pos = helper.absolutePos(relative);
+            BlockState state = helper.getBlockState(relative);
+            double height = state.getShape(helper.getLevel(), pos).bounds().maxY;
+            helper.assertTrue(Math.abs(height - 9 / 16.0) < 1.0E-9, "Laser table did not retain 9/16 height");
+            var drops = Block.getDrops(state, helper.getLevel(), pos, helper.getLevel().getBlockEntity(pos));
+            helper.assertTrue(drops.stream().anyMatch(stack -> stack.is(state.getBlock().asItem())),
+                    "Placeholder laser table did not drop itself");
+        }
         helper.succeed();
     }
 

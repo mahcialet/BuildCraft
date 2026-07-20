@@ -5,6 +5,8 @@ import buildcraft.silicon.block.entity.AssemblyTableBlockEntity;
 import buildcraft.silicon.block.entity.LaserBlockEntity;
 import buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity;
 import buildcraft.silicon.block.entity.IntegrationTableBlockEntity;
+import buildcraft.silicon.block.entity.ChargingTableBlockEntity;
+import buildcraft.silicon.block.entity.ProgrammingTableBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -27,6 +29,12 @@ public final class BCSiliconBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<IntegrationTableBlockEntity>>
         INTEGRATION_TABLE = BLOCK_ENTITIES.register("integration_table", () -> new BlockEntityType<>(
             IntegrationTableBlockEntity::new, BCSiliconBlocks.INTEGRATION_TABLE.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChargingTableBlockEntity>>
+        CHARGING_TABLE = BLOCK_ENTITIES.register("charging_table", () -> new BlockEntityType<>(
+            ChargingTableBlockEntity::new, BCSiliconBlocks.CHARGING_TABLE.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ProgrammingTableBlockEntity>>
+        PROGRAMMING_TABLE = BLOCK_ENTITIES.register("programming_table", () -> new BlockEntityType<>(
+            ProgrammingTableBlockEntity::new, BCSiliconBlocks.PROGRAMMING_TABLE.get()));
 
     private BCSiliconBlockEntities() {}
     public static void register(IEventBus bus) {

@@ -29,6 +29,8 @@ public final class BCSilicon {
         event.accept(BCSiliconItems.ASSEMBLY_TABLE.get());
         event.accept(BCSiliconItems.ADVANCED_CRAFTING_TABLE.get());
         event.accept(BCSiliconItems.INTEGRATION_TABLE.get());
+        event.accept(BCSiliconItems.CHARGING_TABLE.get());
+        event.accept(BCSiliconItems.PROGRAMMING_TABLE.get());
         event.accept(BCSiliconItems.PLUG_PULSAR.get());
         event.accept(BCSiliconItems.PLUG_LIGHT_SENSOR.get());
         event.accept(BCSiliconItems.PLUG_TIMER.get());

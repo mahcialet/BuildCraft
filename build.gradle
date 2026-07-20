@@ -358,11 +358,27 @@ tasks.named('processResources', ProcessResources) {
         include '*.png'
         into 'assets/buildcraftsilicon/textures/block/table/integration'
     }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/table/charging') {
+        include '*.png'
+        into 'assets/buildcraftsilicon/textures/block/table/charging'
+    }
+    from('buildcraft_resources/assets/buildcraftsilicon/textures/blocks/table/programming') {
+        include '*.png'
+        into 'assets/buildcraftsilicon/textures/block/table/programming'
+    }
     from('buildcraft_resources/assets/buildcraftsilicon/models/block/table') {
         include 'integration.json'
         rename { 'integration_table.json' }
         filter { line -> line.replace('"block/block"', '"minecraft:block/block"')
                 .replace('buildcraftsilicon:blocks/', 'buildcraftsilicon:block/') }
+        into 'assets/buildcraftsilicon/models/block'
+    }
+    from('buildcraft_resources/assets/buildcraftsilicon/models/block/table') {
+        include 'charging.json', 'programming.json'
+        rename { name -> name.replace('.json', '_table.json') }
+        filter { line -> line.replace('"block/block"', '"minecraft:block/block"')
+                .replace('buildcraftsilicon:blocks/', 'buildcraftsilicon:block/')
+                .replace('"blocks/glass_white"', '"minecraft:block/white_stained_glass"') }
         into 'assets/buildcraftsilicon/models/block'
     }
     from('buildcraft_resources/assets/buildcraftcore/textures/blocks/misc') {

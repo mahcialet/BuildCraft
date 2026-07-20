@@ -51,6 +51,10 @@ public final class BCSiliconItems {
         ITEMS.registerSimpleBlockItem("advanced_crafting_table", BCSiliconBlocks.ADVANCED_CRAFTING_TABLE);
     public static final DeferredItem<?> INTEGRATION_TABLE =
         ITEMS.registerSimpleBlockItem("integration_table", BCSiliconBlocks.INTEGRATION_TABLE);
+    public static final DeferredItem<?> CHARGING_TABLE =
+        ITEMS.registerSimpleBlockItem("charging_table", BCSiliconBlocks.CHARGING_TABLE);
+    public static final DeferredItem<?> PROGRAMMING_TABLE =
+        ITEMS.registerSimpleBlockItem("programming_table", BCSiliconBlocks.PROGRAMMING_TABLE);
 
     public static ItemStack lens(DyeColor color, boolean filter) {
         ItemStack stack = new ItemStack(PLUG_LENS.get());
