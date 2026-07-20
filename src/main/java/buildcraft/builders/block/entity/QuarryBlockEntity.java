@@ -73,6 +73,7 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
     private int miningCursor;
     private BlockPos target;
     private long progress;
+    private long nextMineTick;
     private Vec3 head;
 
     public QuarryBlockEntity(BlockPos pos, BlockState state) {
@@ -211,6 +212,8 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         long accepted = battery.extractPower(0, Math.min(MAX_POWER_PER_TICK, required - progress), false);
         progress += accepted;
         if (progress < required) { setChanged(); return; }
+        long mineDelay = configuredMineDelayTicks();
+        if (mineDelay > 0 && level.getGameTime() < nextMineTick) return;
 
         var fakePlayer = FakePlayerFactory.getMinecraft(level);
         ItemStack tool = new ItemStack(Items.DIAMOND_PICKAXE);
@@ -225,6 +228,7 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         }
         List<ItemStack> mined = Block.getDrops(state, level, target, level.getBlockEntity(target), fakePlayer, tool);
         level.removeBlock(target, false);
+        if (mineDelay > 0) nextMineTick = level.getGameTime() + mineDelay;
         for (ItemStack stack : mined) storeOrDrop(level, stack);
         target = null;
         progress = 0;
@@ -274,6 +278,11 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
             if (mineable(state, level, pos)) return pos;
         }
         return null;
+    }
+
+    public static long configuredMineDelayTicks() {
+        double maxRate = BCBuildersConfig.QUARRY_MAX_BLOCK_MINE_RATE.get();
+        return maxRate < 0.01 ? 0 : Math.max(1, (long) Math.ceil(20.0 / maxRate));
     }
 
     private boolean mineable(BlockState state, ServerLevel level, BlockPos pos) {
@@ -402,6 +411,7 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         miningCursor = Math.max(0, input.getIntOr("mining_cursor", 0));
         target = input.getLong("target").stream().map(BlockPos::of).findFirst().orElse(null);
         progress = Math.max(0, input.getLongOr("progress", 0));
+        nextMineTick = Math.max(0, input.getLongOr("next_mine_tick", 0));
         blockedColumns.clear();
         forcedChunks.clear();
         blockedColumns.addAll(input.read("blocked_columns", Codec.INT.listOf()).orElse(List.of()));
@@ -421,6 +431,7 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         if (miningCursor > 0) output.putInt("mining_cursor", miningCursor);
         if (target != null) output.putLong("target", target.asLong());
         if (progress > 0) output.putLong("progress", progress);
+        if (nextMineTick > 0) output.putLong("next_mine_tick", nextMineTick);
         if (!blockedColumns.isEmpty()) output.store("blocked_columns", Codec.INT.listOf(), new ArrayList<>(blockedColumns));
         if (head != null) {
             output.putBoolean("has_head", true);
