@@ -105,6 +105,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> siliconPlaceholderEnvironment = event.registerEnvironment(id("silicon_placeholders"));
         Holder<TestEnvironmentDefinition<?>> gateParameterEnvironment = event.registerEnvironment(id("gate_parameters"));
         Holder<TestEnvironmentDefinition<?>> fillerGateEnvironment = event.registerEnvironment(id("filler_gate_patterns"));
+        Holder<TestEnvironmentDefinition<?>> roboticsGateListEnvironment = event.registerEnvironment(id("robotics_gate_lists"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -241,6 +242,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, siliconPlaceholderEnvironment, "silicon_placeholder_tables", BCCoreGameTests::siliconPlaceholderTables);
         registerTest(event, gateParameterEnvironment, "silicon_gate_parameter_triggers", BCCoreGameTests::siliconGateParameterTriggers);
         registerTest(event, fillerGateEnvironment, "builders_filler_gate_patterns", BCCoreGameTests::buildersFillerGatePatterns);
+        registerTest(event, roboticsGateListEnvironment, "robotics_gate_list_parameters", BCCoreGameTests::roboticsGateListParameters);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -5934,6 +5936,56 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 (int) java.util.Arrays.stream(buildcraft.silicon.gate.GateAction.values())
                         .filter(action -> buildcraft.builders.BuildersGateActions.pattern(action) != null).count(),
                 "not every active Filler pattern has a gate action");
+        helper.succeed();
+    }
+
+    private static void roboticsGateListParameters(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Robotics List test could not install its Station");
+
+        ItemStack itemList = new ItemStack(BCCoreItems.LIST.get());
+        ItemList.setData(itemList, new ListData("Gate items", java.util.List.of(
+                new ListLineData(java.util.List.of(new ItemStack(Items.IRON_INGOT)),
+                        false, buildcraft.api.lists.ListMatchMode.TYPE), ListLineData.empty())));
+        ItemStack robotList = new ItemStack(BCCoreItems.LIST.get());
+        ItemList.setData(robotList, new ListData("Gate robots", java.util.List.of(
+                new ListLineData(java.util.List.of(buildcraft.robotics.item.RobotItem.create(
+                        buildcraft.robotics.RobotBoardType.CARRIER, 0)),
+                        true, buildcraft.api.lists.ListMatchMode.DIRECT), ListLineData.empty())));
+
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_PROVIDE_ITEMS,
+                                java.util.Optional.empty(), java.util.List.of(itemList)),
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_FORCE_ROBOT,
+                                java.util.Optional.empty(), java.util.List.of(robotList)))));
+        helper.assertTrue(holder.installAttachment(Direction.UP, gate),
+                "Robotics List test could not install its Gate");
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipePos, Direction.NORTH);
+        tickPipes(helper, 1, pipePos);
+        var address = new buildcraft.robotics.RobotStationRegistry.Address(pipePos, Direction.NORTH);
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.providesItem(helper.getLevel(), address,
+                buildcraft.robotics.RobotStationConfig.DEFAULT, new ItemStack(Items.GOLD_INGOT)),
+                "type-matching List did not admit another ingot");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesItem(helper.getLevel(), address,
+                buildcraft.robotics.RobotStationConfig.DEFAULT, new ItemStack(Items.COBBLESTONE)),
+                "type-matching List admitted an unrelated item");
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(), address,
+                buildcraft.robotics.RobotBoardType.CARRIER), "Robot List rejected its configured board");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(), address,
+                buildcraft.robotics.RobotBoardType.PICKER), "Robot List admitted an unconfigured board");
         helper.succeed();
     }
 

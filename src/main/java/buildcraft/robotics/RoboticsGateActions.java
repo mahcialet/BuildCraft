@@ -1,6 +1,8 @@
 package buildcraft.robotics;
 
 import buildcraft.api.robots.IRequestProvider;
+import buildcraft.api.items.IList;
+import buildcraft.robotics.item.RobotItem;
 import buildcraft.robotics.entity.RobotEntity;
 import buildcraft.silicon.gate.GateAction;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
@@ -196,7 +198,7 @@ public final class RoboticsGateActions {
         private boolean matchesItem(GateAction action, ItemStack stack) {
             List<ItemStack> filters = parameters.get(action);
             return filters != null && (unrestricted.contains(action)
-                    || filters.stream().anyMatch(filter -> ItemStack.isSameItemSameComponents(filter, stack)));
+                    || filters.stream().anyMatch(filter -> matchesItem(filter, stack)));
         }
 
         private boolean has(GateAction action) {
@@ -206,11 +208,19 @@ public final class RoboticsGateActions {
         private boolean matchesOptionalItem(GateAction action, ItemStack stack) {
             List<ItemStack> filters = parameters.get(action);
             return filters == null || unrestricted.contains(action)
-                    || filters.stream().anyMatch(filter -> ItemStack.isSameItemSameComponents(filter, stack));
+                    || filters.stream().anyMatch(filter -> matchesItem(filter, stack));
+        }
+
+        private static boolean matchesItem(ItemStack filter, ItemStack stack) {
+            return filter.getItem() instanceof IList list
+                    ? list.matches(filter, stack)
+                    : ItemStack.isSameItemSameComponents(filter, stack);
         }
 
         private boolean matchesRobot(GateAction action, RobotBoardType board) {
+            ItemStack robot = RobotItem.create(board, 0);
             return parameters.getOrDefault(action, List.of()).stream().anyMatch(parameter -> {
+                if (parameter.getItem() instanceof IList list && list.matches(parameter, robot)) return true;
                 RobotBoardType type = parameter.getOrDefault(BCRoboticsDataComponents.BOARD_TYPE.get(),
                         RobotBoardType.EMPTY);
                 RobotItemData data = parameter.get(BCRoboticsDataComponents.ROBOT.get());
