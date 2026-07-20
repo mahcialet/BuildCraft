@@ -25,7 +25,7 @@ import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
-public final class AutoWorkbenchBlockEntity extends BlockEntity {
+public final class AutoWorkbenchBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity {
     public static final long POWER_REQUIRED = 40 * MjAPI.MJ;
     private static final long PASSIVE_POWER = MjAPI.MJ / 5;
     private static final long POWER_LOST = 2 * MjAPI.MJ;
@@ -58,6 +58,8 @@ public final class AutoWorkbenchBlockEntity extends BlockEntity {
             }
             if (workbench.battery.getStored() >= POWER_REQUIRED && workbench.craft(craft)) {
                 workbench.battery.extractAll();
+                workbench.ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                    player, "buildcraftfactory:lazy_crafting"));
             }
         } else if (workbench.battery.getStored() > 0) {
             workbench.battery.extractPower(0, Math.min(POWER_LOST, workbench.battery.getStored()), false);

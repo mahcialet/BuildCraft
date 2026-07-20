@@ -49,7 +49,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IControllable {
+public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity implements IHasWork, IControllable {
     public static final long BATTERY_CAPACITY = 2_000 * MjAPI.MJ;
     public static final long MAX_POWER_PER_TICK = 10 * MjAPI.MJ;
     public static final long FRAME_COST = 4 * MjAPI.MJ;
@@ -186,6 +186,12 @@ public final class QuarryBlockEntity extends BlockEntity implements IHasWork, IC
             progress = 0;
             if (target == null) {
                 stage = Stage.DONE;
+                if (areaMin != null && areaMax != null
+                    && areaMax.getX() - areaMin.getX() == 63
+                    && areaMax.getZ() - areaMin.getZ() == 63) {
+                    ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                        player, "buildcraftbuilders:diggy_diggy_hole"));
+                }
                 sync();
                 return;
             }

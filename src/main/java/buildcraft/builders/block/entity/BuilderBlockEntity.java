@@ -34,7 +34,7 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
-public final class BuilderBlockEntity extends BlockEntity implements IHasWork, IControllable {
+public final class BuilderBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity implements IHasWork, IControllable {
     private static final long BATTERY_CAPACITY = 16_000 * MjAPI.MJ;
     private final MjBattery battery = new MjBattery(BATTERY_CAPACITY);
     private final MjBatteryReceiver receiver = new MjBatteryReceiver(battery);
@@ -125,6 +125,8 @@ public final class BuilderBlockEntity extends BlockEntity implements IHasWork, I
                 passIncorrect = false;
             } else {
                 finished = true;
+                ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                    player, "buildcraftbuilders:paving_the_way"));
             }
             sync();
         }

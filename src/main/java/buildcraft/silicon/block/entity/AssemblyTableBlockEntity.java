@@ -19,7 +19,7 @@ import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 
-public final class AssemblyTableBlockEntity extends BlockEntity implements ILaserTarget {
+public final class AssemblyTableBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity implements ILaserTarget {
     private final ItemStacksResourceHandler inventory = new ItemStacksResourceHandler(12);
     private long storedLaserPower;
     private AssemblySelection selection = AssemblySelection.RED;
@@ -53,6 +53,10 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
             table.storedLaserPower = 0;
         } else if (table.storedLaserPower >= recipe.requiredPower()) {
             if (table.craft(recipe)) table.storedLaserPower = 0;
+        }
+        if (recipe != null && recipe.requiredPower() > 0) {
+            table.ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                player, "buildcraftsilicon:precision_crafting"));
         }
         table.setChanged();
     }

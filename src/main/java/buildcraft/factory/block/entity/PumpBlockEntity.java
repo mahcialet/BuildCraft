@@ -27,7 +27,7 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class PumpBlockEntity extends BlockEntity implements buildcraft.api.core.IHasWork {
+public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity implements buildcraft.api.core.IHasWork {
     public static final int CAPACITY = 16_000;
     public static final long POWER_PER_SOURCE = 10 * MjAPI.MJ;
     private static final int MAX_DEPTH = 512;
@@ -45,6 +45,8 @@ public final class PumpBlockEntity extends BlockEntity implements buildcraft.api
     private final MjBatteryReceiver receiver = new MjBatteryReceiver(battery);
     private final ArrayDeque<BlockPos> sources = new ArrayDeque<>();
     private BlockPos intake;
+    private BlockPos oilSpringSource;
+    private int initialSpringSources;
     private int rebuildTicks;
 
     @Override public boolean hasWork() { return intake != null || !sources.isEmpty(); }
@@ -108,6 +110,20 @@ public final class PumpBlockEntity extends BlockEntity implements buildcraft.api
             if (fluidState.isSource()) sources.addLast(current);
             for (Direction direction : search) queue.addLast(current.relative(direction));
         }
+        BlockPos foundSpringSource = sources.stream().filter(source -> {
+            BlockState below = level.getBlockState(source.below());
+            return below.is(buildcraft.core.BCCoreBlocks.SPRING.get())
+                && below.getValue(buildcraft.core.block.BlockSpring.SPRING_TYPE)
+                    == buildcraft.api.enums.EnumSpring.OIL;
+        }).findFirst().orElse(null);
+        if (foundSpringSource != null) {
+            if (!foundSpringSource.equals(oilSpringSource)) initialSpringSources = sources.size();
+            else initialSpringSources = Math.max(initialSpringSources, sources.size());
+            oilSpringSource = foundSpringSource.immutable();
+        } else {
+            oilSpringSource = null;
+            initialSpringSources = 0;
+        }
         changed();
     }
 
@@ -137,6 +153,17 @@ public final class PumpBlockEntity extends BlockEntity implements buildcraft.api
         if (!isInfiniteWaterSource(sourcePos, fluidState.getType())) {
             level.setBlock(sourcePos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
         }
+        ownerPlayer().ifPresent(player -> {
+            buildcraft.core.AdvancementUtil.award(player, "buildcraftfactory:draining_the_world");
+            if (fluidState.getType() == buildcraft.energy.BCEnergyFluids.OIL.get()
+                || fluidState.getType() == buildcraft.energy.BCEnergyFluids.FLOWING_OIL.get()) {
+                buildcraft.core.AdvancementUtil.award(player, "buildcraftfactory:oil_platform");
+                if (sourcePos.equals(oilSpringSource) && initialSpringSources > 0
+                    && sources.size() - 1 <= initialSpringSources / 8) {
+                    buildcraft.core.AdvancementUtil.award(player, "buildcraftfactory:black_gold");
+                }
+            }
+        });
         sources.removeLast();
         changed();
     }
@@ -185,6 +212,9 @@ public final class PumpBlockEntity extends BlockEntity implements buildcraft.api
         long stored = Math.max(0, input.getLongOr("stored_mj", 0));
         if (stored > 0) battery.addPower(stored, false);
         rebuildTicks = Math.clamp(input.getIntOr("rebuild_ticks", 0), 0, 29);
+        oilSpringSource = input.getLong("oil_spring_source").stream()
+            .map(BlockPos::of).findFirst().orElse(null);
+        initialSpringSources = Math.max(0, input.getIntOr("initial_spring_sources", 0));
     }
 
     @Override protected void saveAdditional(ValueOutput output) {
@@ -192,6 +222,8 @@ public final class PumpBlockEntity extends BlockEntity implements buildcraft.api
         tank.serialize(output.child("tank"));
         if (battery.getStored() > 0) output.putLong("stored_mj", battery.getStored());
         if (rebuildTicks > 0) output.putInt("rebuild_ticks", rebuildTicks);
+        if (oilSpringSource != null) output.putLong("oil_spring_source", oilSpringSource.asLong());
+        if (initialSpringSources > 0) output.putInt("initial_spring_sources", initialSpringSources);
     }
 
     private final class PumpTank extends FluidStacksResourceHandler {

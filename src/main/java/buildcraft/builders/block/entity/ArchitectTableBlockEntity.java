@@ -36,7 +36,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 
-public final class ArchitectTableBlockEntity extends BlockEntity {
+public final class ArchitectTableBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity {
     private final ItemStacksResourceHandler inventory = new ItemStacksResourceHandler(2);
     private BlockPos areaMin;
     private BlockPos areaMax;
@@ -173,6 +173,8 @@ public final class ArchitectTableBlockEntity extends BlockEntity {
         inventory.set(1, ItemResource.of(output), 1);
         long remaining = inventory.getAmountAsLong(0) - 1;
         inventory.set(0, remaining > 0 ? input : ItemResource.EMPTY, (int) Math.max(0, remaining));
+        ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+            player, "buildcraftbuilders:architect"));
         resetScan();
         sync();
     }

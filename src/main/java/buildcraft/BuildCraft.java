@@ -15,6 +15,10 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
 import buildcraft.core.client.BCCoreClient;
+import buildcraft.core.block.entity.OwnedBlockEntity;
+import net.minecraft.world.entity.LivingEntity;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.level.BlockEvent;
 
 /** Entry point for the incremental NeoForge port. */
 @Mod(BuildCraft.MOD_ID)
@@ -33,8 +37,16 @@ public final class BuildCraft {
         BCCoreItems.register(modBus);
         BCCreativeTabs.register(modBus);
         BCCoreGameTests.register(modBus);
+        NeoForge.EVENT_BUS.addListener(BuildCraft::recordMachineOwner);
         if (FMLEnvironment.getDist() == Dist.CLIENT) {
             BCCoreClient.register(modBus);
+        }
+    }
+
+    private static void recordMachineOwner(BlockEvent.EntityPlaceEvent event) {
+        if (event.getEntity() instanceof LivingEntity placer
+            && event.getLevel().getBlockEntity(event.getPos()) instanceof OwnedBlockEntity machine) {
+            machine.setOwner(placer);
         }
     }
 }

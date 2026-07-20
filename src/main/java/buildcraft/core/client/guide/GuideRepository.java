@@ -11,15 +11,18 @@ import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.resources.Identifier;
 
 /** Loads the historical external BuildCraftGuide markdown pack from client resources. */
 public final class GuideRepository {
     private static final String ROOT = "compat/buildcraft/guide/en_us/";
     private static final Pattern CHAPTER = Pattern.compile("<chapter\\s+name=\"([^\"]+)\"\\s*/>");
+    private static final Pattern LINK = Pattern.compile("<link\\s+to=\"([^\"]+)\"[^>]*/>");
     private static final Pattern TAG = Pattern.compile("<[^>]+>");
 
-    public record Page(String id, String title, String category, List<String> paragraphs, String searchable) { }
+    public record Page(String id, String title, String category, List<String> paragraphs,
+                       List<String> links, String searchable) { }
 
     private GuideRepository() { }
 
@@ -45,27 +48,39 @@ public final class GuideRepository {
         String id = source.getNamespace() + ":" + relative;
         String category = relative.contains("/") ? relative.substring(0, relative.indexOf('/')) : "general";
         Matcher chapter = CHAPTER.matcher(raw);
-        String title = chapter.find() ? chapter.group(1) : humanName(relative.substring(relative.lastIndexOf('/') + 1));
+        String title = chapter.find() ? localize(chapter.group(1))
+            : humanName(relative.substring(relative.lastIndexOf('/') + 1));
+        List<String> links = LINK.matcher(raw).results().map(result -> result.group(1)).distinct().toList();
 
         String cleaned = raw
             .replace("<lore>", "").replace("</lore>", "")
             .replaceAll("(?s)<no_lore>.*?</no_lore>", "")
+            .replaceAll("(?s)<no_detail>.*?</no_detail>", "")
             .replaceAll("<new_page\\s*/>", "\n\n")
             .replaceAll("<chapter\\s+name=\"([^\"]+)\"\\s*/>", "\n\n$1\n")
-            .replaceAll("<recipes(?:_usages)?[^>]*/>", "\n[Recipes]\n")
-            .replaceAll("<image[^>]*/>", "\n[Image]\n")
+            .replaceAll("<recipes_usages\\s+stack=\"([^\"]+)\"[^>]*/>", "\nRecipes and uses: $1\n")
+            .replaceAll("<recipes\\s+stack=\"([^\"]+)\"[^>]*/>", "\nRecipes: $1\n")
+            .replaceAll("<usages\\s+stack=\"([^\"]+)\"[^>]*/>", "\nUses: $1\n")
+            .replaceAll("<recipe\\s+stack=\"([^\"]+)\"[^>]*/>", "\nRecipe: $1\n")
+            .replaceAll("<image\\s+src=\"([^\"]+)\"[^>]*/>", "\nImage: $1\n")
             .replaceAll("<note\\s+id=\"([^\"]+)\"\\s*>", "\nNote: $1\n")
             .replace("</note>", "")
-            .replaceAll("<(?:bold|italic|underline|blue|green|red)>", "")
-            .replaceAll("</(?:bold|italic|underline|blue|green|red)>", "");
+            .replaceAll("<(?:bold|italic|underline|strikethrough|black|dark_blue|dark_green|dark_aqua|dark_red|dark_purple|gold|gray|dark_gray|blue|green|aqua|red|light_purple|yellow|white)>", "")
+            .replaceAll("</(?:bold|italic|underline|strikethrough|black|dark_blue|dark_green|dark_aqua|dark_red|dark_purple|gold|gray|dark_gray|blue|green|aqua|red|light_purple|yellow|white)>", "");
         cleaned = TAG.matcher(cleaned).replaceAll("");
         List<String> paragraphs = new ArrayList<>();
         for (String value : cleaned.split("\\n\\s*\\n|\\R")) {
-            String text = value.trim().replaceAll("\\s+", " ");
+            String text = localize(value.trim().replaceAll("\\s+", " "));
             if (!text.isEmpty()) paragraphs.add(text);
         }
         return new Page(id, title, source.getNamespace() + " / " + category,
-            List.copyOf(paragraphs), (title + " " + id + " " + cleaned).toLowerCase(Locale.ROOT));
+            List.copyOf(paragraphs), links,
+            (title + " " + id + " " + cleaned).toLowerCase(Locale.ROOT));
+    }
+
+    private static String localize(String value) {
+        String translated = I18n.get(value);
+        return translated.equals(value) ? value : translated;
     }
 
     private static String humanName(String value) {

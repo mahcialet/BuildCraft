@@ -83,6 +83,11 @@ public final class DiamondWoodMenu extends AbstractContainerMenu {
             if (holder != null) {
                 ItemStack carried = getCarried();
                 holder.setDiamondFilter(slotId, carried.isEmpty() ? ItemStack.EMPTY : carried.copyWithCount(1));
+                if (player instanceof ServerPlayer serverPlayer
+                    && holder.diamondFilters().stream().filter(filter -> !filter.isEmpty()).count() >= FILTERS - 2) {
+                    buildcraft.core.AdvancementUtil.award(
+                        serverPlayer, "buildcrafttransport:too_many_pipe_filters");
+                }
                 refresh();
             }
             return;

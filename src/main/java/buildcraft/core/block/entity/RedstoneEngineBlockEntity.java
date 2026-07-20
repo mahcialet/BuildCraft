@@ -24,7 +24,7 @@ import net.minecraft.util.Mth;
 import org.jspecify.annotations.Nullable;
 
 /** Redstone engine state, pulse cycle, and sided MJ output. */
-public final class RedstoneEngineBlockEntity extends BlockEntity implements EngineBlockEntity {
+public final class RedstoneEngineBlockEntity extends OwnedBlockEntity implements EngineBlockEntity {
     public static final double MIN_HEAT = 20;
     public static final double MAX_HEAT = 250;
     private static final long MAX_POWER = MjAPI.MJ;
@@ -91,6 +91,8 @@ public final class RedstoneEngineBlockEntity extends BlockEntity implements Engi
         } else if (powered && extractable(receiver, false) > 0) {
             progressPart = 1;
             pumping = true;
+            ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                player, "buildcraftcore:free_power"));
         } else {
             pumping = false;
         }

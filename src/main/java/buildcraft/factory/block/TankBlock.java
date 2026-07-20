@@ -71,10 +71,16 @@ public final class TankBlock extends BaseEntityBlock {
     @Override
     protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
         Player player, InteractionHand hand, BlockHitResult hitResult) {
-        if (level.getBlockEntity(pos) instanceof TankBlockEntity tank
-                && net.neoforged.neoforge.transfer.fluid.FluidUtil.interactWithFluidHandler(
+        if (level.getBlockEntity(pos) instanceof TankBlockEntity tank) {
+            long before = tank.stackedFluidHandler().getAmountAsLong(0);
+            if (net.neoforged.neoforge.transfer.fluid.FluidUtil.interactWithFluidHandler(
                     player, hand, pos, tank.stackedFluidHandler())) {
-            return InteractionResult.SUCCESS;
+                if (!level.isClientSide() && player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                    && tank.stackedFluidHandler().getAmountAsLong(0) > before) {
+                    buildcraft.core.AdvancementUtil.award(serverPlayer, "buildcraftfactory:fluid_storage");
+                }
+                return InteractionResult.SUCCESS;
+            }
         }
         return InteractionResult.TRY_WITH_EMPTY_HAND;
     }

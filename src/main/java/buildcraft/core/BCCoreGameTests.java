@@ -168,6 +168,8 @@ public final class BCCoreGameTests {
         registerTest(event, builderRobotEnvironment, "robotics_builder_robot",
                 BCCoreGameTests::roboticsBuilderRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
+        registerTest(event, environment, "machine_ownership_advancements",
+                BCCoreGameTests::machineOwnershipAdvancements);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
         registerTest(event, environment, "path_marker_sync", BCCoreGameTests::pathMarkerSync);
@@ -9404,6 +9406,29 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                         new net.minecraft.world.phys.AABB(helper.absolutePos(clearRelative)).inflate(3),
                         item -> item.getItem().is(Items.DIRT)).isEmpty(),
                 "Builder did not preserve excavation drops");
+        helper.succeed();
+    }
+
+    private static void machineOwnershipAdvancements(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(1, 1, 1);
+        helper.setBlock(relative, buildcraft.builders.BCBuildersBlocks.QUARRY.get());
+        var quarry = helper.getBlockEntity(relative,
+            buildcraft.builders.block.entity.QuarryBlockEntity.class);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        quarry.setOwner(player);
+        helper.assertValueEqual(quarry.ownerId().orElseThrow(), player.getUUID(),
+            "Machine did not retain placer identity");
+
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(
+            quarry.getBlockPos(), quarry.getBlockState(),
+            quarry.saveWithFullMetadata(helper.getLevel().registryAccess()),
+            helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.builders.block.entity.QuarryBlockEntity,
+            "Owned machine did not reload");
+        helper.assertValueEqual(
+            ((buildcraft.builders.block.entity.QuarryBlockEntity) loaded).ownerId().orElseThrow(),
+            player.getUUID(), "Machine owner was not persistent");
+
         helper.succeed();
     }
 

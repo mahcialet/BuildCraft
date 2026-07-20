@@ -22,7 +22,7 @@ import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 
-public final class ChuteBlockEntity extends BlockEntity {
+public final class ChuteBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity {
     public static final long BATTERY_CAPACITY = MjAPI.MJ;
     public static final long PICKUP_COST = MjAPI.MJ / 10;
     private static final long GRAVITY_PROGRESS = MjAPI.MJ / 1_000;
@@ -87,7 +87,11 @@ public final class ChuteBlockEntity extends BlockEntity {
                 try (Transaction transaction = Transaction.openRoot()) {
                     int inserted = target.insert(resource, 1, transaction);
                     int extracted = inventory.extract(slot, resource, inserted, transaction);
-                    if (extracted > 0) transaction.commit();
+                    if (extracted > 0) {
+                        transaction.commit();
+                        ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                            player, "buildcraftfactory:retired_hopper"));
+                    }
                 }
                 break;
             }

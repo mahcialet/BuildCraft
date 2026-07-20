@@ -19,7 +19,7 @@ import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class FloodGateBlockEntity extends BlockEntity {
+public final class FloodGateBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity {
     public static final int CAPACITY = 2_000;
     private static final Direction[] LIQUID_SEARCH = {
         Direction.DOWN, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
@@ -47,6 +47,8 @@ public final class FloodGateBlockEntity extends BlockEntity {
         if (target != null && net.neoforged.neoforge.transfer.fluid.FluidUtil.tryPlaceFluid(
                 gate.fluidBuffer, null, level, InteractionHand.MAIN_HAND, target
         ).getAmount() > 0) {
+            gate.ownerPlayer().ifPresent(player -> buildcraft.core.AdvancementUtil.award(
+                player, "buildcraftfactory:flooding_the_world"));
             gate.changed();
         }
     }

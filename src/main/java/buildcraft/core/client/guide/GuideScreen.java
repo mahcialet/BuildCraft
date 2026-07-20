@@ -8,6 +8,7 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
@@ -15,21 +16,29 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.resources.Identifier;
+import net.minecraft.ChatFormatting;
 
 /** Searchable two-page reader for the original BuildCraftGuide resource pack. */
 public final class GuideScreen extends Screen {
     private static final int BOOK_WIDTH = 386;
     private static final int BOOK_HEIGHT = 248;
+    private static final Identifier LEFT_PAGE = Identifier.fromNamespaceAndPath(
+        "buildcraftcore", "textures/gui/guide/left_page.png");
+    private static final Identifier RIGHT_PAGE = Identifier.fromNamespaceAndPath(
+        "buildcraftcore", "textures/gui/guide/right_page.png");
     private final ItemStack source;
     private final boolean note;
     private final Deque<Page> back = new ArrayDeque<>();
     private final Deque<Page> forward = new ArrayDeque<>();
     private List<Page> allPages = List.of();
     private List<Page> matches = List.of();
-    private List<FormattedCharSequence> lines = List.of();
+    private List<GuideLine> lines = List.of();
     private Page page;
     private EditBox search;
     private int sheet;
+
+    private record GuideLine(FormattedCharSequence text, String target) { }
 
     public GuideScreen(ItemStack source, boolean note) {
         super(Component.translatable("gui.buildcraftcore.guide.title"));
@@ -95,10 +104,25 @@ public final class GuideScreen extends Screen {
     }
 
     private void rebuildLines() {
-        List<FormattedCharSequence> wrapped = new ArrayList<>();
+        List<GuideLine> wrapped = new ArrayList<>();
         if (page != null) for (String paragraph : page.paragraphs()) {
-            wrapped.addAll(font.split(Component.literal(paragraph), 158));
-            wrapped.add(FormattedCharSequence.EMPTY);
+            for (FormattedCharSequence line : font.split(Component.literal(paragraph), 158)) {
+                wrapped.add(new GuideLine(line, null));
+            }
+            wrapped.add(new GuideLine(FormattedCharSequence.EMPTY, null));
+        }
+        if (page != null && !page.links().isEmpty()) {
+            wrapped.add(new GuideLine(Component.translatable("gui.buildcraftcore.guide.related")
+                .withStyle(ChatFormatting.BOLD).getVisualOrderText(), null));
+            for (String target : page.links()) {
+                Page linked = allPages.stream().filter(candidate -> candidate.id().equals(target)).findFirst().orElse(null);
+                String label = linked == null ? target : linked.title();
+                for (FormattedCharSequence line : font.split(Component.literal("→ " + label)
+                        .withStyle(linked == null ? ChatFormatting.DARK_GRAY : ChatFormatting.BLUE,
+                            linked == null ? ChatFormatting.ITALIC : ChatFormatting.UNDERLINE), 158)) {
+                    wrapped.add(new GuideLine(line, linked == null ? null : target));
+                }
+            }
         }
         lines = List.copyOf(wrapped);
         sheet = 0;
@@ -114,8 +138,10 @@ public final class GuideScreen extends Screen {
         super.extractRenderState(graphics, mouseX, mouseY, partialTick);
         int left = (width - BOOK_WIDTH) / 2;
         int top = (height - BOOK_HEIGHT) / 2;
-        graphics.fill(left, top, left + BOOK_WIDTH, top + BOOK_HEIGHT, 0xffc8ae7b);
-        graphics.fill(left + 193, top + 4, left + 195, top + 220, 0xff6e4d2e);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, LEFT_PAGE, left, top, 0, 0,
+            193, 248, 193, 248);
+        graphics.blit(RenderPipelines.GUI_TEXTURED, RIGHT_PAGE, left + 193, top, 0, 0,
+            193, 248, 193, 248);
         graphics.text(font, title, left + 25, top + 6, 0x3b2818, false);
 
         if (page == null) {
@@ -139,8 +165,9 @@ public final class GuideScreen extends Screen {
             for (int index = start; index < Math.min(lines.size(), start + 36); index++) {
                 int column = (index - start) / 18;
                 int row = (index - start) % 18;
-                graphics.text(font, lines.get(index), left + 25 + column * 188, top + 45 + row * 10,
-                    0x281c12, false);
+                GuideLine line = lines.get(index);
+                graphics.text(font, line.text(), left + 25 + column * 188, top + 45 + row * 10,
+                    line.target() == null ? 0x281c12 : 0x3159a6, false);
             }
         }
     }
@@ -156,6 +183,16 @@ public final class GuideScreen extends Screen {
             && index >= 0 && index < matches.size()) {
             open(matches.get(index));
             return true;
+        }
+        if (page != null && event.button() == 0 && mouseY >= top + 45 && mouseY < top + 225) {
+            int column = mouseX >= left + 193 ? 1 : 0;
+            int row = (int) ((mouseY - (top + 45)) / 10);
+            int lineIndex = sheet * 36 + column * 18 + row;
+            if (lineIndex >= 0 && lineIndex < lines.size() && lines.get(lineIndex).target() != null) {
+                String target = lines.get(lineIndex).target();
+                allPages.stream().filter(candidate -> candidate.id().equals(target)).findFirst().ifPresent(this::open);
+                return true;
+            }
         }
         return super.mouseClicked(event, doubleClick);
     }
