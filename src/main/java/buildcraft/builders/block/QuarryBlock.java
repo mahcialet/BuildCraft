@@ -21,6 +21,11 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.context.UseOnContext;
+import buildcraft.core.AdvancementUtil;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import org.jspecify.annotations.Nullable;
 
 public final class QuarryBlock extends BaseEntityBlock implements IWrenchable {
     public static final MapCodec<QuarryBlock> CODEC = simpleCodec(QuarryBlock::new);
@@ -34,6 +39,13 @@ public final class QuarryBlock extends BaseEntityBlock implements IWrenchable {
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) { builder.add(FACING); }
     @Override public BlockState getStateForPlacement(net.minecraft.world.item.context.BlockPlaceContext context) {
         return defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+    @Override public void setPlacedBy(Level level, BlockPos pos, BlockState state,
+            @Nullable LivingEntity placer, ItemStack stack) {
+        super.setPlacedBy(level, pos, state, placer, stack);
+        if (!level.isClientSide() && placer instanceof ServerPlayer player) {
+            AdvancementUtil.award(player, "buildcraftbuilders:shaping_the_world");
+        }
     }
     @Override public BlockEntity newBlockEntity(BlockPos pos, BlockState state) { return new QuarryBlockEntity(pos, state); }
     @Override public InteractionResult onWrenched(UseOnContext context) {

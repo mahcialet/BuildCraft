@@ -7,6 +7,10 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.DyeColor;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.server.level.ServerPlayer;
+import buildcraft.core.AdvancementUtil;
 import org.jspecify.annotations.Nullable;
 
 public final class PipeItem extends BlockItem {
@@ -34,5 +38,15 @@ public final class PipeItem extends BlockItem {
     @Override
     public Component getName(ItemStack stack) {
         return Component.translatable("item.buildcrafttransport." + pipeType.itemId());
+    }
+
+    @Override
+    public InteractionResult useOn(UseOnContext context) {
+        InteractionResult result = super.useOn(context);
+        if (!context.getLevel().isClientSide() && result.consumesAction()
+            && context.getPlayer() instanceof ServerPlayer player) {
+            AdvancementUtil.award(player, "buildcrafttransport:pipe_dream");
+        }
+        return result;
     }
 }
