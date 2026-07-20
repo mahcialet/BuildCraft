@@ -125,6 +125,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_pump"));
         Holder<TestEnvironmentDefinition<?>> knightEnvironment =
                 event.registerEnvironment(id("robotics_knight"));
+        Holder<TestEnvironmentDefinition<?>> bomberEnvironment =
+                event.registerEnvironment(id("robotics_bomber"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -146,6 +148,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsPumpRobot);
         registerTest(event, knightEnvironment, "robotics_knight_robot",
                 BCCoreGameTests::roboticsKnightRobot);
+        registerTest(event, bomberEnvironment, "robotics_bomber_robot",
+                BCCoreGameTests::roboticsBomberRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7972,6 +7976,81 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                         new net.minecraft.world.phys.AABB(target).inflate(3),
                         item -> item.getItem().is(Items.GOLD_INGOT)).isEmpty(),
                 "Knight did not preserve hostile drops");
+        helper.succeed();
+    }
+
+    private static void roboticsBomberRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 156, 1);
+        BlockPos sourceRelative = new BlockPos(2, 156, 1);
+        BlockPos targetRelative = new BlockPos(6, 156, 1);
+        BlockPos excludedRelative = new BlockPos(6, 156, 3);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(targetRelative, Blocks.STONE);
+        helper.setBlock(excludedRelative, Blocks.STONE);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(new ItemStack(Items.TNT))));
+        source.installAttachment(Direction.UP, sourceStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        sourceChest.setItem(0, new ItemStack(Items.TNT));
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.BOMBER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Bomber failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        java.util.List<net.minecraft.world.entity.item.PrimedTnt> primed = java.util.List.of();
+        for (int tick = 0; tick < 1800 && (primed.isEmpty()
+                || robot.bomberPhase() != buildcraft.robotics.BomberPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), source.getBlockPos(), Direction.UP);
+            robot.tick();
+            primed = helper.getLevel().getEntitiesOfClass(net.minecraft.world.entity.item.PrimedTnt.class,
+                    new net.minecraft.world.phys.AABB(target).inflate(30));
+        }
+        helper.assertTrue(!primed.isEmpty(),
+                "Bomber did not prime TNT above zoned ground: phase=" + robot.bomberPhase()
+                        + ", state=" + robot.taskState());
+        var tnt = primed.getFirst();
+        helper.assertValueEqual(37, tnt.getFuse(), "Bomber used the wrong historical TNT fuse");
+        helper.assertTrue(Math.pow(tnt.getX() - (target.getX() + 0.5), 2)
+                        + Math.pow(tnt.getZ() - (target.getZ() + 0.5), 2) < 4
+                        && tnt.getY() > target.getY() + 15,
+                "Bomber did not drop TNT from 20 blocks above its zoned target");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Bomber did not load TNT from Provide station");
+        helper.assertTrue(robot.isEmpty(), "Bomber retained its dropped TNT");
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.STONE),
+                "Bomber modified ground outside its work zone before detonation");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Bomber did not return home after exhausting TNT");
+        helper.assertValueEqual(buildcraft.robotics.BomberPhase.NONE, robot.bomberPhase(),
+                "Bomber scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Bomber work consumed no battery energy");
         helper.succeed();
     }
 

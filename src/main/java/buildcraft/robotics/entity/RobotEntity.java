@@ -26,6 +26,7 @@ import buildcraft.robotics.ButcherPhase;
 import buildcraft.robotics.CombatTargetRegistry;
 import buildcraft.robotics.PumpPhase;
 import buildcraft.robotics.KnightPhase;
+import buildcraft.robotics.BomberPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -133,6 +134,10 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private UUID knightEntityTarget;
     private KnightPhase knightPhase = KnightPhase.NONE;
     private int knightAttackDelay;
+    private RobotStationRegistry.Address bomberStationTarget;
+    private BlockPos bomberGroundTarget;
+    private BomberPhase bomberPhase = BomberPhase.NONE;
+    private int bomberSearchAttempts;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -198,6 +203,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public PumpPhase pumpPhase() { return pumpPhase; }
     public KnightPhase knightPhase() { return knightPhase; }
     public ItemStack knightTool() { return knightTool.copy(); }
+    public BomberPhase bomberPhase() { return bomberPhase; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -278,6 +284,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.KNIGHT
                     && knightPhase == KnightPhase.NONE && tickCount % 20 == 0) {
                 beginKnight(serverLevel);
+            } else if (board() == RobotBoardType.BOMBER
+                    && bomberPhase == BomberPhase.NONE && tickCount % 20 == 0) {
+                beginBomber(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -309,6 +318,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (butcherPhase != ButcherPhase.NONE) tickButcher(serverLevel);
         if (pumpPhase != PumpPhase.NONE) tickPump(serverLevel);
         if (knightPhase != KnightPhase.NONE) tickKnight(serverLevel);
+        if (bomberPhase != BomberPhase.NONE) tickBomber(serverLevel);
     }
 
     private boolean hasActiveWorkflow() {
@@ -325,7 +335,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 || shovelmanPhase != ShovelmanPhase.NONE
                 || butcherPhase != ButcherPhase.NONE
                 || pumpPhase != PumpPhase.NONE
-                || knightPhase != KnightPhase.NONE;
+                || knightPhase != KnightPhase.NONE
+                || bomberPhase != BomberPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -2512,6 +2523,176 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         knightAttackDelay = 0;
     }
 
+    private void beginBomber(ServerLevel level) {
+        if (!hasBomberTnt()) {
+            Optional<RobotStationRegistry.Address> source = findBomberTntStation(level);
+            if (source.isEmpty()) return;
+            bomberStationTarget = source.get();
+            bomberPhase = BomberPhase.TO_LOAD;
+            leaveStation();
+            return;
+        }
+        bomberSearchAttempts = 0;
+        bomberPhase = BomberPhase.SEARCHING;
+    }
+
+    private boolean hasBomberTnt() {
+        return inventory.stream().anyMatch(stack -> stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem()));
+    }
+
+    private Optional<RobotStationRegistry.Address> findBomberTntStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadBomberTnt(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem()) || !config.matches(stack)) continue;
+            int accepted = bomberInventoryCapacity(stack);
+            if (accepted <= 0) return;
+            try (Transaction transaction = Transaction.openRoot()) {
+                int extracted = handler.extract(slot, resource,
+                        Math.min(accepted, handler.getAmountAsInt(slot)), transaction);
+                if (extracted > 0) {
+                    transaction.commit();
+                    storeBomberTnt(resource.toStack(extracted));
+                }
+            }
+        }
+    }
+
+    private int bomberInventoryCapacity(ItemStack stack) {
+        int capacity = 0;
+        for (ItemStack carried : inventory) {
+            if (carried.isEmpty()) capacity += stack.getMaxStackSize();
+            else if (ItemStack.isSameItemSameComponents(carried, stack)) {
+                capacity += Math.max(0, carried.getMaxStackSize() - carried.getCount());
+            }
+        }
+        return capacity;
+    }
+
+    private void storeBomberTnt(ItemStack stack) {
+        for (int slot = 0; slot < inventory.size() && !stack.isEmpty(); slot++) {
+            ItemStack carried = inventory.get(slot);
+            if (!carried.isEmpty() && ItemStack.isSameItemSameComponents(carried, stack)) {
+                int moved = Math.min(stack.getCount(), carried.getMaxStackSize() - carried.getCount());
+                carried.grow(moved);
+                stack.shrink(moved);
+            }
+        }
+        for (int slot = 0; slot < inventory.size() && !stack.isEmpty(); slot++) {
+            if (!inventory.get(slot).isEmpty()) continue;
+            int moved = Math.min(stack.getCount(), stack.getMaxStackSize());
+            inventory.set(slot, stack.copyWithCount(moved));
+            stack.shrink(moved);
+        }
+    }
+
+    private void tickBomber(ServerLevel level) {
+        if (bomberPhase == BomberPhase.TO_LOAD) {
+            if (bomberStationTarget == null) { bomberPhase = BomberPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(bomberStationTarget))) {
+                loadBomberTnt(level, bomberStationTarget);
+                bomberSearchAttempts = 0;
+                bomberPhase = hasBomberTnt() ? BomberPhase.SEARCHING : BomberPhase.RETURN_HOME;
+            }
+        } else if (bomberPhase == BomberPhase.SEARCHING) {
+            searchBomberGround(level);
+        } else if (bomberPhase == BomberPhase.TO_DROP) {
+            if (bomberGroundTarget == null || level.getBlockState(bomberGroundTarget).isAir()) {
+                bomberGroundTarget = null;
+                bomberPhase = BomberPhase.SEARCHING;
+                return;
+            }
+            if (flyToward(Vec3.atCenterOf(bomberGroundTarget.above(20)))) {
+                dropBomberTnt(level);
+                bomberGroundTarget = null;
+                if (hasBomberTnt()) {
+                    bomberSearchAttempts = 0;
+                    bomberPhase = BomberPhase.SEARCHING;
+                } else {
+                    bomberPhase = BomberPhase.RETURN_HOME;
+                }
+            }
+        } else if (bomberPhase == BomberPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                bomberStationTarget = null;
+                bomberPhase = BomberPhase.NONE;
+            }
+        }
+    }
+
+    private void searchBomberGround(ServerLevel level) {
+        if (!hasBomberTnt()) { bomberPhase = BomberPhase.RETURN_HOME; return; }
+        if (energy() < 2) return;
+        setEnergy(energy() - 2);
+        if (++bomberSearchAttempts > 4096) { bomberPhase = BomberPhase.RETURN_HOME; return; }
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime() * 31 + getUUID().getLeastSignificantBits()
+                + bomberSearchAttempts);
+        int x;
+        int z;
+        if (zone != null) {
+            BlockPos column = zone.random(random, blockPosition().getY());
+            if (column == null) { bomberPhase = BomberPhase.RETURN_HOME; return; }
+            x = column.getX();
+            z = column.getZ();
+        } else {
+            double radius = random.nextDouble() * 100;
+            double angle = random.nextDouble() * Math.PI * 2;
+            x = (int) Math.floor(getX() + Math.cos(angle) * radius);
+            z = (int) Math.floor(getZ() + Math.sin(angle) * radius);
+        }
+        if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) return;
+        for (int y = level.getMaxY() - 21; y >= level.getMinY(); y--) {
+            BlockPos candidate = new BlockPos(x, y, z);
+            if (!level.getBlockState(candidate).isAir()) {
+                bomberGroundTarget = candidate;
+                bomberPhase = BomberPhase.TO_DROP;
+                return;
+            }
+        }
+    }
+
+    private void dropBomberTnt(ServerLevel level) {
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack stack = inventory.get(slot);
+            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())) continue;
+            stack.shrink(1);
+            if (stack.isEmpty()) inventory.set(slot, ItemStack.EMPTY);
+            var tnt = new net.minecraft.world.entity.item.PrimedTnt(
+                    level, getX() + 0.25, getY() - 1, getZ() + 0.25, null);
+            tnt.setFuse(37);
+            level.addFreshEntity(tnt);
+            level.playSound(null, blockPosition(), net.minecraft.sounds.SoundEvents.TNT_PRIMED,
+                    net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
+            return;
+        }
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -2853,6 +3034,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (knightEntityTarget != null) output.store("KnightTarget", net.minecraft.core.UUIDUtil.CODEC,
                 knightEntityTarget);
         output.putInt("KnightAttackDelay", knightAttackDelay);
+        output.putInt("BomberPhase", bomberPhase.ordinal());
+        if (bomberStationTarget != null) {
+            output.putLong("BomberStationPos", bomberStationTarget.pipePos().asLong());
+            output.putInt("BomberStationSide", bomberStationTarget.side().get3DDataValue());
+        }
+        if (bomberGroundTarget != null) output.putLong("BomberGround", bomberGroundTarget.asLong());
+        output.putInt("BomberSearchAttempts", bomberSearchAttempts);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -3117,6 +3305,26 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 && knightStationTarget == null) knightPhase = KnightPhase.RETURN_HOME;
         if ((knightPhase == KnightPhase.TO_TARGET || knightPhase == KnightPhase.ATTACKING)
                 && knightEntityTarget == null) knightPhase = KnightPhase.RETURN_HOME;
+        int bomberOrdinal = input.getIntOr("BomberPhase", BomberPhase.NONE.ordinal());
+        BomberPhase[] bomberPhases = BomberPhase.values();
+        bomberPhase = bomberOrdinal >= 0 && bomberOrdinal < bomberPhases.length
+                ? bomberPhases[bomberOrdinal] : BomberPhase.NONE;
+        if (input.getLong("BomberStationPos").isPresent()) {
+            bomberStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("BomberStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "BomberStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("BomberGround").isPresent()) {
+            bomberGroundTarget = BlockPos.of(input.getLongOr("BomberGround", 0));
+        }
+        bomberSearchAttempts = Math.clamp(input.getIntOr("BomberSearchAttempts", 0), 0, 4097);
+        if (bomberPhase == BomberPhase.TO_LOAD && bomberStationTarget == null) {
+            bomberPhase = BomberPhase.RETURN_HOME;
+        }
+        if (bomberPhase == BomberPhase.TO_DROP && bomberGroundTarget == null) {
+            bomberPhase = BomberPhase.SEARCHING;
+        }
         ContainerHelper.loadAllItems(input, inventory);
     }
 
