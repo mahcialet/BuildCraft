@@ -320,7 +320,48 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "decoration light level"
             );
         }
+        assertDecoratedRecipe(
+            helper,
+            buildcraft.builders.BCBuildersItems.BLUEPRINT.get(),
+            Items.PAPER,
+            EnumDecoratedBlock.BLUEPRINT
+        );
+        assertDecoratedRecipe(
+            helper,
+            buildcraft.builders.BCBuildersItems.TEMPLATE.get(),
+            Items.PAPER,
+            EnumDecoratedBlock.TEMPLATE
+        );
+        assertDecoratedRecipe(helper, Items.REDSTONE_BLOCK, Items.OBSIDIAN, EnumDecoratedBlock.LASER_BACK);
         helper.succeed();
+    }
+
+    private static void assertDecoratedRecipe(
+        GameTestHelper helper,
+        net.minecraft.world.item.Item center,
+        net.minecraft.world.item.Item surround,
+        EnumDecoratedBlock expected
+    ) {
+        java.util.List<ItemStack> stacks = new java.util.ArrayList<>();
+        for (int slot = 0; slot < 9; slot++) {
+            stacks.add(new ItemStack(slot == 4 ? center : surround));
+        }
+        net.minecraft.world.item.crafting.CraftingInput input =
+            net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        ItemStack result = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+            net.minecraft.world.item.crafting.RecipeType.CRAFTING,
+            input,
+            helper.getLevel()
+        ).map(holder -> holder.value().assemble(input))
+            .orElse(ItemStack.EMPTY);
+        helper.assertTrue(result.is(BCCoreItems.DECORATED), "Decoration recipe produced the wrong item");
+        helper.assertValueEqual(result.getCount(), 16, "Decoration recipe output count");
+        helper.assertValueEqual(
+            result.getOrDefault(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY)
+                .get(BlockDecoration.DECORATION_TYPE),
+            expected,
+            "Decoration recipe output state"
+        );
     }
 
     private static void wrenchRotation(GameTestHelper helper) {
@@ -5770,6 +5811,17 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(wireOutput.is(buildcraft.transport.BCTransportItems.PIPE_WIRE_RED.get()),
                 "pipe wire recipe returned wrong item");
         helper.assertValueEqual(wireOutput.getCount(), 8, "pipe wire recipe returned wrong count");
+        var wireAssemblyInput = new buildcraft.silicon.recipe.AssemblyRecipeInput(java.util.List.of(
+                new ItemStack(Items.REDSTONE), new ItemStack(Items.RED_DYE)), null);
+        var wireAssembly = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                buildcraft.silicon.BCSiliconRecipes.ASSEMBLY_TYPE.get(), wireAssemblyInput, helper.getLevel())
+                .orElseThrow().value();
+        ItemStack assembledWire = wireAssembly.assemble(wireAssemblyInput);
+        helper.assertTrue(assembledWire.is(buildcraft.transport.BCTransportItems.PIPE_WIRE_RED.get()),
+                "pipe wire Assembly recipe returned wrong item");
+        helper.assertValueEqual(assembledWire.getCount(), 8, "pipe wire Assembly recipe returned wrong count");
+        helper.assertValueEqual(wireAssembly.requiredPower(), 10_000L * buildcraft.api.mj.MjAPI.MJ,
+                "pipe wire Assembly recipe power cost");
         helper.succeed();
     }
 

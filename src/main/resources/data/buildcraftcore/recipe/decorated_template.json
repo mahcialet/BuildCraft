@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "building",
+  "pattern": ["PPP", "PTP", "PPP"],
+  "key": {
+    "P": "minecraft:paper",
+    "T": "buildcraftbuilders:template"
+  },
+  "result": {
+    "id": "buildcraftcore:decorated",
+    "count": 16,
+    "components": {
+      "minecraft:block_state": {
+        "decoration_type": "template"
+      }
+    }
+  }
+}
