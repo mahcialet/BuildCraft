@@ -108,6 +108,8 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> roboticsGateListEnvironment = event.registerEnvironment(id("robotics_gate_lists"));
         Holder<TestEnvironmentDefinition<?>> transportCreativeEnvironment = event.registerEnvironment(id("transport_creative"));
         Holder<TestEnvironmentDefinition<?>> siliconLensEnvironment = event.registerEnvironment(id("silicon_lens_variants"));
+        Holder<TestEnvironmentDefinition<?>> siliconSensorTimerEnvironment =
+                event.registerEnvironment(id("silicon_sensor_timer"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -247,6 +249,8 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, roboticsGateListEnvironment, "robotics_gate_list_parameters", BCCoreGameTests::roboticsGateListParameters);
         registerTest(event, transportCreativeEnvironment, "transport_creative_pipe_entries", BCCoreGameTests::transportCreativePipeEntries);
         registerTest(event, siliconLensEnvironment, "silicon_lens_variants", BCCoreGameTests::siliconLensVariants);
+        registerTest(event, siliconSensorTimerEnvironment, "silicon_sensor_timer_plugs",
+                BCCoreGameTests::siliconSensorTimerPlugs);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -3995,6 +3999,52 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(holder.attachment(Direction.UP).is(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()),
                 "pipe stored wrong utility attachment");
         helper.succeed();
+    }
+
+    private static void siliconSensorTimerPlugs(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 2, 3));
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+
+        helper.getLevel().setBlock(pipePos.east(), Blocks.GLOWSTONE.defaultBlockState(), Block.UPDATE_ALL);
+        helper.assertTrue(holder.installAttachment(Direction.EAST,
+                new ItemStack(buildcraft.silicon.BCSiliconItems.PLUG_LIGHT_SENSOR.get())),
+                "light sensor could not be installed");
+        helper.assertFalse(holder.attachmentBlocksConnection(Direction.EAST),
+                "light sensor incorrectly blocked its pipe side");
+        helper.runAfterDelay(2, () -> {
+        helper.assertTrue(helper.getLevel().getMaxLocalRawBrightness(pipePos.east()) >= 8,
+                "light source did not illuminate the Light Sensor side");
+        ItemStack lightGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        lightGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.LIGHT_HIGH,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        helper.assertTrue(holder.installAttachment(Direction.UP, lightGate),
+                "light-sensor test gate could not be installed");
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), holder);
+        helper.assertTrue(holder.gateRedstoneOutput(),
+                "bright Light Sensor trigger did not activate gate output");
+
+        holder.takeAttachment(Direction.EAST);
+        helper.assertTrue(holder.installAttachment(Direction.EAST,
+                new ItemStack(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get())),
+                "timer could not be installed");
+        helper.assertTrue(holder.attachmentBlocksConnection(Direction.EAST),
+                "timer did not block its historical pipe side");
+        helper.assertTrue(buildcraft.silicon.item.GateItem.timerActive(200L, 5),
+                "five-second Timer trigger missed its pulse boundary");
+        helper.assertFalse(buildcraft.silicon.item.GateItem.timerActive(201L, 5),
+                "five-second Timer trigger remained active outside its pulse boundary");
+        helper.succeed();
+        });
     }
 
     private static void siliconPulsarGate(GameTestHelper helper) {

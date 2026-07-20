@@ -103,8 +103,8 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case TIMER_SHORT -> timer(pipe, 5);
             case TIMER_MEDIUM -> timer(pipe, 10);
             case TIMER_LONG -> timer(pipe, 15);
-            case LIGHT_LOW -> light(pipe, false);
-            case LIGHT_HIGH -> light(pipe, true);
+            case LIGHT_LOW -> lightActive(pipe, false);
+            case LIGHT_HIGH -> lightActive(pipe, true);
             case INVENTORY_EMPTY -> pipe.adjacentInventory(gateSide).empty();
             case INVENTORY_CONTAINS -> pipe.adjacentInventory(gateSide, firstParameter(rule)).contains();
             case INVENTORY_SPACE -> pipe.adjacentInventory(gateSide, firstParameter(rule)).space();
@@ -147,12 +147,16 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
         if (pipe.getLevel() == null) return false;
         for (Direction side : Direction.values()) {
             if (pipe.attachment(side).is(BCSiliconItems.PLUG_TIMER.get())) {
-                return pipe.getLevel().getGameTime() % (20L * seconds) == 0;
+                return timerActive(pipe.getLevel().getGameTime(), seconds);
             }
         }
         return false;
     }
-    private static boolean light(PipeHolderBlockEntity pipe, boolean bright) {
+
+    public static boolean timerActive(long gameTime, int seconds) {
+        return gameTime % (20L * seconds) == 0;
+    }
+    private static boolean lightActive(PipeHolderBlockEntity pipe, boolean bright) {
         if (pipe.getLevel() == null) return false;
         for (Direction side : Direction.values()) {
             if (pipe.attachment(side).is(BCSiliconItems.PLUG_LIGHT_SENSOR.get())) {

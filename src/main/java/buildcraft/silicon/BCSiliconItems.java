@@ -10,6 +10,7 @@ import buildcraft.silicon.item.GateCopierItem;
 import buildcraft.silicon.item.PulsarItem;
 import buildcraft.silicon.item.LensItem;
 import buildcraft.silicon.item.FacadeItem;
+import buildcraft.silicon.item.TimerItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -43,8 +44,8 @@ public final class BCSiliconItems {
             ITEMS.registerItem("plug_facade", FacadeItem::new);
     public static final DeferredItem<PipePlugItem> PLUG_LIGHT_SENSOR =
             ITEMS.registerItem("plug_light_sensor", PipePlugItem::new);
-    public static final DeferredItem<PipePlugItem> PLUG_TIMER =
-            ITEMS.registerItem("plug_timer", PipePlugItem::new);
+    public static final DeferredItem<TimerItem> PLUG_TIMER =
+        ITEMS.registerItem("plug_timer", TimerItem::new);
     public static final DeferredItem<GateCopierItem> GATE_COPIER =
             ITEMS.registerItem("gate_copier", GateCopierItem::new);
     public static final DeferredItem<?> LASER = ITEMS.registerSimpleBlockItem("laser", BCSiliconBlocks.LASER);
