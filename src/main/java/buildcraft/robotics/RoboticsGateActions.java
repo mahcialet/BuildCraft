@@ -1,5 +1,6 @@
 package buildcraft.robotics;
 
+import buildcraft.api.robots.IRequestProvider;
 import buildcraft.robotics.entity.RobotEntity;
 import buildcraft.silicon.gate.GateAction;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
@@ -21,6 +22,7 @@ import net.neoforged.neoforge.transfer.fluid.FluidResource;
 
 /** Per-tick Robotics actions emitted by active Gates without mutating Station item data. */
 public final class RoboticsGateActions {
+    public static final int MACHINE_REQUEST_SLOT_OFFSET = 1_000_000;
     private static final Map<ServerLevel, Map<RobotStationRegistry.Address, Active>> LEVELS =
             new WeakHashMap<>();
 
@@ -106,6 +108,58 @@ public final class RoboticsGateActions {
                 || active.matchesRobot(GateAction.STATION_FORCE_ROBOT, board);
     }
 
+    public static List<GateRequest> requests(ServerLevel level) {
+        Map<RobotStationRegistry.Address, Active> actions = LEVELS.get(level);
+        if (actions == null) return List.of();
+        long now = level.getGameTime();
+        List<GateRequest> requests = new ArrayList<>();
+        actions.forEach((address, active) -> {
+            if (active.tick != now) return;
+            List<ItemStack> parameters = active.parameters.get(GateAction.STATION_REQUEST_ITEMS);
+            if (parameters == null) return;
+            for (int slot = 0; slot < parameters.size(); slot++) {
+                ItemStack request = parameters.get(slot);
+                if (!request.isEmpty()) requests.add(new GateRequest(address, slot, request));
+            }
+        });
+        actions.forEach((address, active) -> {
+            if (active.tick != now || !active.has(GateAction.STATION_MACHINE_REQUEST_ITEMS)) return;
+            IRequestProvider provider = requestProvider(level, address);
+            if (provider == null) return;
+            for (int slot = 0; slot < provider.getRequestsCount(); slot++) {
+                ItemStack request = provider.getRequest(slot);
+                if (!request.isEmpty()) {
+                    requests.add(new GateRequest(address, MACHINE_REQUEST_SLOT_OFFSET + slot, request));
+                }
+            }
+        });
+        return List.copyOf(requests);
+    }
+
+    public static ItemStack request(ServerLevel level, RobotStationRegistry.Address address, int slot) {
+        Active active = active(level, address);
+        if (active == null) return ItemStack.EMPTY;
+        if (slot >= MACHINE_REQUEST_SLOT_OFFSET) {
+            if (!active.has(GateAction.STATION_MACHINE_REQUEST_ITEMS)) return ItemStack.EMPTY;
+            IRequestProvider provider = requestProvider(level, address);
+            int providerSlot = slot - MACHINE_REQUEST_SLOT_OFFSET;
+            return provider == null || providerSlot >= provider.getRequestsCount()
+                    ? ItemStack.EMPTY : provider.getRequest(providerSlot).copy();
+        }
+        List<ItemStack> requests = active.parameters.get(GateAction.STATION_REQUEST_ITEMS);
+        return requests == null || slot < 0 || slot >= requests.size()
+                ? ItemStack.EMPTY : requests.get(slot).copy();
+    }
+
+    public static IRequestProvider requestProvider(ServerLevel level, RobotStationRegistry.Address address) {
+        var blockEntity = level.getBlockEntity(address.pipePos().relative(address.side()));
+        return blockEntity instanceof IRequestProvider provider ? provider : null;
+    }
+
+    public record GateRequest(RobotStationRegistry.Address address, int slot, ItemStack request) {
+        public GateRequest { request = request.copy(); }
+    }
+
     private static ZonePlan zone(ServerLevel level, RobotStationRegistry.Address address, GateAction action) {
         Active active = active(level, address);
         if (active == null) return null;
@@ -136,7 +190,7 @@ public final class RoboticsGateActions {
             List<ItemStack> merged = parameters.computeIfAbsent(action, ignored -> new ArrayList<>());
             List<ItemStack> filtered = supplied.stream().filter(stack -> !stack.isEmpty()).limit(3).toList();
             if (filtered.isEmpty()) unrestricted.add(action);
-            filtered.stream().map(stack -> stack.copyWithCount(1)).forEach(merged::add);
+            filtered.stream().map(ItemStack::copy).forEach(merged::add);
         }
 
         private boolean matchesItem(GateAction action, ItemStack stack) {

@@ -3301,15 +3301,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private void deliverRequestedItems(ServerLevel level) {
-        Optional<buildcraft.robotics.block.entity.RequesterBlockEntity> requester =
-                RequesterRegistry.requester(level, deliveryReservation);
-        if (requester.isPresent()) {
-            for (int slot = 0; slot < inventory.size(); slot++) {
-                ItemStack carried = inventory.get(slot);
-                if (carried.isEmpty() || !ItemStack.isSameItemSameComponents(
-                        carried, deliveryReservation.request())) continue;
-                inventory.set(slot, requester.get().offerItem(deliveryReservation.slot(), carried.copy()));
-            }
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            ItemStack carried = inventory.get(slot);
+            if (carried.isEmpty() || !ItemStack.isSameItemSameComponents(
+                    carried, deliveryReservation.request())) continue;
+            inventory.set(slot, RequesterRegistry.offer(level, deliveryReservation, carried.copy()));
         }
         RequesterRegistry.release(level, deliveryReservation);
         deliveryPhase = isEmpty() ? DeliveryPhase.RETURN_HOME : DeliveryPhase.RETURN_LEFTOVERS;
@@ -3454,6 +3450,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             output.putLong("DeliveryRequestPos", deliveryReservation.position().asLong());
             output.putInt("DeliveryRequestSlot", deliveryReservation.slot());
             output.store("DeliveryRequest", ItemStack.CODEC, deliveryReservation.request());
+            deliveryReservation.station().ifPresent(address ->
+                    output.putInt("DeliveryRequestStationSide", address.side().get3DDataValue()));
         }
         if (deliverySource != null) {
             output.putLong("DeliverySourcePos", deliverySource.pipePos().asLong());
@@ -3609,6 +3607,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             deliveryReservation = new RequesterRegistry.Reservation(
                     BlockPos.of(input.getLongOr("DeliveryRequestPos", 0)),
                     input.getIntOr("DeliveryRequestSlot", 0), request.get(), getUUID());
+            if (input.getInt("DeliveryRequestStationSide").isPresent()) {
+                BlockPos requestPos = deliveryReservation.position();
+                deliveryReservation = new RequesterRegistry.Reservation(requestPos,
+                        deliveryReservation.slot(), deliveryReservation.request(), getUUID(),
+                        Optional.of(new RobotStationRegistry.Address(requestPos, Direction.from3DDataValue(
+                                input.getIntOr("DeliveryRequestStationSide", Direction.UP.get3DDataValue())))));
+            }
         }
         if (input.getLong("DeliverySourcePos").isPresent()) {
             deliverySource = new RobotStationRegistry.Address(

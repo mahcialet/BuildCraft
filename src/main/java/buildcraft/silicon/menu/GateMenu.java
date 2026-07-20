@@ -91,9 +91,9 @@ public final class GateMenu extends AbstractContainerMenu {
             if (carried.isEmpty()) {
                 if (parameter < parameters.size()) parameters.remove(parameter);
             } else if (parameter < parameters.size()) {
-                parameters.set(parameter, carried.copyWithCount(1));
+                parameters.set(parameter, carried.copy());
             } else {
-                parameters.add(carried.copyWithCount(1));
+                parameters.add(carried.copy());
             }
             rules.set(row, new GateRule(old.trigger(), old.action(), old.actionSide(), parameters));
         } else if (actionButton) {

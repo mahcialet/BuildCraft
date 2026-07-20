@@ -27,7 +27,6 @@ public record GateRule(GateTrigger trigger, GateAction action, Optional<Directio
     }
 
     public GateRule {
-        parameters = parameters.stream().limit(MAX_PARAMETERS)
-                .map(stack -> stack.copyWithCount(1)).toList();
+        parameters = parameters.stream().limit(MAX_PARAMETERS).map(ItemStack::copy).toList();
     }
 }

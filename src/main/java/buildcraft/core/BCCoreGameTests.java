@@ -6719,8 +6719,8 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         ItemStack parameter = holder.attachment(Direction.UP)
                 .get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
                 .rules().getFirst().parameters().getFirst();
-        helper.assertTrue(parameter.is(Items.COBBLESTONE) && parameter.getCount() == 1,
-                "Gate editor did not preserve a normalized item parameter");
+        helper.assertTrue(parameter.is(Items.COBBLESTONE) && parameter.getCount() == 32,
+                "Gate editor did not preserve the exact item parameter count");
 
         ItemStack actionGate = holder.attachment(Direction.UP).copy();
         actionGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
@@ -6871,6 +6871,87 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertFalse(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(),
                 robotActionAddress, buildcraft.robotics.RobotBoardType.PICKER),
                 "Force Robot accepted unconfigured board");
+
+        BlockPos requestRelative = new BlockPos(7, 2, 5);
+        BlockPos requestPos = helper.absolutePos(requestRelative);
+        helper.getLevel().setBlock(requestPos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState().setValue(
+                        buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_ITEM), 3);
+        var requestHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(requestPos);
+        helper.assertTrue(requestHolder != null && requestHolder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Request Items test rejected Robot Station");
+        ItemStack requestGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        requestGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_REQUEST_ITEMS,
+                                java.util.Optional.empty(),
+                                java.util.List.of(new ItemStack(Items.COBBLESTONE, 12))))));
+        helper.assertTrue(requestHolder.installAttachment(Direction.UP, requestGate),
+                "Request Items test rejected Gate");
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), requestPos, Direction.NORTH);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), requestPos,
+                helper.getLevel().getBlockState(requestPos), requestHolder);
+        java.util.UUID requestRobot = java.util.UUID.randomUUID();
+        var requestReservation = buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
+                Vec3.atCenterOf(requestPos), requestRobot, 2).orElseThrow();
+        helper.assertTrue(requestReservation.station().isPresent()
+                        && requestReservation.request().getCount() == 12,
+                "Request Items action did not expose its exact-count Station request");
+        helper.assertTrue(buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
+                Vec3.atCenterOf(requestPos), java.util.UUID.randomUUID(), 2).isEmpty(),
+                "Request Items action accepted two reservations for one slot");
+        helper.assertTrue(buildcraft.robotics.RequesterRegistry.offer(helper.getLevel(), requestReservation,
+                new ItemStack(Items.COBBLESTONE, 12)).isEmpty(),
+                "Request Items delivery was not injected into the Station pipe");
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), requestPos,
+                helper.getLevel().getBlockState(requestPos), requestHolder);
+        helper.assertTrue(requestHolder.hasTravellingItems(),
+                "Request Items delivery did not create a travelling pipe item");
+        buildcraft.robotics.RequesterRegistry.release(helper.getLevel(), requestReservation);
+
+        BlockPos machineRelative = new BlockPos(4, 2, 5);
+        BlockPos machinePos = helper.absolutePos(machineRelative);
+        BlockPos providerRelative = machineRelative.relative(Direction.NORTH);
+        helper.setBlock(machineRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(providerRelative, buildcraft.robotics.BCRoboticsBlocks.REQUESTER.get());
+        var machineHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(machinePos);
+        var provider = (buildcraft.robotics.block.entity.RequesterBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(providerRelative));
+        provider.setRequest(0, new ItemStack(Items.DIRT, 9));
+        helper.assertTrue(machineHolder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Machine Request test rejected Robot Station");
+        ItemStack machineGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        machineGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_MACHINE_REQUEST_ITEMS))));
+        helper.assertTrue(machineHolder.installAttachment(Direction.UP, machineGate),
+                "Machine Request test rejected Gate");
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), machinePos, Direction.NORTH);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), machinePos,
+                helper.getLevel().getBlockState(machinePos), machineHolder);
+        java.util.UUID machineRobot = java.util.UUID.randomUUID();
+        var machineReservation = buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
+                Vec3.atCenterOf(machinePos), machineRobot, 2, machinePos::equals).orElseThrow();
+        helper.assertTrue(machineReservation.request().is(Items.DIRT)
+                        && machineReservation.request().getCount() == 9,
+                "Machine Request did not forward the adjacent provider request");
+        helper.assertTrue(buildcraft.robotics.RequesterRegistry.offer(helper.getLevel(), machineReservation,
+                new ItemStack(Items.DIRT, 9)).isEmpty() && provider.fulfilled(0),
+                "Machine Request did not deliver into the adjacent provider");
+        buildcraft.robotics.RequesterRegistry.release(helper.getLevel(), machineReservation);
         helper.succeed();
     }
 
@@ -7026,9 +7107,11 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         java.util.UUID auditOwner = java.util.UUID.randomUUID();
         buildcraft.robotics.RequesterRegistry.Reservation auditReservation =
                 buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
-                        Vec3.atCenterOf(holder.getBlockPos()), auditOwner, 128).orElseThrow();
+                        Vec3.atCenterOf(holder.getBlockPos()), auditOwner, 128,
+                        helper.absolutePos(requesterRelative)::equals).orElseThrow();
         helper.assertTrue(buildcraft.robotics.RequesterRegistry.reserveClosest(helper.getLevel(),
-                        Vec3.atCenterOf(holder.getBlockPos()), java.util.UUID.randomUUID(), 128).isEmpty(),
+                        Vec3.atCenterOf(holder.getBlockPos()), java.util.UUID.randomUUID(), 128,
+                        helper.absolutePos(requesterRelative)::equals).isEmpty(),
                 "Requester accepted two Delivery reservations for one slot");
         buildcraft.robotics.RequesterRegistry.release(helper.getLevel(), auditReservation);
 
