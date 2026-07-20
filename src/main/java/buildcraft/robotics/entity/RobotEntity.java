@@ -13,6 +13,8 @@ import buildcraft.robotics.BCRoboticsDataComponents;
 import buildcraft.robotics.DroppedItemRegistry;
 import buildcraft.robotics.PickerPhase;
 import buildcraft.robotics.FluidCarrierPhase;
+import buildcraft.robotics.LumberjackPhase;
+import buildcraft.robotics.BlockWorkRegistry;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -68,6 +70,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private final FluidStacksResourceHandler fluidTank = new FluidStacksResourceHandler(1, FLUID_CAPACITY);
     private RobotStationRegistry.Address fluidCarrierTarget;
     private FluidCarrierPhase fluidCarrierPhase = FluidCarrierPhase.NONE;
+    private ItemStack lumberjackTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address lumberjackStationTarget;
+    private BlockPos lumberjackBlockTarget;
+    private LumberjackPhase lumberjackPhase = LumberjackPhase.NONE;
+    private float lumberjackBreakProgress;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -115,6 +122,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public PickerPhase pickerPhase() { return pickerPhase; }
     public FluidCarrierPhase fluidCarrierPhase() { return fluidCarrierPhase; }
     public ResourceHandler<FluidResource> fluidTank() { return fluidTank; }
+    public LumberjackPhase lumberjackPhase() { return lumberjackPhase; }
+    public ItemStack lumberjackTool() { return lumberjackTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -165,6 +174,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.FLUID_CARRIER
                     && fluidCarrierPhase == FluidCarrierPhase.NONE && tickCount % 20 == 0) {
                 beginFluidCarrier(serverLevel);
+            } else if (board() == RobotBoardType.LUMBERJACK
+                    && lumberjackPhase == LumberjackPhase.NONE && tickCount % 20 == 0) {
+                beginLumberjack(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -187,6 +199,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (carrierPhase != CarrierPhase.NONE) tickCarrier(serverLevel);
         if (pickerPhase != PickerPhase.NONE) tickPicker(serverLevel);
         if (fluidCarrierPhase != FluidCarrierPhase.NONE) tickFluidCarrier(serverLevel);
+        if (lumberjackPhase != LumberjackPhase.NONE) tickLumberjack(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -614,6 +627,216 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
     }
 
+    private void beginLumberjack(ServerLevel level) {
+        if (lumberjackTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findLumberjackToolStation(level);
+            if (source.isEmpty()) return;
+            lumberjackStationTarget = source.get();
+            lumberjackPhase = LumberjackPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (lumberjackTool.isDamageableItem()
+                && lumberjackTool.getDamageValue() >= lumberjackTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findLumberjackToolReceiver(level);
+            if (receiver.isEmpty()) return;
+            lumberjackStationTarget = receiver.get();
+            lumberjackPhase = LumberjackPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        if (selectLumberjackBlock(level)) {
+            lumberjackPhase = LumberjackPhase.TO_BLOCK;
+            leaveStation();
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findLumberjackToolStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.AXES)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private Optional<RobotStationRegistry.Address> findLumberjackToolReceiver(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().receives() || !config.matches(lumberjackTool)) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    try (Transaction transaction = Transaction.openRoot()) {
+                        return handler.insert(ItemResource.of(lumberjackTool), 1, transaction) == 1;
+                    }
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadLumberjackTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.AXES) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    lumberjackTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadLumberjackTool(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (lumberjackTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives() || !config.matches(lumberjackTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(lumberjackTool), 1, transaction) == 1) {
+                lumberjackTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private boolean selectLumberjackBlock(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime() ^ getUUID().getLeastSignificantBits());
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null
+                        || !level.getBlockState(candidate).is(net.minecraft.tags.BlockTags.LOGS)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        lumberjackBlockTarget = best;
+        return best != null;
+    }
+
+    private void tickLumberjack(ServerLevel level) {
+        if (lumberjackPhase == LumberjackPhase.TO_TOOL) {
+            if (lumberjackStationTarget == null) { lumberjackPhase = LumberjackPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(lumberjackStationTarget))) {
+                loadLumberjackTool(level, lumberjackStationTarget);
+                lumberjackPhase = LumberjackPhase.RETURN_HOME;
+            }
+        } else if (lumberjackPhase == LumberjackPhase.TO_UNLOAD_TOOL) {
+            if (lumberjackStationTarget == null) { lumberjackPhase = LumberjackPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(lumberjackStationTarget))) {
+                unloadLumberjackTool(level, lumberjackStationTarget);
+                lumberjackPhase = LumberjackPhase.RETURN_HOME;
+            }
+        } else if (lumberjackPhase == LumberjackPhase.TO_BLOCK) {
+            if (lumberjackBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, lumberjackBlockTarget, getUUID())
+                    || !level.getBlockState(lumberjackBlockTarget).is(net.minecraft.tags.BlockTags.LOGS)) {
+                releaseLumberjackBlock(level);
+                lumberjackPhase = LumberjackPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(lumberjackBlockTarget))) {
+                int breakResult = progressLumberjackBlock(level);
+                if (breakResult == 0) return;
+                releaseLumberjackBlock(level);
+                if (breakResult > 0 && !lumberjackTool.isEmpty() && selectLumberjackBlock(level)) return;
+                lumberjackPhase = LumberjackPhase.RETURN_HOME;
+            }
+        } else if (lumberjackPhase == LumberjackPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                lumberjackPhase = LumberjackPhase.NONE;
+                lumberjackStationTarget = null;
+            }
+        }
+    }
+
+    /** @return -1 when aborted, 0 while breaking, 1 after a successful harvest. */
+    private int progressLumberjackBlock(ServerLevel level) {
+        final long energyPerTick = 66_667;
+        if (lumberjackBlockTarget == null || lumberjackTool.isEmpty() || energy() < energyPerTick) return -1;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(lumberjackBlockTarget);
+        float hardness = state.getDestroySpeed(level, lumberjackBlockTarget);
+        if (!state.is(net.minecraft.tags.BlockTags.LOGS) || hardness < 0) return -1;
+        float speed = lumberjackTool.getDestroySpeed(state);
+        lumberjackBreakProgress += hardness == 0 ? 1.1F : speed / hardness / 30.0F;
+        setEnergy(energy() - energyPerTick);
+        level.destroyBlockProgress(getId(), lumberjackBlockTarget,
+                Math.min(9, Math.max(0, (int) (lumberjackBreakProgress * 10))));
+        if (lumberjackBreakProgress <= 1.0F) return 0;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack usedTool = lumberjackTool.copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, usedTool);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer,
+                lumberjackBlockTarget, state);
+        if (event.isCanceled()) return -1;
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, lumberjackBlockTarget, level.getBlockEntity(lumberjackBlockTarget),
+                fakePlayer, usedTool);
+        level.removeBlock(lumberjackBlockTarget, false);
+        for (ItemStack drop : drops) net.minecraft.world.level.block.Block.popResource(
+                level, lumberjackBlockTarget, drop);
+        lumberjackTool.hurtAndBreak(1, level, null, item -> {});
+        lumberjackBreakProgress = 0;
+        return 1;
+    }
+
+    private void releaseLumberjackBlock(ServerLevel level) {
+        if (lumberjackBlockTarget != null) {
+            BlockWorkRegistry.release(level, lumberjackBlockTarget, getUUID());
+            level.destroyBlockProgress(getId(), lumberjackBlockTarget, -1);
+            lumberjackBlockTarget = null;
+            lumberjackBreakProgress = 0;
+        }
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -773,11 +996,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             RobotStationRegistry.get(serverLevel, stationAddress).ifPresent(station -> station.release(getUUID()));
         }
         releasePickerTarget(serverLevel);
+        releaseLumberjackBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
             if (!stack.isEmpty()) spawnAtLocation(serverLevel, stack.copy());
         }
+        if (!lumberjackTool.isEmpty()) spawnAtLocation(serverLevel, lumberjackTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -793,10 +1018,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 RobotStationRegistry.get(level, stationAddress).ifPresent(station -> station.release(getUUID()));
             }
             releasePickerTarget(level);
+            releaseLumberjackBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
             }
+            if (!lumberjackTool.isEmpty()) spawnAtLocation(level, lumberjackTool.copy());
             discard();
         }
         return true;
@@ -839,6 +1066,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             output.putLong("FluidCarrierTargetPos", fluidCarrierTarget.pipePos().asLong());
             output.putInt("FluidCarrierTargetSide", fluidCarrierTarget.side().get3DDataValue());
         }
+        if (!lumberjackTool.isEmpty()) output.store("LumberjackTool", ItemStack.CODEC, lumberjackTool);
+        output.putInt("LumberjackPhase", lumberjackPhase.ordinal());
+        if (lumberjackStationTarget != null) {
+            output.putLong("LumberjackStationPos", lumberjackStationTarget.pipePos().asLong());
+            output.putInt("LumberjackStationSide", lumberjackStationTarget.side().get3DDataValue());
+        }
+        if (lumberjackBlockTarget != null) output.putLong("LumberjackBlock", lumberjackBlockTarget.asLong());
+        output.putFloat("LumberjackBreakProgress", lumberjackBreakProgress);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -913,6 +1148,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (fluidCarrierPhase != FluidCarrierPhase.NONE && fluidCarrierTarget == null) {
             fluidCarrierPhase = FluidCarrierPhase.NONE;
+        }
+        lumberjackTool = input.read("LumberjackTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int lumberjackOrdinal = input.getIntOr("LumberjackPhase", LumberjackPhase.NONE.ordinal());
+        LumberjackPhase[] lumberjackPhases = LumberjackPhase.values();
+        lumberjackPhase = lumberjackOrdinal >= 0 && lumberjackOrdinal < lumberjackPhases.length
+                ? lumberjackPhases[lumberjackOrdinal] : LumberjackPhase.NONE;
+        if (input.getLong("LumberjackStationPos").isPresent()) {
+            lumberjackStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("LumberjackStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "LumberjackStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("LumberjackBlock").isPresent()) {
+            lumberjackBlockTarget = BlockPos.of(input.getLongOr("LumberjackBlock", 0));
+        }
+        lumberjackBreakProgress = Math.clamp(input.getFloatOr("LumberjackBreakProgress", 0), 0, 1.1F);
+        if ((lumberjackPhase == LumberjackPhase.TO_TOOL
+                || lumberjackPhase == LumberjackPhase.TO_UNLOAD_TOOL)
+                && lumberjackStationTarget == null) lumberjackPhase = LumberjackPhase.RETURN_HOME;
+        if (lumberjackPhase == LumberjackPhase.TO_BLOCK && lumberjackBlockTarget == null) {
+            lumberjackPhase = LumberjackPhase.RETURN_HOME;
         }
         ContainerHelper.loadAllItems(input, inventory);
     }

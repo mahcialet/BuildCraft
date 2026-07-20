@@ -105,7 +105,11 @@ public final class BCCoreGameTests {
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
             event.registerEnvironment(id("robotics_fluid_carrier"));
+        Holder<TestEnvironmentDefinition<?>> lumberjackEnvironment =
+            event.registerEnvironment(id("robotics_lumberjack"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
+        registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
+            BCCoreGameTests::roboticsLumberjackRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7063,6 +7067,102 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(workZone.equals(editedConfig.workZone())
                         && workZone.equals(editedConfig.loadUnloadZone()),
                 "Zone Map interaction did not assign work and load/unload areas");
+        helper.succeed();
+    }
+
+    private static void roboticsLumberjackRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 12, 1);
+        BlockPos sourceRelative = new BlockPos(2, 12, 1);
+        BlockPos receiverRelative = new BlockPos(3, 12, 1);
+        BlockPos targetRelative = new BlockPos(4, 12, 1);
+        BlockPos excludedRelative = new BlockPos(4, 12, 2);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        helper.setBlock(targetRelative, Blocks.OAK_LOG);
+        helper.setBlock(excludedRelative, Blocks.OAK_LOG);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        BlockPos target = helper.absolutePos(targetRelative);
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        helper.assertTrue(home.installAttachment(Direction.UP, homeStation),
+                "Lumberjack home station installation failed");
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        net.minecraft.world.Container sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenAxe = new ItemStack(Items.WOODEN_AXE);
+        nearlyBrokenAxe.setDamageValue(nearlyBrokenAxe.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenAxe);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.LUMBERJACK);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Lumberjack failed to dock at its home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1_500 && (!helper.getBlockState(targetRelative).isAir()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.lumberjackPhase() != buildcraft.robotics.LumberjackPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(targetRelative).isAir(),
+                "Lumberjack did not harvest the zoned log: phase=" + robot.lumberjackPhase()
+                        + ", task=" + robot.taskState() + ", tool=" + robot.lumberjackTool()
+                        + ", source=" + sourceChest.getItem(0)
+                        + ", receiver=" + receiverChest.getItem(0));
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.OAK_LOG),
+                "Lumberjack harvested a log outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(),
+                "Lumberjack did not extract exactly one axe");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.WOODEN_AXE)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Lumberjack did not apply durability and unload its worn axe");
+        helper.assertTrue(robot.lumberjackTool().isEmpty(),
+                "Lumberjack retained its unloaded axe");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Lumberjack did not return home");
+        helper.assertValueEqual(buildcraft.robotics.LumberjackPhase.NONE, robot.lumberjackPhase(),
+                "Lumberjack scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY - 1_000_000,
+                "Lumberjack work consumed insufficient battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class,
+                new net.minecraft.world.phys.AABB(target).inflate(2),
+                item -> item.getItem().is(Items.OAK_LOG)).isEmpty(),
+                "Lumberjack did not preserve harvested block drops");
         helper.succeed();
     }
 
