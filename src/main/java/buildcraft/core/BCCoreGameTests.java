@@ -6427,18 +6427,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void siliconFacade(GameTestHelper helper) {
-        java.util.List<ItemStack> stacks = new java.util.ArrayList<>(java.util.Collections.nCopies(9, ItemStack.EMPTY));
-        stacks.set(0, new ItemStack(Blocks.COBBLESTONE_WALL));
-        stacks.set(1, new ItemStack(Blocks.COBBLESTONE_WALL));
-        stacks.set(2, new ItemStack(Blocks.COBBLESTONE_WALL));
-        stacks.set(4, new ItemStack(Blocks.OAK_PLANKS));
-        var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        var input = new buildcraft.silicon.recipe.AssemblyRecipeInput(java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get(), 3),
+                new ItemStack(Blocks.OAK_PLANKS)), null);
         var recipe = buildcraft.silicon.recipe.FacadeRecipe.INSTANCE;
         helper.assertTrue(recipe.matches(input, helper.getLevel()),
-                "facade recipe rejected three cobblestone walls and a block");
+                "facade recipe rejected three Structure Pipes and a block");
         ItemStack facade = recipe.assemble(input);
         helper.assertTrue(facade.is(buildcraft.silicon.BCSiliconItems.PLUG_FACADE.get()),
                 "facade recipe produced the wrong item");
+        helper.assertValueEqual(6, facade.getCount(), "facade recipe did not produce six covers");
+        helper.assertValueEqual(64 * buildcraft.api.mj.MjAPI.MJ, recipe.requiredPower(),
+                "facade recipe has the wrong Assembly Table power cost");
         helper.assertValueEqual(Blocks.OAK_PLANKS.defaultBlockState(),
                 facade.get(buildcraft.silicon.BCSiliconDataComponents.FACADE_STATE.get()),
                 "facade recipe did not capture the block state");
@@ -6457,10 +6457,33 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(holder.installAttachment(Direction.SOUTH, removed),
                 "state-preserving facade could not be reinstalled");
 
-        stacks.set(4, new ItemStack(Items.COAL));
-        var invalid = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, stacks);
+        var invalid = new buildcraft.silicon.recipe.AssemblyRecipeInput(java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get(), 3),
+                new ItemStack(Items.COAL)), null);
         helper.assertFalse(recipe.matches(invalid, helper.getLevel()),
                 "facade recipe accepted a non-block appearance item");
+        BlockPos tablePos = helper.absolutePos(new BlockPos(6, 2, 3));
+        helper.getLevel().setBlock(tablePos, buildcraft.silicon.BCSiliconBlocks.ASSEMBLY_TABLE.get()
+                .defaultBlockState(), Block.UPDATE_ALL);
+        var table = (buildcraft.silicon.block.entity.AssemblyTableBlockEntity)
+                helper.getLevel().getBlockEntity(tablePos);
+        table.inventory().set(0, net.neoforged.neoforge.transfer.item.ItemResource.of(
+                buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()), 3);
+        table.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(Blocks.OAK_PLANKS.asItem()), 1);
+        helper.assertValueEqual(64 * buildcraft.api.mj.MjAPI.MJ, table.getRequiredLaserPower(),
+                "Assembly Table did not select the facade recipe");
+        helper.assertValueEqual(0L, table.receiveLaserPower(table.getRequiredLaserPower()),
+                "Assembly Table rejected facade recipe power");
+        buildcraft.silicon.block.entity.AssemblyTableBlockEntity.tick(
+                helper.getLevel(), tablePos, helper.getLevel().getBlockState(tablePos), table);
+        int assembledFacades = 0;
+        for (int slot = 0; slot < table.inventory().size(); slot++) {
+            if (table.inventory().getResource(slot).value() == buildcraft.silicon.BCSiliconItems.PLUG_FACADE.get()) {
+                assembledFacades += table.inventory().getAmountAsInt(slot);
+            }
+        }
+        helper.assertValueEqual(6, assembledFacades, "Assembly Table did not produce six facades");
+        helper.assertValueEqual(0L, table.storedLaserPower(), "facade assembly did not consume its power");
         helper.succeed();
     }
 

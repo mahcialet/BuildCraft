@@ -1,6 +1,7 @@
 package buildcraft.silicon;
 
 import buildcraft.silicon.recipe.AssemblyRecipe;
+import buildcraft.silicon.recipe.AssemblyTableRecipe;
 import buildcraft.silicon.recipe.FacadeRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -16,7 +17,7 @@ public final class BCSiliconRecipes {
         DeferredRegister.create(Registries.RECIPE_TYPE, BCSilicon.MOD_ID);
     private static final DeferredRegister<RecipeSerializer<?>> SERIALIZERS =
         DeferredRegister.create(Registries.RECIPE_SERIALIZER, BCSilicon.MOD_ID);
-    public static final DeferredHolder<RecipeType<?>, RecipeType<AssemblyRecipe>> ASSEMBLY_TYPE =
+    public static final DeferredHolder<RecipeType<?>, RecipeType<AssemblyTableRecipe>> ASSEMBLY_TYPE =
         TYPES.register("assembly", () -> RecipeType.simple(Identifier.fromNamespaceAndPath(BCSilicon.MOD_ID, "assembly")));
     public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<AssemblyRecipe>> ASSEMBLY_SERIALIZER =
         SERIALIZERS.register("assembly", () -> new RecipeSerializer<>(AssemblyRecipe.CODEC,

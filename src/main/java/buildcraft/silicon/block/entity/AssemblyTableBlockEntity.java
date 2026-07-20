@@ -2,7 +2,7 @@ package buildcraft.silicon.block.entity;
 
 import buildcraft.api.mj.ILaserTarget;
 import buildcraft.silicon.BCSiliconBlockEntities;
-import buildcraft.silicon.recipe.AssemblyRecipe;
+import buildcraft.silicon.recipe.AssemblyTableRecipe;
 import buildcraft.silicon.recipe.AssemblyRecipeInput;
 import buildcraft.silicon.recipe.AssemblySelection;
 import buildcraft.silicon.ChipsetType;
@@ -42,13 +42,13 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         }
     }
     public long selectedRequiredPower() {
-        AssemblyRecipe recipe = activeRecipe();
+        AssemblyTableRecipe recipe = activeRecipe();
         return recipe == null ? 0 : recipe.requiredPower();
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, AssemblyTableBlockEntity table) {
         if (level.isClientSide()) return;
-        AssemblyRecipe recipe = table.activeRecipe();
+        AssemblyTableRecipe recipe = table.activeRecipe();
         if (recipe == null) {
             table.storedLaserPower = 0;
         } else if (table.storedLaserPower >= recipe.requiredPower()) {
@@ -58,7 +58,7 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
     }
 
     @Override public long getRequiredLaserPower() {
-        AssemblyRecipe recipe = activeRecipe();
+        AssemblyTableRecipe recipe = activeRecipe();
         return recipe == null ? 0 : Math.max(0, recipe.requiredPower() - storedLaserPower);
     }
 
@@ -69,31 +69,14 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         return microJoules - accepted;
     }
 
-    private AssemblyRecipe activeRecipe() {
+    private AssemblyTableRecipe activeRecipe() {
         if (level == null || level.isClientSide()) return null;
         var stacks = new ArrayList<ItemStack>(inventory.size());
         for (int slot = 0; slot < inventory.size(); slot++) stacks.add(stack(slot));
         AssemblyRecipeInput input = new AssemblyRecipeInput(stacks, selection);
         return level.getServer().getRecipeManager().getRecipeFor(
             BCSiliconRecipes.ASSEMBLY_TYPE.get(), input, level).map(holder -> holder.value())
-            .filter(recipe -> canAccept(recipe.result())).orElse(null);
-    }
-
-    private int[] findSlots(AssemblyRecipe recipe) {
-        int[] slots = new int[recipe.ingredients().size()];
-        java.util.Arrays.fill(slots, -1);
-        boolean[] used = new boolean[inventory.size()];
-        for (int ingredientIndex = 0; ingredientIndex < recipe.ingredients().size(); ingredientIndex++) {
-            for (int slot = 0; slot < inventory.size(); slot++) {
-                if (!used[slot] && recipe.ingredients().get(ingredientIndex).test(stack(slot))) {
-                    slots[ingredientIndex] = slot;
-                    used[slot] = true;
-                    break;
-                }
-            }
-            if (slots[ingredientIndex] < 0) return null;
-        }
-        return slots;
+            .filter(recipe -> canAccept(recipe.result(input))).orElse(null);
     }
 
     private ItemStack stack(int slot) {
@@ -107,16 +90,19 @@ public final class AssemblyTableBlockEntity extends BlockEntity implements ILase
         }
     }
 
-    private boolean craft(AssemblyRecipe recipe) {
-        int[] slots = findSlots(recipe);
-        if (slots == null) return false;
+    private boolean craft(AssemblyTableRecipe recipe) {
+        var stacks = new ArrayList<ItemStack>(inventory.size());
+        for (int slot = 0; slot < inventory.size(); slot++) stacks.add(stack(slot));
+        AssemblyRecipeInput input = new AssemblyRecipeInput(stacks, selection);
+        var slots = recipe.findSlots(input);
+        ItemStack result = recipe.result(input);
+        if (slots.isEmpty() || result.isEmpty()) return false;
         try (Transaction transaction = Transaction.openRoot()) {
-            for (int slot : slots) {
-                ItemResource resource = inventory.getResource(slot);
-                if (inventory.extract(slot, resource, 1, transaction) != 1) return false;
+            for (var use : slots) {
+                ItemResource resource = inventory.getResource(use.slot());
+                if (inventory.extract(use.slot(), resource, use.count(), transaction) != use.count()) return false;
             }
-            if (inventory.insert(ItemResource.of(recipe.result()), recipe.result().getCount(), transaction)
-                != recipe.result().getCount()) return false;
+            if (inventory.insert(ItemResource.of(result), result.getCount(), transaction) != result.getCount()) return false;
             transaction.commit();
             return true;
         }

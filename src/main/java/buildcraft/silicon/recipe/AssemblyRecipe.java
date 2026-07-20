@@ -17,7 +17,7 @@ import net.minecraft.world.item.crafting.RecipeType;
 import net.minecraft.world.level.Level;
 
 public record AssemblyRecipe(Optional<AssemblySelection> selection, List<Ingredient> ingredients,
-                             ItemStackTemplate output, long requiredPower) implements Recipe<AssemblyRecipeInput> {
+                             ItemStackTemplate output, long requiredPower) implements AssemblyTableRecipe {
     public static final MapCodec<AssemblyRecipe> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             AssemblySelection.CODEC.optionalFieldOf("selection").forGetter(AssemblyRecipe::selection),
             Ingredient.CODEC.listOf().fieldOf("ingredients").forGetter(AssemblyRecipe::ingredients),
@@ -44,6 +44,21 @@ public record AssemblyRecipe(Optional<AssemblySelection> selection, List<Ingredi
     }
     public ItemStack result() { return output.create(); }
     @Override public ItemStack assemble(AssemblyRecipeInput input) { return result(); }
+    @Override public ItemStack result(AssemblyRecipeInput input) { return result(); }
+    @Override public List<SlotUse> findSlots(AssemblyRecipeInput input) {
+        List<SlotUse> slots = new java.util.ArrayList<>(ingredients.size());
+        boolean[] used = new boolean[input.size()];
+        for (Ingredient ingredient : ingredients) {
+            int found = -1;
+            for (int slot = 0; slot < input.size(); slot++) {
+                if (!used[slot] && ingredient.test(input.getItem(slot))) { found = slot; break; }
+            }
+            if (found < 0) return List.of();
+            used[found] = true;
+            slots.add(new SlotUse(found, 1));
+        }
+        return List.copyOf(slots);
+    }
     @Override public RecipeSerializer<? extends Recipe<AssemblyRecipeInput>> getSerializer() {
         return BCSiliconRecipes.ASSEMBLY_SERIALIZER.get();
     }
