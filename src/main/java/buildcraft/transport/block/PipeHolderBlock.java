@@ -1,6 +1,7 @@
 package buildcraft.transport.block;
 
 import buildcraft.transport.BCTransportBlockEntities;
+import buildcraft.transport.BCTransportItems;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.item.PipeItem;
@@ -12,6 +13,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
@@ -34,11 +36,14 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.EnumProperty;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jspecify.annotations.Nullable;
+import java.util.List;
 
 public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchable {
     public static final MapCodec<PipeHolderBlock> CODEC = simpleCodec(PipeHolderBlock::new);
@@ -102,6 +107,9 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
         if (neighbour.getBlock() instanceof PipeHolderBlock) {
             if (level.getBlockEntity(pos.relative(direction)) instanceof PipeHolderBlockEntity other
                     && other.attachmentBlocksConnection(direction.getOpposite())) return false;
+            if (level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder
+                    && level.getBlockEntity(pos.relative(direction)) instanceof PipeHolderBlockEntity other
+                    && !holder.canConnectColor(other)) return false;
             return type.connectsTo(neighbour.getValue(TYPE));
         }
         if (!(level instanceof Level actualLevel)) return false;
@@ -154,6 +162,28 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
     @Override
     protected RenderShape getRenderShape(BlockState state) {
         return RenderShape.MODEL;
+    }
+
+    @Override
+    protected List<ItemStack> getDrops(BlockState state, LootParams.Builder params) {
+        List<ItemStack> drops = super.getDrops(state, params);
+        BlockEntity blockEntity = params.getOptionalParameter(LootContextParams.BLOCK_ENTITY);
+        if (blockEntity instanceof PipeHolderBlockEntity holder && holder.shellColor() != null) {
+            for (ItemStack drop : drops) {
+                if (drop.getItem() instanceof PipeItem) {
+                    drop.set(buildcraft.transport.BCTransportDataComponents.PIPE_COLOR.get(), holder.shellColor());
+                }
+            }
+        }
+        return drops;
+    }
+
+    @Override
+    protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
+        if (level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder) {
+            return BCTransportItems.pipeItem(state.getValue(TYPE)).createStack(holder.shellColor());
+        }
+        return super.getCloneItemStack(level, pos, state, includeData);
     }
 
     @Override protected boolean isSignalSource(BlockState state) { return true; }

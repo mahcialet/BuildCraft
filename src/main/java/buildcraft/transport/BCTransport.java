@@ -12,6 +12,8 @@ public final class BCTransport {
     public static final String MOD_ID = "buildcrafttransport";
 
     public BCTransport(IEventBus modBus) {
+        BCTransportDataComponents.register(modBus);
+        BCTransportRecipes.register(modBus);
         BCTransportBlocks.register(modBus);
         BCTransportBlockEntities.register(modBus);
         BCTransportItems.register(modBus);

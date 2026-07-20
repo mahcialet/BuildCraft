@@ -248,6 +248,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, fillerGateEnvironment, "builders_filler_gate_patterns", BCCoreGameTests::buildersFillerGatePatterns);
         registerTest(event, roboticsGateListEnvironment, "robotics_gate_list_parameters", BCCoreGameTests::roboticsGateListParameters);
         registerTest(event, transportCreativeEnvironment, "transport_creative_pipe_entries", BCCoreGameTests::transportCreativePipeEntries);
+        registerTest(event, environment, "transport_pipe_shell_colors", BCCoreGameTests::transportPipeShellColors);
         registerTest(event, siliconLensEnvironment, "silicon_lens_variants", BCCoreGameTests::siliconLensVariants);
         registerTest(event, siliconSensorTimerEnvironment, "silicon_sensor_timer_plugs",
                 BCCoreGameTests::siliconSensorTimerPlugs);
@@ -3998,6 +3999,87 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "timer item did not install after side was cleared");
         helper.assertTrue(holder.attachment(Direction.UP).is(buildcraft.silicon.BCSiliconItems.PLUG_TIMER.get()),
                 "pipe stored wrong utility attachment");
+        helper.succeed();
+    }
+
+    private static void transportPipeShellColors(GameTestHelper helper) {
+        BlockPos firstPos = new BlockPos(1, 2, 1);
+        BlockPos secondPos = firstPos.east();
+        BlockState pipeState = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState()
+                .setValue(buildcraft.transport.block.PipeHolderBlock.TYPE,
+                        buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        helper.setBlock(firstPos, pipeState);
+        helper.setBlock(secondPos, pipeState);
+        var first = helper.getBlockEntity(firstPos,
+                buildcraft.transport.block.entity.PipeHolderBlockEntity.class);
+        var second = helper.getBlockEntity(secondPos,
+                buildcraft.transport.block.entity.PipeHolderBlockEntity.class);
+
+        first.setShellColor(net.minecraft.world.item.DyeColor.RED);
+        second.setShellColor(net.minecraft.world.item.DyeColor.BLUE);
+        helper.assertFalse(helper.getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Differently coloured pipes connected");
+
+        second.setShellColor(net.minecraft.world.item.DyeColor.RED);
+        helper.assertTrue(helper.getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Matching coloured pipes did not connect");
+
+        second.setShellColor(null);
+        helper.assertTrue(helper.getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Uncoloured pipe did not connect to a coloured pipe");
+
+        ItemStack colored = buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get()
+                .createStack(net.minecraft.world.item.DyeColor.GREEN);
+        second.applyComponentsFromItemStack(colored);
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.GREEN, second.shellColor(),
+                "Pipe item colour was not applied to its block entity");
+        helper.assertFalse(helper.getBlockState(firstPos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Applying a pipe item colour did not refresh connections");
+
+        var drops = Block.getDrops(helper.getBlockState(secondPos), helper.getLevel(),
+                helper.absolutePos(secondPos), second);
+        helper.assertValueEqual(1, drops.size(), "Coloured pipe drop count");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.GREEN,
+                buildcraft.transport.item.PipeItem.color(drops.getFirst()),
+                "Coloured pipe drop lost its colour");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.WHITE, second.pipeColor(),
+                "Shell colour changed the Lapis/Daizuli behaviour colour");
+
+        var coloredRecipeInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 1, java.util.List.of(
+                new ItemStack(Items.COBBLESTONE), new ItemStack(Items.BLUE_STAINED_GLASS),
+                new ItemStack(Items.COBBLESTONE)));
+        ItemStack coloredResult = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, coloredRecipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(coloredRecipeInput);
+        helper.assertTrue(coloredResult.is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get()),
+                "Stained glass did not craft the matching pipe type");
+        helper.assertValueEqual(8, coloredResult.getCount(), "Coloured pipe recipe output count");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.BLUE,
+                buildcraft.transport.item.PipeItem.color(coloredResult), "Recipe lost stained-glass colour");
+
+        var upgradeInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                coloredResult.copyWithCount(1), new ItemStack(buildcraft.transport.BCTransportItems.WATERPROOF.get())));
+        ItemStack fluidResult = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, upgradeInput, helper.getLevel())
+                .orElseThrow().value().assemble(upgradeInput);
+        helper.assertTrue(fluidResult.is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_FLUID.get()),
+                "Coloured item pipe did not upgrade to fluid pipe");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.BLUE,
+                buildcraft.transport.item.PipeItem.color(fluidResult), "Upgrade lost pipe colour");
+
+        var undoInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 1,
+                java.util.List.of(fluidResult));
+        ItemStack undoResult = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, undoInput, helper.getLevel())
+                .orElseThrow().value().assemble(undoInput);
+        helper.assertTrue(undoResult.is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get()),
+                "Fluid pipe undo did not restore item pipe");
+        helper.assertValueEqual(net.minecraft.world.item.DyeColor.BLUE,
+                buildcraft.transport.item.PipeItem.color(undoResult), "Undo recipe lost pipe colour");
         helper.succeed();
     }
 

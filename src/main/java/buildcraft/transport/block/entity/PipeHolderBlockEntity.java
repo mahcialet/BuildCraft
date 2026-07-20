@@ -5,6 +5,7 @@ import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
+import buildcraft.transport.BCTransportDataComponents;
 import buildcraft.transport.PipeWireColor;
 import buildcraft.transport.PipeType;
 import buildcraft.transport.block.PipeHolderBlock;
@@ -15,6 +16,8 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.component.DataComponentGetter;
+import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -80,6 +83,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private @Nullable Direction extractionDirection;
     private @Nullable Direction routingDirection;
     private DyeColor pipeColor = DyeColor.WHITE;
+    private @Nullable DyeColor shellColor;
     private int installedWires;
     private int wireSources;
     private int poweredWires;
@@ -1060,6 +1064,20 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return pipeColor;
     }
 
+    public @Nullable DyeColor shellColor() {
+        return shellColor;
+    }
+
+    public boolean canConnectColor(PipeHolderBlockEntity other) {
+        return shellColor == null || other.shellColor == null || shellColor == other.shellColor;
+    }
+
+    public void setShellColor(@Nullable DyeColor color) {
+        if (shellColor == color) return;
+        shellColor = color;
+        attachmentChanged();
+    }
+
     public void activatePipeColor(int colorIndex) {
         if (pipeType() != PipeType.LAPIS_ITEM && pipeType() != PipeType.DAIZULI_ITEM) return;
         DyeColor[] colors = DyeColor.values();
@@ -1570,6 +1588,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         extractionDirection = input.read("extraction_direction", Direction.CODEC).orElse(null);
         routingDirection = input.read("routing_direction", Direction.CODEC).orElse(null);
         pipeColor = input.read("pipe_color", DyeColor.CODEC).orElse(DyeColor.WHITE);
+        shellColor = input.read("shell_color", DyeColor.CODEC).orElse(null);
         installedWires = input.getIntOr("installed_wires", 0) & 0xF;
         poweredWires = input.getIntOr("powered_wires", 0) & installedWires;
         wireSources = 0;
@@ -1626,6 +1645,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         if (routingDirection != null) output.store("routing_direction", Direction.CODEC, routingDirection);
         output.store("pipe_color", DyeColor.CODEC, pipeColor);
+        if (shellColor != null) output.store("shell_color", DyeColor.CODEC, shellColor);
         if (installedWires != 0) output.putInt("installed_wires", installedWires);
         if (poweredWires != 0) output.putInt("powered_wires", poweredWires);
         output.store("attachments", ItemStack.OPTIONAL_CODEC.listOf(), attachments);
@@ -1651,6 +1671,20 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         fluidBuffer.serialize(output.child("fluid_buffer"));
         rfEnergy.serialize(output.child("rf_energy"));
         if (rfReceivedFrom != null) output.store("rf_received_from", Direction.CODEC, rfReceivedFrom);
+    }
+
+    @Override
+    protected void applyImplicitComponents(DataComponentGetter components) {
+        super.applyImplicitComponents(components);
+        DyeColor color = components.get(BCTransportDataComponents.PIPE_COLOR.get());
+        if (level == null) shellColor = color;
+        else setShellColor(color);
+    }
+
+    @Override
+    protected void collectImplicitComponents(DataComponentMap.Builder components) {
+        super.collectImplicitComponents(components);
+        if (shellColor != null) components.set(BCTransportDataComponents.PIPE_COLOR.get(), shellColor);
     }
 
     @Override

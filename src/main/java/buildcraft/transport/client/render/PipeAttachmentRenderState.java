@@ -26,4 +26,5 @@ public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     Direction stripesDirection;
     int pipeColor;
     boolean showPipeColor;
+    int shellColor;
 }

@@ -51,6 +51,7 @@ public final class PipeAttachmentRenderer
         state.routingDirection = pipe.routingDirection();
         state.stripesDirection = pipe.stripesDirection();
         state.pipeColor = dyeColor(pipe.pipeColor());
+        state.shellColor = pipe.shellColor() == null ? 0 : dyeColor(pipe.shellColor());
         state.showPipeColor = pipe.pipeType() == PipeType.LAPIS_ITEM
                 || pipe.pipeType() == PipeType.DAIZULI_ITEM;
         state.travellingItems.clear();
@@ -97,6 +98,7 @@ public final class PipeAttachmentRenderer
     @Override public void submit(PipeAttachmentRenderState state, PoseStack poseStack,
                                  SubmitNodeCollector nodes, CameraRenderState camera) {
         submitWires(state, poseStack, nodes);
+        submitShellColor(state, poseStack, nodes);
         submitPowerMeter(state, poseStack, nodes);
         submitPipeStateIndicators(state, poseStack, nodes);
         for (int index = 0; index < state.travellingItems.size(); index++) {
@@ -129,6 +131,27 @@ public final class PipeAttachmentRenderer
             }
             poseStack.popPose();
         }
+    }
+
+    private void submitShellColor(PipeAttachmentRenderState state, PoseStack poseStack, SubmitNodeCollector nodes) {
+        if (state.shellColor == 0) return;
+        TextureAtlasSprite white = sprites.get(Sheets.BLOCKS_MAPPER.apply(
+                Identifier.withDefaultNamespace("block/white_concrete")));
+        nodes.submitCustomGeometry(poseStack, RenderTypes.entityCutout(Sheets.BLOCKS_MAPPER.sheet()),
+                (pose, vertices) -> {
+                    float west = state.connected[Direction.WEST.ordinal()] ? 0 : 4;
+                    float east = state.connected[Direction.EAST.ordinal()] ? 16 : 12;
+                    float north = state.connected[Direction.NORTH.ordinal()] ? 0 : 4;
+                    float south = state.connected[Direction.SOUTH.ordinal()] ? 16 : 12;
+                    wireQuad(vertices, pose, white, state.lightCoords, state.shellColor,
+                            west, 12.01F, 4.05F, east, 12.01F, 4.7F, Direction.UP);
+                    wireQuad(vertices, pose, white, state.lightCoords, state.shellColor,
+                            west, 12.01F, 11.3F, east, 12.01F, 11.95F, Direction.UP);
+                    wireQuad(vertices, pose, white, state.lightCoords, state.shellColor,
+                            4.05F, 12.015F, north, 4.7F, 12.015F, south, Direction.UP);
+                    wireQuad(vertices, pose, white, state.lightCoords, state.shellColor,
+                            11.3F, 12.015F, north, 11.95F, 12.015F, south, Direction.UP);
+                });
     }
 
     private static void submitFacadePart(ItemStackRenderState item, PoseStack poseStack,

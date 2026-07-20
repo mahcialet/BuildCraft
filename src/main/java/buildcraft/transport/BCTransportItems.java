@@ -85,6 +85,11 @@ public final class BCTransportItems {
                 PIPE_DIAMOND_WOOD_RF.get());
     }
 
+    public static PipeItem pipeItem(PipeType type) {
+        return pipeItems().stream().filter(item -> item.pipeType() == type).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("No item for pipe type " + type));
+    }
+
     private BCTransportItems() {
     }
 
