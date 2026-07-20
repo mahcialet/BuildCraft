@@ -3,6 +3,7 @@ package buildcraft.robotics;
 import buildcraft.robotics.item.RedstoneBoardItem;
 import buildcraft.robotics.item.RobotStationItem;
 import buildcraft.robotics.item.RobotItem;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -20,6 +21,10 @@ public final class BCRoboticsItems {
             ITEMS.registerItem("robot_station", RobotStationItem::new);
     public static final DeferredItem<RobotItem> ROBOT =
             ITEMS.registerItem("robot", RobotItem::new);
+    /** Diagnostic headgear with no armour or durability, as in classic BuildCraft. */
+    public static final DeferredItem<net.minecraft.world.item.Item> ROBOT_GOGGLES =
+            ITEMS.registerItem("robot_goggles", properties -> new net.minecraft.world.item.Item(
+                    properties.stacksTo(1).equippable(EquipmentSlot.HEAD)));
 
     private BCRoboticsItems() {}
     public static void register(IEventBus bus) { ITEMS.register(bus); }

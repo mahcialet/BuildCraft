@@ -30,6 +30,7 @@ public final class BCRobotics {
         event.accept(BCRoboticsItems.ZONE_PLANNER.get());
         event.accept(BCRoboticsItems.ROBOT_STATION.get());
         event.accept(BCRoboticsItems.ROBOT.get());
+        event.accept(BCRoboticsItems.ROBOT_GOGGLES.get());
         for (RobotBoardType type : RobotBoardType.values()) {
             if (type != RobotBoardType.EMPTY) {
                 event.accept(buildcraft.robotics.item.RobotItem.create(type, 0));

@@ -4,6 +4,7 @@
   "gui.buildcraftrobotics.zone_planner.name": "Zone name",
   "item.buildcraftrobotics.robot_station": "Robot Station",
   "item.buildcraftrobotics.robot": "Robot",
+  "item.buildcraftrobotics.robot_goggles": "Robot Goggles",
   "entity.buildcraftrobotics.robot": "Robot",
   "message.buildcraftrobotics.robot_station.config": "Robot Station: %s, %s item filter(s), %s fluid filter(s)",
   "message.buildcraftrobotics.robot_station.work_zone": "Robot Station work zone: %s block(s) (use a clean Map Location to clear)",

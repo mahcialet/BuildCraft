@@ -4,10 +4,10 @@ import buildcraft.robotics.BCRoboticsMenus;
 import buildcraft.robotics.BCRoboticsEntities;
 import buildcraft.robotics.client.screen.RequesterScreen;
 import buildcraft.robotics.client.screen.ZonePlannerScreen;
+import buildcraft.robotics.client.render.RobotRenderer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.EntityRenderersEvent;
-import net.minecraft.client.renderer.entity.ThrownItemRenderer;
 
 public final class BCRoboticsClient {
     private BCRoboticsClient() {}
@@ -17,7 +17,7 @@ public final class BCRoboticsClient {
     }
     private static void registerEntityRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(BCRoboticsEntities.ROBOT.get(),
-                context -> new ThrownItemRenderer<>(context, 1.0F, false));
+                RobotRenderer::new);
     }
     private static void registerScreens(RegisterMenuScreensEvent event) {
         event.register(BCRoboticsMenus.REQUESTER.get(), RequesterScreen::new);

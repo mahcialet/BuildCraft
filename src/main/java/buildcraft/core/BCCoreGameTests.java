@@ -211,8 +211,9 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_redstone_board", BCCoreGameTests::roboticsRedstoneBoard);
         registerTest(event, environment, "robotics_requester", BCCoreGameTests::roboticsRequester);
         registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
-        registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
-        registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
+registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
+registerTest(event, environment, "robotics_robot_goggles", BCCoreGameTests::roboticsRobotGoggles);
+registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
         registerTest(event, environment, "robotics_carrier_robot", BCCoreGameTests::roboticsCarrierRobot);
         registerTest(event, fluidCarrierEnvironment, "robotics_fluid_carrier_robot",
@@ -6646,6 +6647,20 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         BlockPos absolutePos = helper.absolutePos(relativePos);
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), net.minecraft.core.Direction.UP, absolutePos, false);
         return new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, stack, hit);
+    }
+
+    private static void roboticsRobotGoggles(GameTestHelper helper) {
+        ItemStack goggles = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_GOGGLES.get());
+        helper.assertValueEqual(1, goggles.getMaxStackSize(), "Robot Goggles stack size");
+        helper.assertFalse(goggles.isDamageableItem(), "Robot Goggles unexpectedly have durability");
+        var equippable = goggles.get(DataComponents.EQUIPPABLE);
+        helper.assertTrue(equippable != null, "Robot Goggles are not equippable");
+        helper.assertValueEqual(net.minecraft.world.entity.EquipmentSlot.HEAD, equippable.slot(),
+                "Robot Goggles equipment slot");
+        var modifiers = goggles.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS,
+                net.minecraft.world.item.component.ItemAttributeModifiers.EMPTY);
+        helper.assertTrue(modifiers.modifiers().isEmpty(), "Robot Goggles unexpectedly provide armour");
+        helper.succeed();
     }
 
     private static void roboticsRobotStation(GameTestHelper helper) {
