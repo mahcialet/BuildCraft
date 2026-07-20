@@ -97,7 +97,11 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
 
     private static boolean connects(PipeType type, LevelReader level, BlockPos pos,
         Direction direction, BlockState neighbour) {
+        if (level.getBlockEntity(pos) instanceof PipeHolderBlockEntity holder
+                && holder.attachmentBlocksConnection(direction)) return false;
         if (neighbour.getBlock() instanceof PipeHolderBlock) {
+            if (level.getBlockEntity(pos.relative(direction)) instanceof PipeHolderBlockEntity other
+                    && other.attachmentBlocksConnection(direction.getOpposite())) return false;
             return type.connectsTo(neighbour.getValue(TYPE));
         }
         if (!(level instanceof Level actualLevel)) return false;
@@ -117,6 +121,16 @@ public final class PipeHolderBlock extends BaseEntityBlock implements IWrenchabl
                 net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK,
                 pos.relative(direction), direction.getOpposite()
         ) != null;
+    }
+
+    public static BlockState refreshConnections(LevelReader level, BlockPos pos, BlockState state) {
+        if (!(state.getBlock() instanceof PipeHolderBlock)) return state;
+        BlockState refreshed = state;
+        for (Direction direction : Direction.values()) {
+            refreshed = refreshed.setValue(property(direction), connects(state.getValue(TYPE), level, pos,
+                    direction, level.getBlockState(pos.relative(direction))));
+        }
+        return refreshed;
     }
 
     public static BooleanProperty property(Direction direction) {

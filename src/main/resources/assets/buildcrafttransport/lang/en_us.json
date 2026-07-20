@@ -22,5 +22,7 @@
   "item.buildcrafttransport.pipe_diamond_power": "Diamond Power Pipe",
   "item.buildcrafttransport.pipe_diamond_wood_power": "Diamond Wooden Power Pipe",
   "block.buildcrafttransport.filtered_buffer": "Filtered Buffer",
-  "item.buildcrafttransport.waterproof": "Pipe Sealant"
+  "item.buildcrafttransport.waterproof": "Pipe Sealant",
+  "item.buildcrafttransport.plug_blocker": "Pipe Plug",
+  "item.buildcrafttransport.plug_power_adaptor": "Power Adaptor"
 }

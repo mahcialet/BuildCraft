@@ -200,6 +200,10 @@ tasks.named('processResources', ProcessResources) {
         rename 'pipewaterproof.png', 'waterproof.png'
         into 'assets/buildcrafttransport/textures/item'
     }
+    from('buildcraft_resources/assets/buildcrafttransport/textures/pipes') {
+        include 'plug.png', 'power_adapter.png'
+        into 'assets/buildcrafttransport/textures/item'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tank') {
         include 'end.png', 'side.png', 'side_joined_below.png'
         into 'assets/buildcraftfactory/textures/block/tank'

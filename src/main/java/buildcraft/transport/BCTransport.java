@@ -24,6 +24,8 @@ public final class BCTransport {
         if (!event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) return;
         event.accept(BCTransportItems.FILTERED_BUFFER.get());
         event.accept(BCTransportItems.WATERPROOF.get());
+        event.accept(BCTransportItems.PLUG_BLOCKER.get());
+        event.accept(BCTransportItems.PLUG_POWER_ADAPTOR.get());
         event.accept(BCTransportItems.PIPE_STRUCTURE.get());
         event.accept(BCTransportItems.PIPE_COBBLE_ITEM.get());
         event.accept(BCTransportItems.PIPE_STONE_ITEM.get());

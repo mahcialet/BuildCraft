@@ -186,6 +186,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_filtered_buffer", BCCoreGameTests::transportFilteredBuffer);
+        registerTest(event, environment, "transport_pipe_plugs", BCCoreGameTests::transportPipePlugs);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
@@ -4524,6 +4525,103 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(drops.size() == 1
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_FLUID.get()),
                 "diamond wooden fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportPipePlugs(GameTestHelper helper) {
+        var pipeBlock = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos firstPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos secondPos = firstPos.east();
+        BlockState itemPipe = pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_ITEM);
+        helper.getLevel().setBlock(firstPos, itemPipe, Block.UPDATE_ALL);
+        helper.getLevel().setBlock(secondPos, itemPipe, Block.UPDATE_ALL);
+        var first = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(firstPos);
+        helper.assertTrue(first.getBlockState().getValue(buildcraft.transport.block.PipeHolderBlock.EAST),
+                "adjacent item pipes did not initially connect");
+        helper.assertTrue(first.installAttachment(Direction.EAST,
+                new ItemStack(buildcraft.transport.BCTransportItems.PLUG_BLOCKER.get())),
+                "Blocker Plug installation failed");
+        helper.assertFalse(helper.getLevel().getBlockState(firstPos).getValue(
+                        buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Blocker Plug did not remove its pipe arm");
+        helper.assertFalse(helper.getLevel().getBlockState(secondPos).getValue(
+                        buildcraft.transport.block.PipeHolderBlock.WEST),
+                "Blocker Plug did not disconnect the neighbouring pipe");
+        helper.assertTrue(first.takeAttachment(Direction.EAST)
+                        .is(buildcraft.transport.BCTransportItems.PLUG_BLOCKER.get()),
+                "Blocker Plug could not be removed");
+        helper.assertTrue(helper.getLevel().getBlockState(firstPos).getValue(
+                        buildcraft.transport.block.PipeHolderBlock.EAST),
+                "pipe connection did not recover after Blocker removal");
+
+        BlockPos powerPos = helper.absolutePos(new BlockPos(5, 2, 1));
+        helper.getLevel().setBlock(powerPos, pipeBlock.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_POWER), Block.UPDATE_ALL);
+        var power = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(powerPos);
+        IMjToRfStatus previous = MjAPI.getRfStatus();
+        try {
+            MjAPI.setRfStatus(new IMjToRfStatus() {
+                @Override public MjRfConversion getConversion() { return MjRfConversion.createDefault(); }
+                @Override public boolean isAutoconvertEnabled() { return true; }
+            });
+            helper.assertTrue(power.installAttachment(Direction.UP,
+                    new ItemStack(buildcraft.transport.BCTransportItems.PLUG_POWER_ADAPTOR.get())),
+                    "Power Adaptor installation failed");
+            helper.assertTrue(MjAPI.isRfAutoConversionEnabled(), "RF auto-conversion did not enable");
+            helper.assertTrue(power.attachment(Direction.UP)
+                            .is(buildcraft.transport.BCTransportItems.PLUG_POWER_ADAPTOR.get()),
+                    "Power Adaptor attachment disappeared");
+            helper.assertTrue(power.attachmentPowerReceiver() != null,
+                    "Power Adaptor pipe has no MJ receiver");
+            helper.assertTrue(power.attachmentEnergyHandler(Direction.UP) != null,
+                    "Power Adaptor did not create its Energy handler");
+            var energy = helper.getLevel().getCapability(
+                    net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+                    powerPos, Direction.UP);
+            helper.assertTrue(energy != null, "Power Adaptor did not expose NeoForge Energy input");
+            try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+                helper.assertValueEqual(50, energy.insert(50, transaction),
+                        "Power Adaptor rejected Energy input");
+                transaction.commit();
+            }
+            helper.assertValueEqual(5 * MjAPI.MJ, power.powerStored(),
+                    "Power Adaptor converted Energy at the wrong MJ ratio");
+        } finally {
+            MjAPI.setRfStatus(previous);
+        }
+        helper.assertTrue(helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+                powerPos, Direction.NORTH) == null,
+                "Power Adaptor exposed Energy on an unconfigured side");
+        var blockerInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 1,
+                java.util.List.of(new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get())));
+        ItemStack blockers = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, blockerInput, helper.getLevel())
+                .orElseThrow().value().assemble(blockerInput);
+        helper.assertTrue(blockers.is(buildcraft.transport.BCTransportItems.PLUG_BLOCKER.get())
+                        && blockers.getCount() == 4,
+                "Blocker Plug recipe output");
+        var adaptorInput = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()),
+                new ItemStack(Items.GOLD_INGOT),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()),
+                new ItemStack(BCCoreItems.GEAR_STONE.get()),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get()),
+                new ItemStack(Items.REDSTONE),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get())));
+        ItemStack adaptors = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, adaptorInput, helper.getLevel())
+                .orElseThrow().value().assemble(adaptorInput);
+        helper.assertTrue(adaptors.is(buildcraft.transport.BCTransportItems.PLUG_POWER_ADAPTOR.get())
+                        && adaptors.getCount() == 4,
+                "Power Adaptor recipe output");
         helper.succeed();
     }
 

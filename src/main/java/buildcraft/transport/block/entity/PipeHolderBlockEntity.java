@@ -116,22 +116,33 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         return !stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment
                 ? attachment.mjReceiver(this, side, stack) : null;
     }
+    public net.neoforged.neoforge.transfer.energy.EnergyHandler attachmentEnergyHandler(Direction side) {
+        if (side == null) return null;
+        ItemStack stack = attachment(side);
+        return !stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment
+                ? attachment.energyHandler(this, side, stack) : null;
+    }
+    public boolean attachmentBlocksConnection(Direction side) {
+        ItemStack stack = attachment(side);
+        return !stack.isEmpty() && stack.getItem() instanceof PipeAttachment attachment
+                && attachment.blocksConnection(this, side, stack);
+    }
     public boolean installAttachment(Direction side, ItemStack stack) {
         if (stack.isEmpty() || !attachments.get(side.ordinal()).isEmpty()) return false;
         attachments.set(side.ordinal(), stack.copyWithCount(1));
-        sync();
+        attachmentChanged();
         return true;
     }
     public ItemStack takeAttachment(Direction side) {
         ItemStack stack = attachments.get(side.ordinal());
         if (stack.isEmpty()) return ItemStack.EMPTY;
         attachments.set(side.ordinal(), ItemStack.EMPTY);
-        sync();
+        attachmentChanged();
         return stack;
     }
     public void setAttachment(Direction side, ItemStack stack) {
         attachments.set(side.ordinal(), stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1));
-        sync();
+        attachmentChanged();
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, PipeHolderBlockEntity holder) {
@@ -909,6 +920,9 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             default -> null;
         };
     }
+    public @Nullable IMjReceiver attachmentPowerReceiver() {
+        return pipeType().isWoodenPowerInput() ? powerReceiver : mjReceiver();
+    }
 
     public @Nullable IMjConnector mjConnector() {
         return pipeType().isWoodenPowerInput() ? powerReceiver
@@ -1419,7 +1433,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
     }
-    public void attachmentChanged() { sync(); }
+    public void attachmentChanged() {
+        if (level != null) {
+            level.invalidateCapabilities(worldPosition);
+            BlockState refreshed = PipeHolderBlock.refreshConnections(level, worldPosition, getBlockState());
+            if (!refreshed.equals(getBlockState())) level.setBlock(worldPosition, refreshed, Block.UPDATE_ALL);
+        }
+        sync();
+    }
 
     @Override
     protected void loadAdditional(ValueInput input) {

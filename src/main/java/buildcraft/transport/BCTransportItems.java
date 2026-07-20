@@ -2,6 +2,8 @@ package buildcraft.transport;
 
 import buildcraft.transport.item.PipeItem;
 import buildcraft.transport.item.PipeWireItem;
+import buildcraft.transport.item.BlockerPlugItem;
+import buildcraft.transport.item.PowerAdaptorPlugItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -11,6 +13,10 @@ public final class BCTransportItems {
     public static final DeferredItem<?> FILTERED_BUFFER =
         ITEMS.registerSimpleBlockItem("filtered_buffer", BCTransportBlocks.FILTERED_BUFFER);
     public static final DeferredItem<?> WATERPROOF = ITEMS.registerSimpleItem("waterproof");
+    public static final DeferredItem<BlockerPlugItem> PLUG_BLOCKER =
+        ITEMS.registerItem("plug_blocker", BlockerPlugItem::new);
+    public static final DeferredItem<PowerAdaptorPlugItem> PLUG_POWER_ADAPTOR =
+        ITEMS.registerItem("plug_power_adaptor", PowerAdaptorPlugItem::new);
     public static final DeferredItem<PipeItem> PIPE_STRUCTURE = pipe(PipeType.STRUCTURE);
     public static final DeferredItem<PipeItem> PIPE_COBBLE_ITEM = pipe(PipeType.COBBLESTONE_ITEM);
     public static final DeferredItem<PipeItem> PIPE_STONE_ITEM = pipe(PipeType.STONE_ITEM);
