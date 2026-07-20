@@ -68,6 +68,9 @@ neoForge {
         buildcraftsilicon {
             sourceSet sourceSets.main
         }
+        buildcraftrobotics {
+            sourceSet sourceSets.main
+        }
     }
 }
 
@@ -318,7 +321,7 @@ tasks.named('processResources', ProcessResources) {
         into 'assets/buildcraftfactory/textures/block/auto_workbench_item'
     }
     from('buildcraft_resources/assets/buildcraftfactory/textures/items') {
-        include 'water_gel.png', 'gel.png'
+        include 'water_gel.png', 'gel.png', 'plastic_sheet.png'
         into 'assets/buildcraftfactory/textures/item'
     }
     from('buildcraft_resources/assets/buildcraftfactory/models/item') {

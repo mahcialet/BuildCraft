@@ -7,6 +7,7 @@ import buildcraft.transport.item.PowerAdaptorPlugItem;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.resources.Identifier;
 
 public final class BCTransportItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCTransport.MOD_ID);
@@ -104,6 +105,8 @@ public final class BCTransportItems {
     }
 
     public static void register(IEventBus bus) {
+        ITEMS.addAlias(Identifier.fromNamespaceAndPath(BCTransport.MOD_ID, "wire"),
+            Identifier.fromNamespaceAndPath(BCTransport.MOD_ID, "pipe_wire_red"));
         ITEMS.register(bus);
     }
 }

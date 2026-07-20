@@ -11,6 +11,7 @@ import buildcraft.builders.item.SnapshotItem;
 import buildcraft.builders.item.FillerPlannerItem;
 import buildcraft.builders.snapshot.SnapshotData;
 import buildcraft.builders.snapshot.SnapshotKind;
+import net.minecraft.resources.Identifier;
 
 public final class BCBuildersItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCBuilders.MOD_ID);
@@ -38,5 +39,15 @@ public final class BCBuildersItems {
     public static ItemStack snapshotStack(SnapshotData snapshot) {
         return SnapshotItem.apply(new ItemStack(snapshot.kind() == SnapshotKind.BLUEPRINT ? BLUEPRINT.get() : TEMPLATE.get()), snapshot);
     }
-    public static void register(IEventBus bus) { ITEMS.register(bus); }
+    public static void register(IEventBus bus) {
+        ITEMS.addAlias(id("architect"), id("architect_table"));
+        ITEMS.addAlias(id("library"), id("blueprint_library"));
+        ITEMS.addAlias(id("snapshot"), id("blueprint"));
+        ITEMS.addAlias(id("schematic_single"), id("single_schematic"));
+        ITEMS.register(bus);
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(BCBuilders.MOD_ID, path);
+    }
 }

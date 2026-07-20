@@ -32,6 +32,7 @@ public final class BCFactory {
             event.accept(BCFactoryItems.HEAT_EXCHANGER.get());
             event.accept(BCFactoryItems.WATER_GEL.get());
             event.accept(BCFactoryItems.GEL.get());
+            event.accept(BCFactoryItems.PLASTIC_SHEET.get());
             event.accept(BCFactoryItems.AUTO_WORKBENCH.get());
         }
     }

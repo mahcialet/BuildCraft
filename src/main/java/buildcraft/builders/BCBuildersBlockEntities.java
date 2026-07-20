@@ -16,6 +16,7 @@ import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.resources.Identifier;
 
 public final class BCBuildersBlockEntities {
     private static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
@@ -42,8 +43,14 @@ public final class BCBuildersBlockEntities {
     private BCBuildersBlockEntities() {}
 
     public static void register(IEventBus bus) {
+        BLOCK_ENTITIES.addAlias(id("architect"), id("architect_table"));
+        BLOCK_ENTITIES.addAlias(id("library"), id("blueprint_library"));
         BLOCK_ENTITIES.register(bus);
         bus.addListener(BCBuildersBlockEntities::registerCapabilities);
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(BCBuilders.MOD_ID, path);
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {

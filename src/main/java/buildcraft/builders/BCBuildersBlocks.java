@@ -11,6 +11,7 @@ import buildcraft.builders.block.ConstructionMarkerBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
+import net.minecraft.resources.Identifier;
 
 public final class BCBuildersBlocks {
     private static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(BCBuilders.MOD_ID);
@@ -27,5 +28,13 @@ public final class BCBuildersBlocks {
             BLOCKS.registerBlock("construction_marker", ConstructionMarkerBlock::new);
 
     private BCBuildersBlocks() {}
-    public static void register(IEventBus bus) { BLOCKS.register(bus); }
+    public static void register(IEventBus bus) {
+        BLOCKS.addAlias(id("architect"), id("architect_table"));
+        BLOCKS.addAlias(id("library"), id("blueprint_library"));
+        BLOCKS.register(bus);
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(BCBuilders.MOD_ID, path);
+    }
 }

@@ -22,6 +22,7 @@ public final class BCFactoryItems {
     public static final DeferredItem<WaterGelItem> WATER_GEL =
         ITEMS.registerItem("water_gel_spawn", WaterGelItem::new);
     public static final DeferredItem<?> GEL = ITEMS.registerSimpleItem("gel");
+    public static final DeferredItem<?> PLASTIC_SHEET = ITEMS.registerSimpleItem("plastic_sheet");
     public static final DeferredItem<?> AUTO_WORKBENCH =
         ITEMS.registerSimpleBlockItem("autoworkbench_item", BCFactoryBlocks.AUTO_WORKBENCH);
 

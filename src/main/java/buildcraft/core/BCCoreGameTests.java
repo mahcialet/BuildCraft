@@ -2175,6 +2175,9 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void factoryWaterGel(GameTestHelper helper) {
+        helper.assertValueEqual(net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                buildcraft.factory.BCFactoryItems.PLASTIC_SHEET.get()).toString(),
+            "buildcraftfactory:plastic_sheet", "historical Plastic Sheet registry id");
         BlockPos center = helper.absolutePos(new BlockPos(3, 2, 3));
         BlockState initial = buildcraft.factory.BCFactoryBlocks.WATER_GEL.get().defaultBlockState();
         helper.getLevel().setBlock(center, initial, Block.UPDATE_ALL);
@@ -9410,6 +9413,30 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void machineOwnershipAdvancements(GameTestHelper helper) {
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(
+                Identifier.fromNamespaceAndPath("buildcraftbuilders", "architect")
+            ) == buildcraft.builders.BCBuildersBlocks.ARCHITECT_TABLE.get(),
+            "Legacy architect block identifier did not resolve"
+        );
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(
+                Identifier.fromNamespaceAndPath("buildcraftbuilders", "snapshot")
+            ) == buildcraft.builders.BCBuildersItems.BLUEPRINT.get(),
+            "Legacy snapshot item identifier did not resolve"
+        );
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.ITEM.getValue(
+                Identifier.fromNamespaceAndPath("buildcrafttransport", "wire")
+            ) == buildcraft.transport.BCTransportItems.PIPE_WIRE_RED.get(),
+            "Legacy wire item identifier did not resolve"
+        );
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("buildcraftbuilders", "library")
+            ) == buildcraft.builders.BCBuildersBlockEntities.BLUEPRINT_LIBRARY.get(),
+            "Legacy library block entity identifier did not resolve"
+        );
         BlockPos relative = new BlockPos(1, 1, 1);
         helper.setBlock(relative, buildcraft.builders.BCBuildersBlocks.QUARRY.get());
         var quarry = helper.getBlockEntity(relative,
