@@ -7,7 +7,7 @@ import java.util.WeakHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
-/** Owner-checked reservations for blocks targeted by terrain-working robots. */
+/** Owner-checked reservations for block positions targeted by world-working robots. */
 public final class BlockWorkRegistry {
     private static final Map<ServerLevel, Map<BlockPos, UUID>> RESERVATIONS = new WeakHashMap<>();
 
@@ -22,7 +22,7 @@ public final class BlockWorkRegistry {
     }
 
     public static boolean reclaim(ServerLevel level, BlockPos position, UUID robot) {
-        return !level.getBlockState(position).isAir() && reserve(level, position, robot);
+        return reserve(level, position, robot);
     }
 
     public static void release(ServerLevel level, BlockPos position, UUID robot) {

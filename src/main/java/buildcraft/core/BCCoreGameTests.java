@@ -127,6 +127,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_knight"));
         Holder<TestEnvironmentDefinition<?>> bomberEnvironment =
                 event.registerEnvironment(id("robotics_bomber"));
+        Holder<TestEnvironmentDefinition<?>> stripesEnvironment =
+                event.registerEnvironment(id("robotics_stripes"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -150,6 +152,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsKnightRobot);
         registerTest(event, bomberEnvironment, "robotics_bomber_robot",
                 BCCoreGameTests::roboticsBomberRobot);
+        registerTest(event, stripesEnvironment, "robotics_stripes_robot",
+                BCCoreGameTests::roboticsStripesRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -8051,6 +8055,80 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Bomber scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Bomber work consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsStripesRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 168, 1);
+        BlockPos sourceRelative = new BlockPos(2, 168, 1);
+        BlockPos targetRelative = new BlockPos(5, 169, 1);
+        BlockPos deployedRelative = targetRelative.north();
+        BlockPos excludedRelative = new BlockPos(5, 169, 3);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(deployedRelative.below(), Blocks.STONE);
+        helper.setBlock(excludedRelative.below(), Blocks.STONE);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        source.installAttachment(Direction.UP, sourceStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        sourceChest.setItem(0, new ItemStack(Items.COBBLESTONE));
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.STRIPES);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Stripes failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1600 && (!helper.getBlockState(deployedRelative).is(Blocks.COBBLESTONE)
+                || robot.stripesPhase() != buildcraft.robotics.StripesPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), source.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(deployedRelative).is(Blocks.COBBLESTONE),
+                "Stripes did not use BlockItem in zoned air: phase=" + robot.stripesPhase()
+                        + ", state=" + robot.taskState() + ", item=" + robot.stripesItem()
+                        + ", target=" + robot.stripesBlockTarget()
+                        + ", attempts=" + robot.stripesSearchAttempts()
+                        + ", position=" + robot.position()
+                        + ", activation=" + helper.getBlockState(targetRelative)
+                        + ", deployment=" + helper.getBlockState(deployedRelative)
+                        + ", support=" + helper.getBlockState(deployedRelative.below()));
+        helper.assertTrue(helper.getBlockState(excludedRelative).isAir(),
+                "Stripes deployed item outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(),
+                "Stripes did not extract exactly one arbitrary item");
+        helper.assertTrue(robot.stripesItem().isEmpty(), "Stripes retained consumed deployment item");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Stripes did not return home");
+        helper.assertValueEqual(buildcraft.robotics.StripesPhase.NONE, robot.stripesPhase(),
+                "Stripes scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Stripes work consumed no battery energy");
         helper.succeed();
     }
 

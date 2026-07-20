@@ -27,6 +27,7 @@ import buildcraft.robotics.CombatTargetRegistry;
 import buildcraft.robotics.PumpPhase;
 import buildcraft.robotics.KnightPhase;
 import buildcraft.robotics.BomberPhase;
+import buildcraft.robotics.StripesPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -138,6 +139,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos bomberGroundTarget;
     private BomberPhase bomberPhase = BomberPhase.NONE;
     private int bomberSearchAttempts;
+    private ItemStack stripesItem = ItemStack.EMPTY;
+    private RobotStationRegistry.Address stripesStationTarget;
+    private BlockPos stripesBlockTarget;
+    private StripesPhase stripesPhase = StripesPhase.NONE;
+    private int stripesUseCycles;
+    private int stripesSearchAttempts;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -204,6 +211,10 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public KnightPhase knightPhase() { return knightPhase; }
     public ItemStack knightTool() { return knightTool.copy(); }
     public BomberPhase bomberPhase() { return bomberPhase; }
+    public StripesPhase stripesPhase() { return stripesPhase; }
+    public ItemStack stripesItem() { return stripesItem.copy(); }
+    public Optional<BlockPos> stripesBlockTarget() { return Optional.ofNullable(stripesBlockTarget); }
+    public int stripesSearchAttempts() { return stripesSearchAttempts; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -287,6 +298,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.BOMBER
                     && bomberPhase == BomberPhase.NONE && tickCount % 20 == 0) {
                 beginBomber(serverLevel);
+            } else if (board() == RobotBoardType.STRIPES
+                    && stripesPhase == StripesPhase.NONE && tickCount % 20 == 0) {
+                beginStripes(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -319,6 +333,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (pumpPhase != PumpPhase.NONE) tickPump(serverLevel);
         if (knightPhase != KnightPhase.NONE) tickKnight(serverLevel);
         if (bomberPhase != BomberPhase.NONE) tickBomber(serverLevel);
+        if (stripesPhase != StripesPhase.NONE) tickStripes(serverLevel);
     }
 
     private boolean hasActiveWorkflow() {
@@ -336,7 +351,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 || butcherPhase != ButcherPhase.NONE
                 || pumpPhase != PumpPhase.NONE
                 || knightPhase != KnightPhase.NONE
-                || bomberPhase != BomberPhase.NONE;
+                || bomberPhase != BomberPhase.NONE
+                || stripesPhase != StripesPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -2693,6 +2709,195 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
     }
 
+    private void beginStripes(ServerLevel level) {
+        if (stripesItem.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findStripesItemStation(level);
+            if (source.isEmpty()) return;
+            stripesStationTarget = source.get();
+            stripesPhase = StripesPhase.TO_ITEM;
+            leaveStation();
+            return;
+        }
+        stripesSearchAttempts = 0;
+        stripesPhase = StripesPhase.SEARCHING;
+    }
+
+    private Optional<RobotStationRegistry.Address> findStripesItemStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (!stack.isEmpty() && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadStripesItem(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (stack.isEmpty() || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    stripesItem = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void tickStripes(ServerLevel level) {
+        if (stripesPhase == StripesPhase.TO_ITEM) {
+            if (stripesStationTarget == null) { stripesPhase = StripesPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(stripesStationTarget))) {
+                loadStripesItem(level, stripesStationTarget);
+                stripesSearchAttempts = 0;
+                stripesPhase = stripesItem.isEmpty() ? StripesPhase.RETURN_HOME : StripesPhase.SEARCHING;
+            }
+        } else if (stripesPhase == StripesPhase.SEARCHING) {
+            searchStripesBlock(level);
+        } else if (stripesPhase == StripesPhase.TO_BLOCK) {
+            if (stripesBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, stripesBlockTarget, getUUID())
+                    || !level.getBlockState(stripesBlockTarget).isAir()) {
+                releaseStripesBlock(level);
+                stripesPhase = StripesPhase.SEARCHING;
+                return;
+            }
+            if (flyToward(Vec3.atCenterOf(stripesBlockTarget))) {
+                stripesUseCycles = 0;
+                stripesPhase = StripesPhase.USING;
+            }
+        } else if (stripesPhase == StripesPhase.USING) {
+            if (stripesBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, stripesBlockTarget, getUUID())
+                    || !level.getBlockState(stripesBlockTarget).isAir()) {
+                releaseStripesBlock(level);
+                stripesPhase = StripesPhase.SEARCHING;
+                return;
+            }
+            if (energy() < 15) return;
+            setEnergy(energy() - 15);
+            if (++stripesUseCycles > 60) {
+                boolean handled = useStripesItem(level);
+                releaseStripesBlock(level);
+                if (handled || stripesItem.isEmpty()) {
+                    stripesPhase = StripesPhase.RETURN_HOME;
+                } else {
+                    stripesSearchAttempts = 0;
+                    stripesPhase = StripesPhase.SEARCHING;
+                }
+            }
+        } else if (stripesPhase == StripesPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                stripesStationTarget = null;
+                stripesPhase = StripesPhase.NONE;
+            }
+        }
+    }
+
+    private void searchStripesBlock(ServerLevel level) {
+        if (stripesItem.isEmpty()) { stripesPhase = StripesPhase.RETURN_HOME; return; }
+        if (energy() < 2) return;
+        setEnergy(energy() - 2);
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime() * 37
+                + getUUID().getMostSignificantBits() + stripesSearchAttempts);
+        for (int checked = 0; checked < 128 && stripesSearchAttempts < 4096; checked++, stripesSearchAttempts++) {
+            BlockPos candidate;
+            if (zone != null) {
+                candidate = zone.random(random, blockPosition().getY());
+                if (candidate == null) { stripesPhase = StripesPhase.RETURN_HOME; return; }
+            } else {
+                candidate = blockPosition().offset(random.nextInt(129) - 64,
+                        random.nextInt(129) - 64, random.nextInt(129) - 64);
+            }
+            if (candidate.distToCenterSqr(position()) > 96 * 96) continue;
+            if (level.getChunkSource().getChunkNow(candidate.getX() >> 4, candidate.getZ() >> 4) == null) continue;
+            if (level.getBlockState(candidate).isAir()
+                    && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                stripesBlockTarget = candidate.immutable();
+                stripesPhase = StripesPhase.TO_BLOCK;
+                return;
+            }
+        }
+        if (stripesSearchAttempts >= 4096) stripesPhase = StripesPhase.RETURN_HOME;
+    }
+
+    private boolean useStripesItem(ServerLevel level) {
+        if (stripesBlockTarget == null || stripesItem.isEmpty()) return false;
+        Direction direction = Direction.NORTH;
+        BlockPos actionTarget = stripesBlockTarget.relative(direction);
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        fakePlayer.setPos(position());
+        ItemStack working = stripesItem.copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, working);
+        net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
+                Vec3.atCenterOf(actionTarget), direction.getOpposite(), actionTarget, false);
+        InteractionResult result = fakePlayer.gameMode.useItemOn(
+                fakePlayer, level, working, InteractionHand.MAIN_HAND, hit);
+        boolean handled = result.consumesAction();
+        if (!handled && !level.getBlockState(actionTarget.below()).isAir()) {
+            hit = new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(actionTarget.below()),
+                    Direction.UP, actionTarget.below(), false);
+            result = fakePlayer.gameMode.useItemOn(
+                    fakePlayer, level, working, InteractionHand.MAIN_HAND, hit);
+            handled = result.consumesAction();
+        }
+        if (!handled) {
+            for (net.minecraft.world.entity.LivingEntity entity : level.getEntitiesOfClass(
+                    net.minecraft.world.entity.LivingEntity.class,
+                    new net.minecraft.world.phys.AABB(actionTarget))) {
+                result = fakePlayer.interactOn(entity, InteractionHand.MAIN_HAND, entity.position());
+                if (result.consumesAction()) { handled = true; break; }
+            }
+        }
+        if (!handled) {
+            var behavior = net.minecraft.world.level.block.DispenserBlock.DISPENSER_REGISTRY.get(working.getItem());
+            if (behavior != null) {
+                net.minecraft.world.level.block.state.BlockState dispenserState =
+                        net.minecraft.world.level.block.Blocks.DISPENSER.defaultBlockState()
+                                .setValue(net.minecraft.world.level.block.DispenserBlock.FACING, direction);
+                var dispenser = new net.minecraft.world.level.block.entity.DispenserBlockEntity(
+                        blockPosition(), dispenserState);
+                ItemStack dispensed = behavior.dispense(new net.minecraft.core.dispenser.BlockSource(
+                        level, blockPosition(), dispenserState, dispenser), working.copy());
+                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, dispensed);
+                handled = true;
+            }
+        }
+        ItemStack remaining = fakePlayer.getMainHandItem().copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        if (handled) {
+            stripesItem = ItemStack.EMPTY;
+            if (!remaining.isEmpty()) spawnAtLocation(level, remaining);
+        }
+        return handled;
+    }
+
+    private void releaseStripesBlock(ServerLevel level) {
+        if (stripesBlockTarget != null) {
+            BlockWorkRegistry.release(level, stripesBlockTarget, getUUID());
+            stripesBlockTarget = null;
+        }
+        stripesUseCycles = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -2862,6 +3067,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseButcherTarget(serverLevel);
         releasePumpSource(serverLevel);
         releaseKnightTarget(serverLevel);
+        releaseStripesBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -2875,6 +3081,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!shovelmanTool.isEmpty()) spawnAtLocation(serverLevel, shovelmanTool.copy());
         if (!butcherTool.isEmpty()) spawnAtLocation(serverLevel, butcherTool.copy());
         if (!knightTool.isEmpty()) spawnAtLocation(serverLevel, knightTool.copy());
+        if (!stripesItem.isEmpty()) spawnAtLocation(serverLevel, stripesItem.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -2900,6 +3107,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseButcherTarget(level);
             releasePumpSource(level);
             releaseKnightTarget(level);
+            releaseStripesBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -2912,6 +3120,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!shovelmanTool.isEmpty()) spawnAtLocation(level, shovelmanTool.copy());
             if (!butcherTool.isEmpty()) spawnAtLocation(level, butcherTool.copy());
             if (!knightTool.isEmpty()) spawnAtLocation(level, knightTool.copy());
+            if (!stripesItem.isEmpty()) spawnAtLocation(level, stripesItem.copy());
             discard();
         }
         return true;
@@ -3041,6 +3250,15 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (bomberGroundTarget != null) output.putLong("BomberGround", bomberGroundTarget.asLong());
         output.putInt("BomberSearchAttempts", bomberSearchAttempts);
+        if (!stripesItem.isEmpty()) output.store("StripesItem", ItemStack.CODEC, stripesItem);
+        output.putInt("StripesPhase", stripesPhase.ordinal());
+        if (stripesStationTarget != null) {
+            output.putLong("StripesStationPos", stripesStationTarget.pipePos().asLong());
+            output.putInt("StripesStationSide", stripesStationTarget.side().get3DDataValue());
+        }
+        if (stripesBlockTarget != null) output.putLong("StripesBlock", stripesBlockTarget.asLong());
+        output.putInt("StripesUseCycles", stripesUseCycles);
+        output.putInt("StripesSearchAttempts", stripesSearchAttempts);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -3325,6 +3543,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (bomberPhase == BomberPhase.TO_DROP && bomberGroundTarget == null) {
             bomberPhase = BomberPhase.SEARCHING;
         }
+        stripesItem = input.read("StripesItem", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int stripesOrdinal = input.getIntOr("StripesPhase", StripesPhase.NONE.ordinal());
+        StripesPhase[] stripesPhases = StripesPhase.values();
+        stripesPhase = stripesOrdinal >= 0 && stripesOrdinal < stripesPhases.length
+                ? stripesPhases[stripesOrdinal] : StripesPhase.NONE;
+        if (input.getLong("StripesStationPos").isPresent()) {
+            stripesStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("StripesStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "StripesStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("StripesBlock").isPresent()) {
+            stripesBlockTarget = BlockPos.of(input.getLongOr("StripesBlock", 0));
+        }
+        stripesUseCycles = Math.clamp(input.getIntOr("StripesUseCycles", 0), 0, 61);
+        stripesSearchAttempts = Math.clamp(input.getIntOr("StripesSearchAttempts", 0), 0, 4096);
+        if (stripesPhase == StripesPhase.TO_ITEM && stripesStationTarget == null) {
+            stripesPhase = StripesPhase.RETURN_HOME;
+        }
+        if ((stripesPhase == StripesPhase.TO_BLOCK || stripesPhase == StripesPhase.USING)
+                && stripesBlockTarget == null) stripesPhase = StripesPhase.SEARCHING;
         ContainerHelper.loadAllItems(input, inventory);
     }
 
