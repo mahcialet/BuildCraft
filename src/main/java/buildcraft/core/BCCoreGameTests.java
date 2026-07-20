@@ -4080,6 +4080,24 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "Fluid pipe undo did not restore item pipe");
         helper.assertValueEqual(net.minecraft.world.item.DyeColor.BLUE,
                 buildcraft.transport.item.PipeItem.color(undoResult), "Undo recipe lost pipe colour");
+
+        ItemStack plainFluid = new ItemStack(buildcraft.transport.BCTransportItems.PIPE_COBBLE_FLUID.get());
+        var plainUndoInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 1,
+                java.util.List.of(plainFluid));
+        ItemStack plainUndoResult = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, plainUndoInput, helper.getLevel())
+                .orElseThrow().value().assemble(plainUndoInput);
+        helper.assertTrue(plainUndoResult.is(buildcraft.transport.BCTransportItems.PIPE_COBBLE_ITEM.get()),
+                "Uncoloured fluid pipe undo recipe was not restored");
+        helper.assertTrue(buildcraft.transport.item.PipeItem.color(plainUndoResult) == null,
+                "Uncoloured undo recipe invented a pipe colour");
+
+        var unsupportedRfInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_GOLD_POWER.get()),
+                new ItemStack(Items.REDSTONE)));
+        helper.assertTrue(buildcraft.transport.recipe.PipeUpgradeRecipe.INSTANCE
+                        .assemble(unsupportedRfInput).isEmpty(),
+                "Gold power pipe gained an RF upgrade absent from the historical recipe registry");
         helper.succeed();
     }
 

@@ -45,7 +45,7 @@ public final class PipeUpgradeRecipe extends CustomRecipe {
                 extra = stack;
             }
         }
-        if (pipeStack.isEmpty() || PipeItem.color(pipeStack) == null) return ItemStack.EMPTY;
+        if (pipeStack.isEmpty()) return ItemStack.EMPTY;
         PipeType source = ((PipeItem) pipeStack.getItem()).pipeType();
         PipeType target;
         if (extra.isEmpty()) {
@@ -64,7 +64,12 @@ public final class PipeUpgradeRecipe extends CustomRecipe {
     }
 
     private static PipeType undo(PipeType type) {
-        if (type.carriesRf()) return byFamily(type, 3, 2);
+        if (type.carriesRf()) return switch (type) {
+            case WOOD_RF -> PipeType.WOOD_POWER;
+            case COBBLESTONE_RF -> PipeType.COBBLESTONE_POWER;
+            case STONE_RF -> PipeType.STONE_POWER;
+            default -> null;
+        };
         if (type.carriesPower()) return byFamily(type, 2, 0);
         if (type.carriesFluids()) return byFamily(type, 1, 0);
         return null;
@@ -72,7 +77,14 @@ public final class PipeUpgradeRecipe extends CustomRecipe {
 
     private static PipeType fluid(PipeType type) { return byFamily(type, 0, 1); }
     private static PipeType power(PipeType type) { return byFamily(type, 0, 2); }
-    private static PipeType rf(PipeType type) { return byFamily(type, 2, 3); }
+    private static PipeType rf(PipeType type) {
+        return switch (type) {
+            case WOOD_POWER -> PipeType.WOOD_RF;
+            case COBBLESTONE_POWER -> PipeType.COBBLESTONE_RF;
+            case STONE_POWER -> PipeType.STONE_RF;
+            default -> null;
+        };
+    }
 
     private static PipeType byFamily(PipeType type, int from, int to) {
         String name = type.name();
