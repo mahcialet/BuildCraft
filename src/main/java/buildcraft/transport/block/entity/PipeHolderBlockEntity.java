@@ -411,6 +411,24 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
         return new InventoryStatus(true, !contains, contains, space, !space);
     }
+    public InventoryStatus adjacentInventory(Direction side, ItemStack filter) {
+        if (filter.isEmpty()) return adjacentInventory(side);
+        if (!(level instanceof ServerLevel serverLevel)) return InventoryStatus.UNAVAILABLE;
+        var handler = serverLevel.getCapability(Capabilities.Item.BLOCK, worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return InventoryStatus.UNAVAILABLE;
+        boolean contains = false;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            if (handler.getAmountAsLong(slot) > 0 && matchesFilter(filter, handler.getResource(slot).toStack(1))) {
+                contains = true;
+                break;
+            }
+        }
+        boolean space;
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            space = handler.insert(net.neoforged.neoforge.transfer.item.ItemResource.of(filter), 1, transaction) > 0;
+        }
+        return new InventoryStatus(true, !contains, contains, space, !space);
+    }
     public boolean adjacentInventoryBelow(Direction side, int numerator, int denominator) {
         if (!(level instanceof ServerLevel serverLevel)) return false;
         var handler = serverLevel.getCapability(Capabilities.Item.BLOCK,
@@ -440,6 +458,32 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             space |= amount == 0 || amount < handler.getCapacityAsLong(tank, handler.getResource(tank));
         }
         return new FluidStatus(true, !contains, contains, space, !space);
+    }
+    public FluidStatus adjacentFluid(Direction side, ItemStack filter) {
+        var searched = net.neoforged.neoforge.transfer.fluid.FluidUtil.getFirstStackContained(filter);
+        if (searched.isEmpty()) return adjacentFluid(side);
+        var searchedResource = net.neoforged.neoforge.transfer.fluid.FluidResource.of(searched);
+        if (!(level instanceof ServerLevel serverLevel)) return FluidStatus.UNAVAILABLE;
+        var handler = serverLevel.getCapability(Capabilities.Fluid.BLOCK, worldPosition.relative(side), side.getOpposite());
+        if (handler == null || handler.size() == 0) return FluidStatus.UNAVAILABLE;
+        boolean contains = false;
+        for (int tank = 0; tank < handler.size(); tank++) {
+            if (handler.getAmountAsLong(tank) > 0 && handler.getResource(tank).equals(searchedResource)) {
+                contains = true;
+                break;
+            }
+        }
+        boolean space;
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            space = handler.insert(searchedResource, 1, transaction) > 0;
+        }
+        return new FluidStatus(true, !contains, contains, space, !space);
+    }
+
+    private static boolean matchesFilter(ItemStack filter, ItemStack candidate) {
+        return filter.getItem() instanceof buildcraft.api.items.IList list
+                ? list.matches(filter, candidate)
+                : ItemStack.isSameItemSameComponents(filter, candidate);
     }
     public boolean adjacentFluidBelow(Direction side, int numerator, int denominator) {
         if (!(level instanceof ServerLevel serverLevel)) return false;

@@ -100,12 +100,12 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case LIGHT_LOW -> light(pipe, false);
             case LIGHT_HIGH -> light(pipe, true);
             case INVENTORY_EMPTY -> pipe.adjacentInventory(gateSide).empty();
-            case INVENTORY_CONTAINS -> pipe.adjacentInventory(gateSide).contains();
-            case INVENTORY_SPACE -> pipe.adjacentInventory(gateSide).space();
+            case INVENTORY_CONTAINS -> pipe.adjacentInventory(gateSide, firstParameter(rule)).contains();
+            case INVENTORY_SPACE -> pipe.adjacentInventory(gateSide, firstParameter(rule)).space();
             case INVENTORY_FULL -> pipe.adjacentInventory(gateSide).full();
             case FLUID_EMPTY -> pipe.adjacentFluid(gateSide).empty();
-            case FLUID_CONTAINS -> pipe.adjacentFluid(gateSide).contains();
-            case FLUID_SPACE -> pipe.adjacentFluid(gateSide).space();
+            case FLUID_CONTAINS -> pipe.adjacentFluid(gateSide, firstParameter(rule)).contains();
+            case FLUID_SPACE -> pipe.adjacentFluid(gateSide, firstParameter(rule)).space();
             case FLUID_FULL -> pipe.adjacentFluid(gateSide).full();
             case INVENTORY_BELOW_25 -> pipe.adjacentInventoryBelow(gateSide, 1, 4);
             case INVENTORY_BELOW_50 -> pipe.adjacentInventoryBelow(gateSide, 1, 2);
@@ -132,6 +132,10 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case ROBOT_LINKED -> buildcraft.robotics.RoboticsGateTriggers.linked(pipe);
             case ROBOT_RESERVED -> buildcraft.robotics.RoboticsGateTriggers.reserved(pipe);
         };
+    }
+
+    private static ItemStack firstParameter(GateRule rule) {
+        return rule.parameters().isEmpty() ? ItemStack.EMPTY : rule.parameters().getFirst();
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {
         if (pipe.getLevel() == null) return false;

@@ -103,6 +103,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(id("core"));
         Holder<TestEnvironmentDefinition<?>> diagnosticsEnvironment = event.registerEnvironment(id("core_diagnostics"));
         Holder<TestEnvironmentDefinition<?>> siliconPlaceholderEnvironment = event.registerEnvironment(id("silicon_placeholders"));
+        Holder<TestEnvironmentDefinition<?>> gateParameterEnvironment = event.registerEnvironment(id("gate_parameters"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -237,6 +238,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, environment, "silicon_advanced_crafting_table", BCCoreGameTests::siliconAdvancedCraftingTable);
         registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
         registerTest(event, siliconPlaceholderEnvironment, "silicon_placeholder_tables", BCCoreGameTests::siliconPlaceholderTables);
+        registerTest(event, gateParameterEnvironment, "silicon_gate_parameter_triggers", BCCoreGameTests::siliconGateParameterTriggers);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -5836,6 +5838,58 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 new buildcraft.silicon.gate.GateProgram(java.util.List.of(
                         new buildcraft.silicon.gate.GateRule(trigger,
                                 buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        tickPipes(helper, 1, holder.getBlockPos());
+        helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
+    }
+
+    private static void siliconGateParameterTriggers(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos targetPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(targetPos, Blocks.CHEST.defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity) helper.getLevel().getBlockEntity(pipePos);
+        var chest = (net.minecraft.world.Container) helper.getLevel().getBlockEntity(targetPos);
+        chest.setItem(0, new ItemStack(Items.IRON_INGOT));
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate), "parameter trigger gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.INVENTORY_CONTAINS,
+                new ItemStack(Items.IRON_INGOT), true, "matching inventory parameter did not trigger");
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.INVENTORY_CONTAINS,
+                new ItemStack(Items.GOLD_INGOT), false, "wrong inventory parameter triggered");
+
+        helper.getLevel().removeBlock(targetPos, false);
+        helper.getLevel().setBlock(targetPos, buildcraft.factory.BCFactoryBlocks.TANK.get().defaultBlockState(), 3);
+        var fluid = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Fluid.BLOCK, targetPos, Direction.SOUTH);
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(500, fluid.insert(water, 500, transaction), "parameter trigger tank rejected water");
+            transaction.commit();
+        }
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.FLUID_CONTAINS,
+                new ItemStack(Items.WATER_BUCKET), true, "matching fluid parameter did not trigger");
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.FLUID_CONTAINS,
+                new ItemStack(Items.LAVA_BUCKET), false, "wrong fluid parameter triggered");
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.FLUID_SPACE,
+                new ItemStack(Items.WATER_BUCKET), true, "matching fluid space parameter did not trigger");
+        assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.FLUID_SPACE,
+                new ItemStack(Items.LAVA_BUCKET), false, "incompatible fluid space parameter triggered");
+        helper.succeed();
+    }
+
+    private static void assertParameterizedTrigger(GameTestHelper helper,
+            buildcraft.transport.block.entity.PipeHolderBlockEntity holder, ItemStack gate,
+            buildcraft.silicon.gate.GateTrigger trigger, ItemStack parameter, boolean expected, String message) {
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(new buildcraft.silicon.gate.GateRule(
+                        trigger, buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT,
+                        java.util.Optional.empty(), java.util.List.of(parameter)))));
         tickPipes(helper, 1, holder.getBlockPos());
         helper.assertValueEqual(expected, holder.gateRedstoneOutput(), message);
     }
