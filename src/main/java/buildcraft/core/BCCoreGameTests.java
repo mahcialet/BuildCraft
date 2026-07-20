@@ -106,6 +106,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> gateParameterEnvironment = event.registerEnvironment(id("gate_parameters"));
         Holder<TestEnvironmentDefinition<?>> fillerGateEnvironment = event.registerEnvironment(id("filler_gate_patterns"));
         Holder<TestEnvironmentDefinition<?>> roboticsGateListEnvironment = event.registerEnvironment(id("robotics_gate_lists"));
+        Holder<TestEnvironmentDefinition<?>> obsidianFluidEnvironment = event.registerEnvironment(id("obsidian_fluid_pipe"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -243,6 +244,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, gateParameterEnvironment, "silicon_gate_parameter_triggers", BCCoreGameTests::siliconGateParameterTriggers);
         registerTest(event, fillerGateEnvironment, "builders_filler_gate_patterns", BCCoreGameTests::buildersFillerGatePatterns);
         registerTest(event, roboticsGateListEnvironment, "robotics_gate_list_parameters", BCCoreGameTests::roboticsGateListParameters);
+        registerTest(event, obsidianFluidEnvironment, "transport_obsidian_fluid_pipe", BCCoreGameTests::transportObsidianFluidPipe);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -5986,6 +5988,54 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 buildcraft.robotics.RobotBoardType.CARRIER), "Robot List rejected its configured board");
         helper.assertFalse(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(), address,
                 buildcraft.robotics.RobotBoardType.PICKER), "Robot List admitted an unconfigured board");
+        helper.succeed();
+    }
+
+    private static void transportObsidianFluidPipe(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos outputPos = pipePos.east();
+        BlockPos blockedPos = pipePos.west();
+        helper.getLevel().setBlock(pipePos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.OBSIDIAN_FLUID), 3);
+        helper.getLevel().setBlock(outputPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.COBBLESTONE_FLUID), 3);
+        helper.getLevel().setBlock(blockedPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.OBSIDIAN_FLUID), 3);
+        var pipe = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        var output = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(outputPos);
+        helper.assertTrue(helper.getLevel().getBlockState(pipePos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.EAST),
+                "Obsidian Fluid Pipe did not connect to another fluid pipe");
+        helper.assertFalse(helper.getLevel().getBlockState(pipePos).getValue(
+                buildcraft.transport.block.PipeHolderBlock.WEST),
+                "two Obsidian Fluid Pipes connected to each other");
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        pipe.fluidBuffer().set(0, water, 160);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pipePos, helper.getLevel().getBlockState(pipePos), pipe);
+        helper.assertValueEqual(80, output.fluidBuffer().getAmountAsInt(0),
+                "Obsidian Fluid Pipe did not forward its historical full fluid rate");
+
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_ITEM.get()),
+                new ItemStack(buildcraft.transport.BCTransportItems.WATERPROOF.get())));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_FLUID.get()),
+                "Obsidian Pipe waterproof recipe returned the wrong pipe");
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                helper.getLevel().getBlockState(pipePos), helper.getLevel(), pipePos, pipe);
+        helper.assertTrue(drops.size() == 1
+                        && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_OBSIDIAN_FLUID.get()),
+                "Obsidian Fluid Pipe did not drop itself");
         helper.succeed();
     }
 
