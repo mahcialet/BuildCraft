@@ -28,6 +28,7 @@ public final class BCBuilders {
         BCBuildersDataComponents.register(modBus);
         BCBuildersMenus.register(modBus);
         BCBuildersNetwork.register(modBus);
+        BCBuildersFillerPlanners.register();
         modBus.addListener(BCBuilders::registerTicketControllers);
         if (FMLEnvironment.getDist() == Dist.CLIENT) BCBuildersClient.register(modBus);
         modBus.addListener(this::addCreativeTabContents);
@@ -49,6 +50,7 @@ public final class BCBuilders {
             event.accept(BCBuildersItems.BLUEPRINT.get());
             event.accept(BCBuildersItems.TEMPLATE.get());
             event.accept(BCBuildersItems.SINGLE_SCHEMATIC.get());
+            event.accept(BCBuildersItems.FILLER_PLANNER.get());
         }
     }
 }

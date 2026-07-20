@@ -259,6 +259,10 @@ tasks.named('processResources', ProcessResources) {
         include 'clean.png', 'used.png'
         into 'assets/buildcraftbuilders/textures/item/template'
     }
+    from('buildcraft_resources/assets/buildcraftbuilders/textures/addons') {
+        include 'filler_planner.png'
+        into 'assets/buildcraftbuilders/textures/item'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/flood_gate') {
         include 'top.png', 'open.png', 'closed.png'
         into 'assets/buildcraftfactory/textures/block/flood_gate'

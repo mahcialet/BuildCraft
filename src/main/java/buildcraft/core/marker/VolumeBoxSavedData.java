@@ -54,6 +54,13 @@ public final class VolumeBoxSavedData extends SavedData {
         return boxes.stream().filter(box -> box.contains(pos)).findFirst();
     }
 
+    /** Returns the first box intersected by the player's four-block reach ray. */
+    public Optional<VolumeBox> lookedAt(Player player) {
+        Vec3 start = player.getEyePosition();
+        int index = nearestBox(start, start.add(player.getLookAngle().scale(4.0)));
+        return index < 0 ? Optional.empty() : Optional.of(boxes.get(index));
+    }
+
     public boolean add(BlockPos pos) {
         if (boxAt(pos).isPresent()) return false;
         boxes.add(VolumeBox.at(pos));

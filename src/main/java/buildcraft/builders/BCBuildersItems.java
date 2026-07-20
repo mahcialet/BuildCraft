@@ -8,6 +8,7 @@ import net.minecraft.world.item.ItemStack;
 import buildcraft.builders.item.SingleSchematicItem;
 import buildcraft.builders.item.ConstructionMarkerItem;
 import buildcraft.builders.item.SnapshotItem;
+import buildcraft.builders.item.FillerPlannerItem;
 import buildcraft.builders.snapshot.SnapshotData;
 import buildcraft.builders.snapshot.SnapshotKind;
 
@@ -30,6 +31,8 @@ public final class BCBuildersItems {
             "template", properties -> new SnapshotItem(properties, SnapshotKind.TEMPLATE));
     public static final DeferredItem<SingleSchematicItem> SINGLE_SCHEMATIC =
             ITEMS.registerItem("single_schematic", SingleSchematicItem::new);
+    public static final DeferredItem<FillerPlannerItem> FILLER_PLANNER =
+            ITEMS.registerItem("filler_planner", FillerPlannerItem::new);
 
     private BCBuildersItems() {}
     public static ItemStack snapshotStack(SnapshotData snapshot) {

@@ -5,6 +5,7 @@ import buildcraft.builders.menu.ArchitectTableMenu;
 import buildcraft.builders.menu.BuilderMenu;
 import buildcraft.builders.menu.ReplacerMenu;
 import buildcraft.builders.menu.BlueprintLibraryMenu;
+import buildcraft.builders.menu.FillerPlannerMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
 import net.neoforged.bus.api.IEventBus;
@@ -25,6 +26,8 @@ public final class BCBuildersMenus {
             MENUS.register("replacer", () -> IMenuTypeExtension.create(ReplacerMenu::new));
     public static final DeferredHolder<MenuType<?>, MenuType<BlueprintLibraryMenu>> BLUEPRINT_LIBRARY =
             MENUS.register("blueprint_library", () -> IMenuTypeExtension.create(BlueprintLibraryMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<FillerPlannerMenu>> FILLER_PLANNER =
+            MENUS.register("filler_planner", () -> IMenuTypeExtension.create(FillerPlannerMenu::new));
 
     private BCBuildersMenus() {}
     public static void register(IEventBus bus) { MENUS.register(bus); }

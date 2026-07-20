@@ -168,6 +168,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "paintbrush", BCCoreGameTests::paintbrush);
         registerTest(event, environment, "list", BCCoreGameTests::list);
         registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
+        registerTest(event, environment, "builders_filler_planner", BCCoreGameTests::buildersFillerPlanner);
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
@@ -707,6 +708,30 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         VolumeBox decoded = VolumeBox.CODEC.parse(JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
         helper.assertValueEqual(decoded.id(), codecBox.id(), "persisted volume-box id");
         helper.assertValueEqual(decoded.edit(), codecBox.edit(), "persisted volume-box edit state");
+        helper.succeed();
+    }
+
+    private static void buildersFillerPlanner(GameTestHelper helper) {
+        BlockPos absolute = helper.absolutePos(new BlockPos(2, 8, 2));
+        VolumeBoxSavedData boxes = VolumeBoxSavedData.get(helper.getLevel());
+        helper.assertTrue(boxes.add(absolute), "Could not create planner volume box");
+        VolumeBox box = boxes.boxAt(absolute).orElseThrow();
+        var planners = buildcraft.builders.planner.FillerPlannerSavedData.get(helper.getLevel());
+        helper.assertTrue(planners.attach(box.id()), "Could not attach Filler Planner");
+        helper.assertTrue(!planners.attach(box.id()), "Duplicate Filler Planner attachment was accepted");
+        var data = buildcraft.builders.planner.FillerPlannerData.defaults()
+                .pattern(buildcraft.builders.FillerPattern.FRAME).inverted(true).hollow(true);
+        planners.set(box.id(), data);
+        helper.assertValueEqual(planners.get(box.id()).orElseThrow(), data, "Planner settings did not persist in memory");
+        helper.assertTrue(buildcraft.builders.planner.FillerPlannerShape.includes(
+                data.inverted(false), absolute, absolute, absolute.offset(2, 2, 2)), "Frame omitted its corner");
+        helper.assertTrue(!buildcraft.builders.planner.FillerPlannerShape.includes(
+                data.inverted(false), absolute.offset(1, 1, 1), absolute, absolute.offset(2, 2, 2)), "Frame included its interior");
+        Object encoded = buildcraft.builders.planner.FillerPlannerData.CODEC.encodeStart(JsonOps.INSTANCE, data).getOrThrow();
+        var decoded = buildcraft.builders.planner.FillerPlannerData.CODEC.parse(
+                JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
+        helper.assertValueEqual(decoded, data, "Filler Planner codec round-trip");
+        helper.assertTrue(planners.remove(box.id()) && planners.get(box.id()).isEmpty(), "Planner did not detach");
         helper.succeed();
     }
 
