@@ -119,6 +119,10 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case PIPE_SIGNAL_GREEN_INACTIVE -> !pipe.isWirePowered(PipeWireColor.GREEN);
             case PIPE_SIGNAL_YELLOW_ACTIVE -> pipe.isWirePowered(PipeWireColor.YELLOW);
             case PIPE_SIGNAL_YELLOW_INACTIVE -> !pipe.isWirePowered(PipeWireColor.YELLOW);
+            case ROBOT_SLEEPING -> buildcraft.robotics.RoboticsGateTriggers.sleeping(pipe);
+            case ROBOT_IN_STATION -> buildcraft.robotics.RoboticsGateTriggers.inStation(pipe);
+            case ROBOT_LINKED -> buildcraft.robotics.RoboticsGateTriggers.linked(pipe);
+            case ROBOT_RESERVED -> buildcraft.robotics.RoboticsGateTriggers.reserved(pipe);
         };
     }
     private static boolean timer(PipeHolderBlockEntity pipe, int seconds) {

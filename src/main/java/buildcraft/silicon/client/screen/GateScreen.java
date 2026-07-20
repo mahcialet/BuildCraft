@@ -1,6 +1,7 @@
 package buildcraft.silicon.client.screen;
 
 import buildcraft.silicon.gate.GateTrigger;
+import buildcraft.silicon.gate.GateAction;
 import buildcraft.silicon.menu.GateMenu;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -10,6 +11,7 @@ import net.minecraft.world.entity.player.Inventory;
 
 public final class GateScreen extends AbstractContainerScreen<GateMenu> {
     private final Button[] triggerButtons = new Button[8];
+    private final Button[] actionButtons = new Button[8];
     private final Button[] clearButtons = new Button[8];
     public GateScreen(GateMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 176, 222);
@@ -20,7 +22,9 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
         for (int row = 0; row < 8; row++) {
             int index = row;
             triggerButtons[row] = addRenderableWidget(Button.builder(Component.literal("+"), button ->
-                    click(index * 2)).bounds(leftPos + 12, topPos + 20 + row * 12, 132, 11).build());
+                    click(index * 2)).bounds(leftPos + 12, topPos + 20 + row * 12, 68, 11).build());
+            actionButtons[row] = addRenderableWidget(Button.builder(Component.literal("→"), button ->
+                    click(16 + index)).bounds(leftPos + 82, topPos + 20 + row * 12, 62, 11).build());
             clearButtons[row] = addRenderableWidget(Button.builder(Component.literal("×"), button ->
                     click(index * 2 + 1)).bounds(leftPos + 148, topPos + 20 + row * 12, 16, 11).build());
         }
@@ -34,11 +38,14 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
         for (int row = 0; row < 8; row++) {
             boolean visible = row < menu.ruleSlots();
             triggerButtons[row].visible = visible;
+            actionButtons[row].visible = visible;
             clearButtons[row].visible = visible;
             if (!visible) continue;
             GateTrigger trigger = menu.trigger(row);
-            triggerButtons[row].setMessage(Component.literal(trigger == null ? "+"
-                    : trigger.getSerializedName() + " → redstone"));
+            GateAction action = menu.action(row);
+            triggerButtons[row].setMessage(Component.literal(trigger == null ? "+" : trigger.getSerializedName()));
+            actionButtons[row].setMessage(Component.literal(action == null ? "→" : action.getSerializedName()));
+            actionButtons[row].active = trigger != null;
             clearButtons[row].active = trigger != null;
         }
     }

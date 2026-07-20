@@ -75,11 +75,17 @@ public final class GateMenu extends AbstractContainerMenu {
     }
     @Override public boolean clickMenuButton(Player player, int id) {
         ItemStack gate = gate();
-        int row = id / 2;
+        boolean actionButton = id >= 16;
+        int row = actionButton ? id - 16 : id / 2;
         if (gate.isEmpty() || row < 0 || row >= GateItem.slots(gate)) return false;
         var rules = new ArrayList<>(gate.getOrDefault(
                 BCSiliconDataComponents.GATE_PROGRAM.get(), GateProgram.EMPTY).rules());
-        if ((id & 1) == 1) {
+        if (actionButton) {
+            while (rules.size() <= row) rules.add(new GateRule(GateTrigger.TRUE, GateAction.REDSTONE_OUTPUT));
+            GateRule old = rules.get(row);
+            GateAction next = GateAction.values()[(old.action().ordinal() + 1) % GateAction.values().length];
+            rules.set(row, new GateRule(old.trigger(), next, old.actionSide()));
+        } else if ((id & 1) == 1) {
             if (row >= rules.size()) return false;
             rules.remove(row);
         } else {
@@ -104,5 +110,9 @@ public final class GateMenu extends AbstractContainerMenu {
     public GateTrigger trigger(int row) {
         int value = data.get(2 + row * 2);
         return value < 0 ? null : GateTrigger.values()[Math.clamp(value, 0, GateTrigger.values().length - 1)];
+    }
+    public GateAction action(int row) {
+        int value = data.get(3 + row * 2);
+        return value < 0 ? null : GateAction.values()[Math.clamp(value, 0, GateAction.values().length - 1)];
     }
 }

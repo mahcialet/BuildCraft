@@ -213,6 +213,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "robotics_zone_data", BCCoreGameTests::roboticsZoneData);
 registerTest(event, environment, "robotics_zone_planner", BCCoreGameTests::roboticsZonePlanner);
 registerTest(event, environment, "robotics_robot_goggles", BCCoreGameTests::roboticsRobotGoggles);
+registerTest(event, environment, "robotics_gate_statements", BCCoreGameTests::roboticsGateStatements);
 registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::roboticsRobotStation);
         registerTest(event, environment, "robotics_delivery_robot", BCCoreGameTests::roboticsDeliveryRobot);
         registerTest(event, environment, "robotics_carrier_robot", BCCoreGameTests::roboticsCarrierRobot);
@@ -6647,6 +6648,73 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         BlockPos absolutePos = helper.absolutePos(relativePos);
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(absolutePos), net.minecraft.core.Direction.UP, absolutePos, false);
         return new UseOnContext(helper.getLevel(), player, InteractionHand.MAIN_HAND, stack, hit);
+    }
+
+    private static void roboticsGateStatements(GameTestHelper helper) {
+        BlockPos relative = new BlockPos(2, 2, 2);
+        BlockPos pos = helper.absolutePos(relative);
+        helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pos);
+        helper.assertTrue(holder != null, "Robotics Gate test pipe has no block entity");
+        helper.assertTrue(holder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Robotics Gate test rejected Robot Station");
+
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.ROBOT_RESERVED,
+                                buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+        helper.assertTrue(holder.installAttachment(Direction.UP, gate),
+                "Robotics Gate test rejected Gate");
+        buildcraft.robotics.item.RobotStationItem stationItem =
+                buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get();
+        stationItem.tickAttachment(holder, Direction.NORTH, holder.attachment(Direction.NORTH));
+        var station = buildcraft.robotics.RobotStationRegistry.get(helper.getLevel(),
+                new buildcraft.robotics.RobotStationRegistry.Address(pos, Direction.NORTH)).orElseThrow();
+        java.util.UUID robotId = java.util.UUID.randomUUID();
+        helper.assertTrue(station.reserve(robotId), "Robotics Gate test could not reserve station");
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+        helper.assertTrue(holder.gateRedstoneOutput(), "Robot Reserved trigger stayed inactive");
+
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setUUID(robotId);
+        robot.setBoard(buildcraft.robotics.RobotBoardType.CARRIER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(robot.dock(station), "Robotics Gate test Robot did not dock");
+        helper.getLevel().addFreshEntity(robot);
+        for (buildcraft.silicon.gate.GateTrigger trigger : java.util.List.of(
+                buildcraft.silicon.gate.GateTrigger.ROBOT_LINKED,
+                buildcraft.silicon.gate.GateTrigger.ROBOT_RESERVED,
+                buildcraft.silicon.gate.GateTrigger.ROBOT_IN_STATION,
+                buildcraft.silicon.gate.GateTrigger.ROBOT_SLEEPING)) {
+            ItemStack updated = holder.attachment(Direction.UP).copy();
+            updated.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                    new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                            new buildcraft.silicon.gate.GateRule(trigger,
+                                    buildcraft.silicon.gate.GateAction.REDSTONE_OUTPUT))));
+            holder.setAttachment(Direction.UP, updated);
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pos, Direction.NORTH);
+            buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                    helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+            helper.assertTrue(holder.gateRedstoneOutput(), trigger.getSerializedName() + " stayed inactive");
+        }
+
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.silicon.menu.GateMenu(57, player.getInventory(), pos, Direction.UP);
+        helper.assertTrue(menu.clickMenuButton(player, 16), "Gate editor rejected action cycle");
+        helper.assertValueEqual(buildcraft.silicon.gate.GateAction.PULSAR_CONSTANT,
+                holder.attachment(Direction.UP)
+                        .get(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get())
+                        .rules().getFirst().action(), "Gate editor did not persist action cycle");
+        helper.succeed();
     }
 
     private static void roboticsRobotGoggles(GameTestHelper helper) {

@@ -16,7 +16,8 @@ public enum GateTrigger implements StringRepresentable {
     PIPE_SIGNAL_RED_ACTIVE, PIPE_SIGNAL_RED_INACTIVE,
     PIPE_SIGNAL_BLUE_ACTIVE, PIPE_SIGNAL_BLUE_INACTIVE,
     PIPE_SIGNAL_GREEN_ACTIVE, PIPE_SIGNAL_GREEN_INACTIVE,
-    PIPE_SIGNAL_YELLOW_ACTIVE, PIPE_SIGNAL_YELLOW_INACTIVE;
+    PIPE_SIGNAL_YELLOW_ACTIVE, PIPE_SIGNAL_YELLOW_INACTIVE,
+    ROBOT_SLEEPING, ROBOT_IN_STATION, ROBOT_LINKED, ROBOT_RESERVED;
     public static final Codec<GateTrigger> CODEC = StringRepresentable.fromEnum(GateTrigger::values);
     @Override public String getSerializedName() { return name().toLowerCase(Locale.ROOT); }
 
