@@ -107,9 +107,13 @@ public final class BCCoreGameTests {
             event.registerEnvironment(id("robotics_fluid_carrier"));
         Holder<TestEnvironmentDefinition<?>> lumberjackEnvironment =
             event.registerEnvironment(id("robotics_lumberjack"));
+        Holder<TestEnvironmentDefinition<?>> harvesterEnvironment =
+            event.registerEnvironment(id("robotics_harvester"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
+        registerTest(event, harvesterEnvironment, "robotics_harvester_robot",
+            BCCoreGameTests::roboticsHarvesterRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7163,6 +7167,71 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 new net.minecraft.world.phys.AABB(target).inflate(2),
                 item -> item.getItem().is(Items.OAK_LOG)).isEmpty(),
                 "Lumberjack did not preserve harvested block drops");
+        helper.succeed();
+    }
+
+    private static void roboticsHarvesterRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 24, 1);
+        BlockPos matureRelative = new BlockPos(3, 24, 1);
+        BlockPos immatureRelative = new BlockPos(4, 24, 1);
+        BlockPos excludedRelative = new BlockPos(3, 24, 2);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        for (BlockPos crop : java.util.List.of(matureRelative, immatureRelative, excludedRelative)) {
+            helper.setBlock(crop.below(), Blocks.FARMLAND);
+        }
+        net.minecraft.world.level.block.CropBlock wheat =
+                (net.minecraft.world.level.block.CropBlock) Blocks.WHEAT;
+        helper.setBlock(matureRelative, wheat.getStateForAge(wheat.getMaxAge()));
+        helper.setBlock(immatureRelative, wheat.getStateForAge(3));
+        helper.setBlock(excludedRelative, wheat.getStateForAge(wheat.getMaxAge()));
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        BlockPos mature = helper.absolutePos(matureRelative);
+        BlockPos immature = helper.absolutePos(immatureRelative);
+        workZone.set(mature.getX(), mature.getZ(), true);
+        workZone.set(immature.getX(), immature.getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, null));
+        helper.assertTrue(home.installAttachment(Direction.UP, homeStation),
+                "Harvester home station installation failed");
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.HARVESTER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Harvester failed to dock at its home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1_000 && (!helper.getBlockState(matureRelative).isAir()
+                || robot.harvesterPhase() != buildcraft.robotics.HarvesterPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), home.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(matureRelative).isAir(),
+                "Harvester did not harvest the mature zoned crop: phase=" + robot.harvesterPhase()
+                        + ", task=" + robot.taskState());
+        helper.assertTrue(helper.getBlockState(immatureRelative).is(Blocks.WHEAT)
+                        && wheat.getAge(helper.getBlockState(immatureRelative)) == 3,
+                "Harvester harvested an immature crop");
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.WHEAT)
+                        && wheat.isMaxAge(helper.getBlockState(excludedRelative)),
+                "Harvester harvested a mature crop outside its work zone");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Harvester did not return home");
+        helper.assertValueEqual(buildcraft.robotics.HarvesterPhase.NONE, robot.harvesterPhase(),
+                "Harvester scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Harvester work consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class,
+                new net.minecraft.world.phys.AABB(mature).inflate(3),
+                item -> item.getItem().is(Items.WHEAT) || item.getItem().is(Items.WHEAT_SEEDS)).isEmpty(),
+                "Harvester did not preserve crop drops");
         helper.succeed();
     }
 

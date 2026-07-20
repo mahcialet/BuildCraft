@@ -15,6 +15,7 @@ import buildcraft.robotics.PickerPhase;
 import buildcraft.robotics.FluidCarrierPhase;
 import buildcraft.robotics.LumberjackPhase;
 import buildcraft.robotics.BlockWorkRegistry;
+import buildcraft.robotics.HarvesterPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -75,6 +76,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos lumberjackBlockTarget;
     private LumberjackPhase lumberjackPhase = LumberjackPhase.NONE;
     private float lumberjackBreakProgress;
+    private BlockPos harvesterBlockTarget;
+    private HarvesterPhase harvesterPhase = HarvesterPhase.NONE;
+    private int harvesterDelay;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -124,6 +128,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ResourceHandler<FluidResource> fluidTank() { return fluidTank; }
     public LumberjackPhase lumberjackPhase() { return lumberjackPhase; }
     public ItemStack lumberjackTool() { return lumberjackTool.copy(); }
+    public HarvesterPhase harvesterPhase() { return harvesterPhase; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -177,6 +182,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.LUMBERJACK
                     && lumberjackPhase == LumberjackPhase.NONE && tickCount % 20 == 0) {
                 beginLumberjack(serverLevel);
+            } else if (board() == RobotBoardType.HARVESTER
+                    && harvesterPhase == HarvesterPhase.NONE && tickCount % 20 == 0) {
+                beginHarvester(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -200,6 +208,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (pickerPhase != PickerPhase.NONE) tickPicker(serverLevel);
         if (fluidCarrierPhase != FluidCarrierPhase.NONE) tickFluidCarrier(serverLevel);
         if (lumberjackPhase != LumberjackPhase.NONE) tickLumberjack(serverLevel);
+        if (harvesterPhase != HarvesterPhase.NONE) tickHarvester(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -837,6 +846,153 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
     }
 
+    private void beginHarvester(ServerLevel level) {
+        if (selectHarvesterBlock(level)) {
+            harvesterPhase = HarvesterPhase.TO_BLOCK;
+            leaveStation();
+        }
+    }
+
+    private boolean selectHarvesterBlock(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(
+                level.getGameTime() ^ getUUID().getMostSignificantBits() ^ 0x48415256455354L);
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                if (!isMatureCrop(level, candidate)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        harvesterBlockTarget = best;
+        harvesterDelay = 0;
+        return best != null;
+    }
+
+    private static boolean isMatureCrop(ServerLevel level, BlockPos position) {
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(position);
+        net.minecraft.world.level.block.Block block = state.getBlock();
+        if (block instanceof net.minecraft.world.level.block.CropBlock crop) return crop.isMaxAge(state);
+        if (block instanceof net.minecraft.world.level.block.NetherWartBlock) {
+            return state.getValue(net.minecraft.world.level.block.NetherWartBlock.AGE)
+                    == net.minecraft.world.level.block.NetherWartBlock.MAX_AGE;
+        }
+        if (block instanceof net.minecraft.world.level.block.CocoaBlock) {
+            return state.getValue(net.minecraft.world.level.block.CocoaBlock.AGE)
+                    == net.minecraft.world.level.block.CocoaBlock.MAX_AGE;
+        }
+        if (block instanceof net.minecraft.world.level.block.SweetBerryBushBlock) {
+            return state.getValue(net.minecraft.world.level.block.SweetBerryBushBlock.AGE)
+                    == net.minecraft.world.level.block.SweetBerryBushBlock.MAX_AGE;
+        }
+        if (block == net.minecraft.world.level.block.Blocks.MELON
+                || block == net.minecraft.world.level.block.Blocks.PUMPKIN
+                || block instanceof net.minecraft.world.level.block.MushroomBlock
+                || block instanceof net.minecraft.world.level.block.FlowerBlock
+                || block instanceof net.minecraft.world.level.block.TallGrassBlock
+                || block instanceof net.minecraft.world.level.block.DoublePlantBlock) return true;
+        if (block instanceof net.minecraft.world.level.block.CactusBlock) {
+            return level.getBlockState(position.below()).is(block);
+        }
+        return !(block instanceof net.minecraft.world.level.block.SugarCaneBlock)
+                && !(block instanceof net.minecraft.world.level.block.BambooStalkBlock)
+                && state.is(net.minecraft.tags.BlockTags.REPLACEABLE_BY_TREES)
+                && level.getBlockState(position.below()).is(block);
+    }
+
+    private void tickHarvester(ServerLevel level) {
+        if (harvesterPhase == HarvesterPhase.TO_BLOCK) {
+            if (harvesterBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, harvesterBlockTarget, getUUID())
+                    || !isMatureCrop(level, harvesterBlockTarget)) {
+                releaseHarvesterBlock(level);
+                harvesterPhase = HarvesterPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(harvesterBlockTarget))) {
+                harvesterPhase = HarvesterPhase.HARVESTING;
+                harvesterDelay = 0;
+            }
+        } else if (harvesterPhase == HarvesterPhase.HARVESTING) {
+            if (harvesterBlockTarget == null || !isMatureCrop(level, harvesterBlockTarget)) {
+                releaseHarvesterBlock(level);
+                harvesterPhase = HarvesterPhase.RETURN_HOME;
+                return;
+            }
+            if (energy() <= 0) {
+                releaseHarvesterBlock(level);
+                harvesterPhase = HarvesterPhase.RETURN_HOME;
+                return;
+            }
+            setEnergy(energy() - 1_000);
+            if (++harvesterDelay <= 20) return;
+            boolean harvested = harvestCrop(level);
+            releaseHarvesterBlock(level);
+            if (harvested && selectHarvesterBlock(level)) {
+                harvesterPhase = HarvesterPhase.TO_BLOCK;
+                return;
+            }
+            harvesterPhase = HarvesterPhase.RETURN_HOME;
+        } else if (harvesterPhase == HarvesterPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) harvesterPhase = HarvesterPhase.NONE;
+        }
+    }
+
+    private boolean harvestCrop(ServerLevel level) {
+        if (harvesterBlockTarget == null || !isMatureCrop(level, harvesterBlockTarget)) return false;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(harvesterBlockTarget);
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer,
+                harvesterBlockTarget, state);
+        if (event.isCanceled()) return false;
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, harvesterBlockTarget, level.getBlockEntity(harvesterBlockTarget),
+                fakePlayer, ItemStack.EMPTY);
+        level.removeBlock(harvesterBlockTarget, false);
+        for (ItemStack drop : drops) {
+            net.minecraft.world.entity.item.ItemEntity entity = new net.minecraft.world.entity.item.ItemEntity(
+                    level, getX(), getY(), getZ(), drop);
+            entity.setPickUpDelay(10);
+            level.addFreshEntity(entity);
+        }
+        level.levelEvent(2001, harvesterBlockTarget, net.minecraft.world.level.block.Block.getId(state));
+        return true;
+    }
+
+    private void releaseHarvesterBlock(ServerLevel level) {
+        if (harvesterBlockTarget != null) {
+            BlockWorkRegistry.release(level, harvesterBlockTarget, getUUID());
+            harvesterBlockTarget = null;
+        }
+        harvesterDelay = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -997,6 +1153,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         releasePickerTarget(serverLevel);
         releaseLumberjackBlock(serverLevel);
+        releaseHarvesterBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -1019,6 +1176,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             }
             releasePickerTarget(level);
             releaseLumberjackBlock(level);
+            releaseHarvesterBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -1074,6 +1232,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (lumberjackBlockTarget != null) output.putLong("LumberjackBlock", lumberjackBlockTarget.asLong());
         output.putFloat("LumberjackBreakProgress", lumberjackBreakProgress);
+        output.putInt("HarvesterPhase", harvesterPhase.ordinal());
+        if (harvesterBlockTarget != null) output.putLong("HarvesterBlock", harvesterBlockTarget.asLong());
+        output.putInt("HarvesterDelay", harvesterDelay);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -1170,6 +1331,16 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (lumberjackPhase == LumberjackPhase.TO_BLOCK && lumberjackBlockTarget == null) {
             lumberjackPhase = LumberjackPhase.RETURN_HOME;
         }
+        int harvesterOrdinal = input.getIntOr("HarvesterPhase", HarvesterPhase.NONE.ordinal());
+        HarvesterPhase[] harvesterPhases = HarvesterPhase.values();
+        harvesterPhase = harvesterOrdinal >= 0 && harvesterOrdinal < harvesterPhases.length
+                ? harvesterPhases[harvesterOrdinal] : HarvesterPhase.NONE;
+        if (input.getLong("HarvesterBlock").isPresent()) {
+            harvesterBlockTarget = BlockPos.of(input.getLongOr("HarvesterBlock", 0));
+        }
+        harvesterDelay = Math.clamp(input.getIntOr("HarvesterDelay", 0), 0, 21);
+        if ((harvesterPhase == HarvesterPhase.TO_BLOCK || harvesterPhase == HarvesterPhase.HARVESTING)
+                && harvesterBlockTarget == null) harvesterPhase = HarvesterPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 
