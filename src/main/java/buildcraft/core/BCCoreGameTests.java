@@ -4287,8 +4287,9 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "light sensor could not be installed");
         helper.assertFalse(holder.attachmentBlocksConnection(Direction.EAST),
                 "light sensor incorrectly blocked its pipe side");
-        helper.runAfterDelay(10, () -> {
-        helper.assertTrue(helper.getLevel().getMaxLocalRawBrightness(pipePos.east()) >= 8,
+        helper.onEachTick(() -> {
+            if (helper.getTick() < 1 || helper.getLevel().getMaxLocalRawBrightness(pipePos.east()) < 8) return;
+            helper.assertTrue(helper.getLevel().getMaxLocalRawBrightness(pipePos.east()) >= 8,
                 "light source did not illuminate the Light Sensor side");
         ItemStack lightGate = buildcraft.silicon.BCSiliconItems.gate(
                 buildcraft.silicon.gate.GateMaterial.IRON,
@@ -9534,6 +9535,12 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void machineOwnershipAdvancements(GameTestHelper helper) {
+        helper.assertFalse(BCCoreConfig.networkUpdateDue(109, 100, 10, false),
+                "network update interval fired early");
+        helper.assertTrue(BCCoreConfig.networkUpdateDue(110, 100, 10, false),
+                "network update interval did not fire");
+        helper.assertTrue(BCCoreConfig.networkUpdateDue(101, 100, 10, true),
+                "forced network update was delayed");
         helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.configuredMineDelayTicks(), 0L,
                 "Quarry should retain its unlimited mining-rate default");
         buildcraft.builders.BCBuildersConfig.QUARRY_MAX_BLOCK_MINE_RATE.set(0.5);

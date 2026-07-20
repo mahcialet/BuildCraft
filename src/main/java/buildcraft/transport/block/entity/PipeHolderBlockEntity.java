@@ -77,6 +77,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private long rfReceivedTick = Long.MIN_VALUE;
     private @Nullable Direction fluidReceivedFrom;
     private int fluidInputCooldown;
+    private long lastFluidSyncTick = -100;
     private final List<Transit> travelling = new ArrayList<>();
     private final WoodReceiver woodReceiver = new WoodReceiver();
     private final ObsidianReceiver obsidianReceiver = new ObsidianReceiver();
@@ -599,7 +600,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 fluidBuffer.extract(0, resource, rate, transaction);
                 transaction.commit();
             }
-            sync();
+            syncFluid(level);
             return;
         }
         int directionCount = Direction.values().length;
@@ -635,11 +636,23 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 if (targetEntity instanceof PipeHolderBlockEntity pipe) {
                     pipe.fluidReceivedFrom = direction.getOpposite();
                     pipe.fluidInputCooldown = 60;
+                    pipe.syncFluid(level);
                 }
                 routeCursor = Math.floorMod(direction.ordinal() + 1, Direction.values().length);
-                sync();
+                syncFluid(level);
                 return;
             }
+        }
+    }
+
+    private void syncFluid(ServerLevel level) {
+        setChanged();
+        int interval = buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get();
+        long now = level.getGameTime();
+        if (buildcraft.core.BCCoreConfig.networkUpdateDue(
+                now, lastFluidSyncTick, interval, fluidBuffer.getAmountAsInt(0) == 0)) {
+            lastFluidSyncTick = now;
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
     }
 

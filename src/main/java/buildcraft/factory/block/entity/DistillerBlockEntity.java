@@ -35,6 +35,7 @@ public final class DistillerBlockEntity extends BlockEntity {
     private final MjBatteryReceiver receiver = new MjBatteryReceiver(battery);
     private long distillPower;
     private boolean active;
+    private long lastNetworkSync = -100;
 
     public DistillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCFactoryBlockEntities.DISTILLER.get(), pos, state);
@@ -61,28 +62,36 @@ public final class DistillerBlockEntity extends BlockEntity {
     }
 
     private void process() {
+        boolean wasActive = active;
         active = false;
         if (input.getAmountAsInt(0) <= 0) {
+            boolean hadProgress = distillPower > 0;
             refundProgress();
+            if (wasActive && !hadProgress) sync();
             return;
         }
         BCEnergyRefineryRecipes.DistillationRecipe recipe =
                 BCEnergyRefineryRecipes.distillation(input.getResource(0).value());
         if (recipe == null || !canProcess(recipe)) {
+            boolean hadProgress = distillPower > 0;
             refundProgress();
+            if (wasActive && !hadProgress) sync();
             return;
         }
         long maximum = MAX_MJ_PER_TICK * (battery.getStored() + MAX_MJ_PER_TICK)
                 / (BATTERY_CAPACITY / 2);
         maximum = Math.min(MAX_MJ_PER_TICK, Math.max(0, maximum));
         long power = battery.extractPower(0, maximum, false);
-        if (power <= 0) return;
+        if (power <= 0) {
+            if (wasActive) sync();
+            return;
+        }
         distillPower += power;
         active = true;
         if (distillPower >= recipe.powerRequired() && execute(recipe)) {
             distillPower -= recipe.powerRequired();
         }
-        sync();
+        syncProgress();
     }
 
     private boolean canProcess(BCEnergyRefineryRecipes.DistillationRecipe recipe) {
@@ -122,6 +131,17 @@ public final class DistillerBlockEntity extends BlockEntity {
     private void sync() {
         setChanged();
         if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+    }
+
+    private void syncProgress() {
+        setChanged();
+        if (level == null) return;
+        long now = level.getGameTime();
+        if (buildcraft.core.BCCoreConfig.networkUpdateDue(
+                now, lastNetworkSync, buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) {
+            lastNetworkSync = now;
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 
     @Override protected void loadAdditional(ValueInput valueInput) {

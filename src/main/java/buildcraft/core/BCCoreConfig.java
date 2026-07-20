@@ -10,6 +10,7 @@ public final class BCCoreConfig {
     public static final ModConfigSpec.IntValue PUMP_MAX_DISTANCE;
     public static final ModConfigSpec.DoubleValue MINING_MULTIPLIER;
     public static final ModConfigSpec.IntValue MINING_MAX_DEPTH;
+    public static final ModConfigSpec.IntValue NETWORK_UPDATE_RATE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -29,9 +30,16 @@ public final class BCCoreConfig {
         MINING_MAX_DEPTH = builder
             .comment("Maximum vertical distance scanned by mining machines and Pumps.")
             .defineInRange("miningMaxDepth", 512, 32, 4096);
+        NETWORK_UPDATE_RATE = builder
+            .comment("How often, in ticks, changing machine and pipe state is synchronized to clients.")
+            .defineInRange("updateFactor", 10, 1, 100);
         builder.pop();
         SPEC = builder.build();
     }
 
     private BCCoreConfig() {}
+
+    public static boolean networkUpdateDue(long gameTime, long previousUpdate, int interval, boolean force) {
+        return force || gameTime - previousUpdate >= Math.max(1, interval);
+    }
 }
