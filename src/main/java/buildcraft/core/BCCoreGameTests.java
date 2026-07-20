@@ -104,6 +104,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> diagnosticsEnvironment = event.registerEnvironment(id("core_diagnostics"));
         Holder<TestEnvironmentDefinition<?>> siliconPlaceholderEnvironment = event.registerEnvironment(id("silicon_placeholders"));
         Holder<TestEnvironmentDefinition<?>> gateParameterEnvironment = event.registerEnvironment(id("gate_parameters"));
+        Holder<TestEnvironmentDefinition<?>> fillerGateEnvironment = event.registerEnvironment(id("filler_gate_patterns"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -239,6 +240,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, environment, "silicon_integration_table", BCCoreGameTests::siliconIntegrationTable);
         registerTest(event, siliconPlaceholderEnvironment, "silicon_placeholder_tables", BCCoreGameTests::siliconPlaceholderTables);
         registerTest(event, gateParameterEnvironment, "silicon_gate_parameter_triggers", BCCoreGameTests::siliconGateParameterTriggers);
+        registerTest(event, fillerGateEnvironment, "builders_filler_gate_patterns", BCCoreGameTests::buildersFillerGatePatterns);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -5880,6 +5882,58 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 new ItemStack(Items.WATER_BUCKET), true, "matching fluid space parameter did not trigger");
         assertParameterizedTrigger(helper, holder, gate, buildcraft.silicon.gate.GateTrigger.FLUID_SPACE,
                 new ItemStack(Items.LAVA_BUCKET), false, "incompatible fluid space parameter triggered");
+        helper.succeed();
+    }
+
+    private static void buildersFillerGatePatterns(GameTestHelper helper) {
+        BlockPos pipePos = helper.absolutePos(new BlockPos(3, 3, 3));
+        BlockPos fillerPos = pipePos.north();
+        helper.getLevel().setBlock(pipePos,
+                buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get().defaultBlockState(), 3);
+        helper.getLevel().setBlock(fillerPos,
+                buildcraft.builders.BCBuildersBlocks.FILLER.get().defaultBlockState(), 3);
+        var holder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(pipePos);
+        var filler = (buildcraft.builders.block.entity.FillerBlockEntity)
+                helper.getLevel().getBlockEntity(fillerPos);
+        ItemStack gate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.IRON,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        helper.assertTrue(holder.installAttachment(Direction.NORTH, gate),
+                "filler pattern gate could not be installed");
+        gate = holder.attachment(Direction.NORTH);
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.FILLER_PYRAMID,
+                                java.util.Optional.empty(), java.util.List.of(), java.util.List.of(1, 8)))));
+        tickPipes(helper, 1, pipePos);
+        helper.assertValueEqual(buildcraft.builders.FillerPattern.PYRAMID, filler.pattern(),
+                "pyramid gate action did not select its pattern");
+        helper.assertValueEqual(Direction.DOWN, filler.verticalDirection(),
+                "pyramid gate vertical parameter was ignored");
+        helper.assertValueEqual(8, filler.pyramidCenter(),
+                "pyramid gate centre parameter was ignored");
+
+        gate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(
+                                buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.FILLER_CIRCLE,
+                                java.util.Optional.empty(), java.util.List.of(), java.util.List.of(2, 1, 3)))));
+        tickPipes(helper, 1, pipePos);
+        helper.assertValueEqual(buildcraft.builders.FillerPattern.CIRCLE, filler.pattern(),
+                "2D gate action did not select its pattern");
+        helper.assertValueEqual(Direction.Axis.Z, filler.shapeAxis(), "2D axis parameter was ignored");
+        helper.assertValueEqual(buildcraft.builders.FillerFillMode.FILLED_OUTER, filler.fillMode(),
+                "2D fill parameter was ignored");
+        helper.assertValueEqual(3, filler.shapeRotation(), "2D rotation parameter was ignored");
+        helper.assertValueEqual(buildcraft.builders.FillerPattern.values().length,
+                (int) java.util.Arrays.stream(buildcraft.silicon.gate.GateAction.values())
+                        .filter(action -> buildcraft.builders.BuildersGateActions.pattern(action) != null).count(),
+                "not every active Filler pattern has a gate action");
         helper.succeed();
     }
 

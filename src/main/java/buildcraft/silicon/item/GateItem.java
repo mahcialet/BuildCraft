@@ -72,6 +72,12 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
                                 side, buildcraft.api.core.IControllable.ControlMode.OFF);
                         case MACHINE_CONTROL_LOOP -> pipe.activateMachineControl(
                                 side, buildcraft.api.core.IControllable.ControlMode.LOOP);
+                        case FILLER_NONE, FILLER_CLEAR, FILLER_FILL, FILLER_BOX, FILLER_FRAME,
+                                FILLER_PYRAMID, FILLER_STAIRS, FILLER_SPHERE, FILLER_HEMISPHERE,
+                                FILLER_QUARTER_SPHERE, FILLER_EIGHTH_SPHERE, FILLER_ARC,
+                                FILLER_CIRCLE, FILLER_HEXAGON, FILLER_OCTAGON, FILLER_PENTAGON,
+                                FILLER_SEMICIRCLE, FILLER_SQUARE, FILLER_TRIANGLE ->
+                                pipe.activateFillerPattern(side, rule.action(), rule.options());
                         case ROBOT_GOTO_STATION, ROBOT_WAKE_UP, ROBOT_WORK_AREA,
                                 ROBOT_LOAD_UNLOAD_AREA, ROBOT_FILTER, ROBOT_FILTER_TOOL,
                                 STATION_REQUEST_ITEMS, STATION_PROVIDE_ITEMS,

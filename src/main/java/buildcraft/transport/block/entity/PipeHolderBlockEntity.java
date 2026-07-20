@@ -1078,6 +1078,14 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         }
     }
 
+    public void activateFillerPattern(Direction side, buildcraft.silicon.gate.GateAction action,
+                                      java.util.List<Integer> options) {
+        if (level != null && level.getBlockEntity(worldPosition.relative(side))
+                instanceof buildcraft.builders.block.entity.FillerBlockEntity filler) {
+            buildcraft.builders.BuildersGateActions.apply(filler, action, options);
+        }
+    }
+
     public boolean cycleLapisColor(boolean reverse) {
         if (pipeType() != PipeType.LAPIS_ITEM) return false;
         DyeColor[] colors = DyeColor.values();

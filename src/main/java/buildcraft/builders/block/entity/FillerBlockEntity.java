@@ -6,6 +6,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.builders.BCBuildersBlockEntities;
 import buildcraft.builders.FillerPattern;
+import buildcraft.builders.FillerFillMode;
 import buildcraft.builders.FillerShape2d;
 import buildcraft.core.marker.VolumeBox;
 import buildcraft.core.marker.VolumeBoxSavedData;
@@ -70,7 +71,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private Direction verticalDirection = Direction.UP;
     private Direction horizontalDirection = Direction.EAST;
     private int pyramidCenter = 4;
-    private boolean hollow;
+    private FillerFillMode fillMode = FillerFillMode.FILLED_INNER;
     private Direction sphereFacing = Direction.DOWN;
     private int sphereRotation;
     private Direction.Axis shapeAxis = Direction.Axis.Y;
@@ -92,7 +93,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public Direction verticalDirection() { return verticalDirection; }
     public Direction horizontalDirection() { return horizontalDirection; }
     public int pyramidCenter() { return pyramidCenter; }
-    public boolean hollow() { return hollow; }
+    public boolean hollow() { return fillMode == FillerFillMode.HOLLOW; }
+    public FillerFillMode fillMode() { return fillMode; }
     public Direction sphereFacing() { return sphereFacing; }
     public int sphereRotation() { return sphereRotation; }
     public Direction.Axis shapeAxis() { return shapeAxis; }
@@ -207,7 +209,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         if (pattern.isSphere()) return includesSphere(target);
         if (pattern.isShape2d()) {
             if (shape2dMask == null) {
-                shape2dMask = FillerShape2d.create(pattern, areaMin, areaMax, shapeAxis, shapeRotation, hollow);
+                shape2dMask = FillerShape2d.create(pattern, areaMin, areaMax, shapeAxis, shapeRotation, fillMode);
             }
             return shape2dMask.includes(target);
         }
@@ -234,8 +236,10 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
 
     private boolean includesSphere(BlockPos target) {
         java.util.EnumSet<Direction> open = sphereOpenFaces();
-        if (!insideSphere(target, open)) return false;
-        if (!hollow) return true;
+        boolean inside = insideSphere(target, open);
+        if (fillMode == FillerFillMode.FILLED_OUTER && !inside) return true;
+        if (!inside) return false;
+        if (fillMode == FillerFillMode.FILLED_INNER) return true;
         for (Direction direction : Direction.values()) {
             if (open.contains(direction)) continue;
             BlockPos neighbour = target.relative(direction);
@@ -407,8 +411,12 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     }
 
     public void setHollow(boolean hollow) {
-        if (this.hollow == hollow) return;
-        this.hollow = hollow;
+        setFillMode(hollow ? FillerFillMode.HOLLOW : FillerFillMode.FILLED_INNER);
+    }
+
+    public void setFillMode(FillerFillMode fillMode) {
+        if (this.fillMode == fillMode) return;
+        this.fillMode = fillMode;
         shape2dMask = null;
         cursor = 0;
         finished = false;
@@ -473,7 +481,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         horizontalDirection = input.read("horizontal_direction", Direction.CODEC).orElse(Direction.EAST);
         if (horizontalDirection.getAxis().isVertical()) horizontalDirection = Direction.EAST;
         pyramidCenter = Math.floorMod(input.getIntOr("pyramid_center", 4), 9);
-        hollow = input.getBooleanOr("hollow", false);
+        fillMode = input.read("fill_mode", FillerFillMode.CODEC).orElse(
+                input.getBooleanOr("hollow", false) ? FillerFillMode.HOLLOW : FillerFillMode.FILLED_INNER);
         sphereFacing = input.read("sphere_facing", Direction.CODEC).orElse(Direction.DOWN);
         sphereRotation = Math.floorMod(input.getIntOr("sphere_rotation", 0), 4);
         int axisOrdinal = Math.floorMod(input.getIntOr("shape_axis", Direction.Axis.Y.ordinal()), Direction.Axis.values().length);
@@ -494,7 +503,7 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         output.store("vertical_direction", Direction.CODEC, verticalDirection);
         output.store("horizontal_direction", Direction.CODEC, horizontalDirection);
         if (pyramidCenter != 4) output.putInt("pyramid_center", pyramidCenter);
-        if (hollow) output.putBoolean("hollow", true);
+        if (fillMode != FillerFillMode.FILLED_INNER) output.store("fill_mode", FillerFillMode.CODEC, fillMode);
         output.store("sphere_facing", Direction.CODEC, sphereFacing);
         if (sphereRotation != 0) output.putInt("sphere_rotation", sphereRotation);
         if (shapeAxis != Direction.Axis.Y) output.putInt("shape_axis", shapeAxis.ordinal());

@@ -1,4 +1,5 @@
 package buildcraft.silicon.client.screen;
+import buildcraft.builders.BuildersGateActions;
 
 import buildcraft.silicon.gate.GateTrigger;
 import buildcraft.silicon.gate.GateAction;
@@ -55,7 +56,17 @@ public final class GateScreen extends AbstractContainerScreen<GateMenu> {
             triggerButtons[row].setMessage(Component.literal(trigger == null ? "+" : trigger.getSerializedName()));
             actionButtons[row].setMessage(Component.literal(action == null ? "→" : action.getSerializedName()));
             actionButtons[row].active = trigger != null;
-            for (Button parameter : parameterButtons[row]) parameter.active = trigger != null;
+            int optionCount = action == null ? 0 : BuildersGateActions.optionCount(action);
+            boolean fillerAction = action != null && BuildersGateActions.pattern(action) != null;
+            var options = java.util.List.of(menu.option(row, 0), menu.option(row, 1), menu.option(row, 2));
+            for (int parameter = 0; parameter < parameterButtons[row].length; parameter++) {
+                Button button = parameterButtons[row][parameter];
+                button.active = trigger != null;
+                button.visible = visible && (!fillerAction || parameter < optionCount);
+                button.setMessage(Component.literal(parameter < optionCount
+                        ? BuildersGateActions.optionLabel(action, options, parameter)
+                        : Integer.toString(parameter + 1)));
+            }
             clearButtons[row].active = trigger != null;
         }
     }

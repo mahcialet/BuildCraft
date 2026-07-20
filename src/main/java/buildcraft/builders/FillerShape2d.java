@@ -12,7 +12,13 @@ public final class FillerShape2d {
     private FillerShape2d() {}
 
     public static Mask create(FillerPattern pattern, BlockPos min, BlockPos max,
-                              Direction.Axis axis, int rotation, boolean hollow) {
+            Direction.Axis axis, int rotation, boolean hollow) {
+        return create(pattern, min, max, axis, rotation,
+                hollow ? FillerFillMode.HOLLOW : FillerFillMode.FILLED_INNER);
+    }
+
+    public static Mask create(FillerPattern pattern, BlockPos min, BlockPos max,
+            Direction.Axis axis, int rotation, FillerFillMode fillMode) {
         int sizeA = switch (axis) {
             case X -> max.getY() - min.getY() + 1;
             case Y, Z -> max.getX() - min.getX() + 1;
@@ -41,7 +47,7 @@ public final class FillerShape2d {
         });
         generate(pattern, shapeMaxA, shapeMaxB, shape);
         Set<Long> included = outline;
-        if (!hollow && shape.fillA >= 0) {
+        if (fillMode == FillerFillMode.FILLED_INNER && shape.fillA >= 0) {
             int fillA;
             int fillB;
             switch (normalized) {
@@ -52,6 +58,16 @@ public final class FillerShape2d {
             }
             included = new HashSet<>(outline);
             floodAll(fillA, fillB, maxA, maxB, outline, included);
+        } else if (fillMode == FillerFillMode.FILLED_OUTER) {
+            included = new HashSet<>(outline);
+            for (int a = 0; a <= maxA; a++) {
+                floodAll(a, 0, maxA, maxB, outline, included);
+                floodAll(a, maxB, maxA, maxB, outline, included);
+            }
+            for (int b = 0; b <= maxB; b++) {
+                floodAll(0, b, maxA, maxB, outline, included);
+                floodAll(maxA, b, maxA, maxB, outline, included);
+            }
         }
         for (long packed : included) {
             int a = (int) (packed >> 32);
