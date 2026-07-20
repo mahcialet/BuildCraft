@@ -898,6 +898,14 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void energyOilWorldgen(GameTestHelper helper) {
+        helper.assertTrue(BCCoreConfig.WORLDGEN_ENABLED.getDefault(),
+                "BuildCraft world generation should retain its enabled default");
+        helper.assertTrue(BCCoreConfig.GENERATE_WATER_SPRINGS.getDefault(),
+                "Water Springs should retain their enabled default");
+        BCCoreConfig.GENERATE_WATER_SPRINGS.set(false);
+        helper.assertFalse(buildcraft.core.gen.WaterSpringFeature.generationEnabled(),
+                "Water Spring setting did not disable generation");
+        BCCoreConfig.GENERATE_WATER_SPRINGS.set(true);
         BlockPos small = helper.absolutePos(new BlockPos(2, 4, 2));
         helper.assertTrue(buildcraft.energy.gen.OilDepositFeature.placeSmallForTest(
                 helper.getLevel(), small, 0xBCE10L), "Small oil deposit placed no blocks");
@@ -956,6 +964,12 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "Hot dry sandy biome was not replaced at historical Oil Desert threshold");
         helper.assertTrue(buildcraft.energy.gen.OilBiomeReplacement.replace(nether, desertQuart, 0) == nether,
                 "Oil biome replacement escaped the Overworld biome tag");
+        BCCoreConfig.WORLDGEN_ENABLED.set(false);
+        helper.assertTrue(buildcraft.energy.gen.OilBiomeReplacement.replace(ocean, oceanQuart, 0) == ocean,
+                "global BuildCraft worldgen setting did not disable Oil biome replacement");
+        helper.assertFalse(buildcraft.core.gen.WaterSpringFeature.generationEnabled(),
+                "global BuildCraft worldgen setting did not disable Water Springs");
+        BCCoreConfig.WORLDGEN_ENABLED.set(true);
         helper.succeed();
     }
 

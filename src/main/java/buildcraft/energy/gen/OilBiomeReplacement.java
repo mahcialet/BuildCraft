@@ -40,6 +40,7 @@ public final class OilBiomeReplacement {
     }
 
     public static Holder<Biome> replace(Holder<Biome> original, int quartX, int quartZ) {
+        if (!buildcraft.core.BCCoreConfig.WORLDGEN_ENABLED.get()) return original;
         State current = state;
         if (current == null || !original.is(BiomeTags.IS_OVERWORLD)) return original;
         double blockX = quartX * 4.0;

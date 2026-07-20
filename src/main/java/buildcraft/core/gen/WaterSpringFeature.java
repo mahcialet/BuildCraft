@@ -20,7 +20,7 @@ public final class WaterSpringFeature extends Feature<NoneFeatureConfiguration> 
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
-        if (!EnumSpring.WATER.canGen) return false;
+        if (!generationEnabled()) return false;
         WorldGenLevel level = context.level();
         BlockPos origin = context.origin();
         int minY = level.getMinY();
@@ -41,4 +41,9 @@ public final class WaterSpringFeature extends Feature<NoneFeatureConfiguration> 
         return false;
     }
 
+    public static boolean generationEnabled() {
+        return buildcraft.core.BCCoreConfig.WORLDGEN_ENABLED.get()
+                && buildcraft.core.BCCoreConfig.GENERATE_WATER_SPRINGS.get()
+                && EnumSpring.WATER.canGen;
+    }
 }

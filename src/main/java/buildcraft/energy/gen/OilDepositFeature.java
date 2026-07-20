@@ -28,7 +28,8 @@ public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
-        if (!BCEnergyConfig.ENABLE_OIL_GENERATION.get()) return false;
+        if (!buildcraft.core.BCCoreConfig.WORLDGEN_ENABLED.get()
+                || !BCEnergyConfig.ENABLE_OIL_GENERATION.get()) return false;
         WorldGenLevel level = context.level();
         int targetChunkX = context.origin().getX() >> 4;
         int targetChunkZ = context.origin().getZ() >> 4;
