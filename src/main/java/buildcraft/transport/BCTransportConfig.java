@@ -12,6 +12,7 @@ public final class BCTransportConfig {
     public static final ModConfigSpec.IntValue BASE_POWER_RATE;
     public static final ModConfigSpec.IntValue BASE_RF_RATE;
     public static final ModConfigSpec.BooleanValue DISABLE_RF_PIPE;
+    public static final ModConfigSpec.BooleanValue FLUID_PIPE_COLOUR_BORDER;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -22,6 +23,9 @@ public final class BCTransportConfig {
         BASE_POWER_RATE = builder.defineInRange("pipes.basePowerRate", 4, 1, 40);
         BASE_RF_RATE = builder.defineInRange("pipes.baseRfRate", 40, 10, 4_000);
         DISABLE_RF_PIPE = builder.define("pipes.disable_rf_pipe", false);
+        builder.pop();
+        builder.push("display");
+        FLUID_PIPE_COLOUR_BORDER = builder.define("pipes.fluidColourIsBorder", true);
         builder.pop();
         SPEC = builder.build();
     }

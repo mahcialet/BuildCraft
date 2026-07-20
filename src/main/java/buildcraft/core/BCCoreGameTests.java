@@ -109,7 +109,17 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> transportCreativeEnvironment = event.registerEnvironment(id("transport_creative"));
         Holder<TestEnvironmentDefinition<?>> siliconLensEnvironment = event.registerEnvironment(id("silicon_lens_variants"));
         Holder<TestEnvironmentDefinition<?>> siliconSensorTimerEnvironment =
-                event.registerEnvironment(id("silicon_sensor_timer"));
+            event.registerEnvironment(id("silicon_sensor_timer"));
+        Holder<TestEnvironmentDefinition<?>> energyFluidsEnvironment =
+            event.registerEnvironment(id("energy_fluids"));
+        Holder<TestEnvironmentDefinition<?>> rfEngineEnvironment =
+            event.registerEnvironment(id("rf_engine"));
+        Holder<TestEnvironmentDefinition<?>> mjDynamoEnvironment =
+            event.registerEnvironment(id("mj_dynamo"));
+        Holder<TestEnvironmentDefinition<?>> transportRfEnvironment =
+            event.registerEnvironment(id("transport_rf"));
+        Holder<TestEnvironmentDefinition<?>> buildersSnapshotEnvironment =
+            event.registerEnvironment(id("builders_snapshot"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -168,7 +178,7 @@ public final class BCCoreGameTests {
         registerTest(event, builderRobotEnvironment, "robotics_builder_robot",
                 BCCoreGameTests::roboticsBuilderRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
-        registerTest(event, environment, "machine_ownership_advancements",
+        registerTest(event, diagnosticsEnvironment, "machine_ownership_advancements",
                 BCCoreGameTests::machineOwnershipAdvancements);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -188,20 +198,20 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
         registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
         registerTest(event, environment, "creative_engine", BCCoreGameTests::creativeEngine);
-        registerTest(event, environment, "energy_fluids", BCCoreGameTests::energyFluids);
+        registerTest(event, energyFluidsEnvironment, "energy_fluids", BCCoreGameTests::energyFluids);
         registerTest(event, environment, "stirling_engine", BCCoreGameTests::stirlingEngine);
         registerTest(event, environment, "combustion_engine", BCCoreGameTests::combustionEngine);
-        registerTest(event, environment, "rf_engine", BCCoreGameTests::rfEngine);
+        registerTest(event, rfEngineEnvironment, "rf_engine", BCCoreGameTests::rfEngine);
         registerTest(event, environment, "engine_menus", BCCoreGameTests::engineMenus);
         registerTest(event, environment, "combustion_containers", BCCoreGameTests::combustionContainers);
         registerTest(event, environment, "energy_engine_recipes", BCCoreGameTests::energyEngineRecipes);
         registerTest(event, environment, "energy_engine_loot", BCCoreGameTests::energyEngineLoot);
         registerTest(event, environment, "energy_refinery_fluids", BCCoreGameTests::energyRefineryFluids);
-        registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
+        registerTest(event, mjDynamoEnvironment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_filtered_buffer", BCCoreGameTests::transportFilteredBuffer);
         registerTest(event, environment, "transport_pipe_plugs", BCCoreGameTests::transportPipePlugs);
-        registerTest(event, environment, "transport_rf_pipes", BCCoreGameTests::transportRfPipes);
+        registerTest(event, transportRfEnvironment, "transport_rf_pipes", BCCoreGameTests::transportRfPipes);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
@@ -218,7 +228,7 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         registerTest(event, environment, "factory_water_gel", BCCoreGameTests::factoryWaterGel);
         registerTest(event, environment, "factory_auto_workbench", BCCoreGameTests::factoryAutoWorkbench);
         registerTest(event, environment, "builders_filler", BCCoreGameTests::buildersFiller);
-        registerTest(event, environment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
+        registerTest(event, buildersSnapshotEnvironment, "builders_snapshot_data", BCCoreGameTests::buildersSnapshotData);
         registerTest(event, environment, "builders_architect_table", BCCoreGameTests::buildersArchitectTable);
         registerTest(event, environment, "builders_builder", BCCoreGameTests::buildersBuilder);
         registerTest(event, environment, "builders_replacer", BCCoreGameTests::buildersReplacer);
@@ -1150,7 +1160,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void rfEngine(GameTestHelper helper) {
-        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.get(),
+        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.getDefault(),
                 "RF Engine should retain its historical disabled default");
         buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.set(true);
         BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
@@ -1184,6 +1194,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(energy.getAmountAsInt() < 1_000, "RF engine did not consume external energy");
         helper.assertTrue(receiver.received > 0, "RF engine did not emit MJ");
         helper.assertTrue(engine.heat() > 20, "RF engine did not heat while converting energy");
+        buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.set(false);
         helper.succeed();
     }
 
@@ -1333,7 +1344,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void mjDynamo(GameTestHelper helper) {
-        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.get(),
+        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.getDefault(),
                 "MJ Dynamo should retain its historical disabled default");
         buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.set(true);
         BlockPos pos = helper.absolutePos(new BlockPos(0, 1, 0));
@@ -1391,7 +1402,8 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         );
         helper.assertValueEqual(drops.size(), 1, "MJ Dynamo returned wrong drop count");
         helper.assertTrue(drops.getFirst().is(buildcraft.energy.BCEnergyItems.MJ_DYNAMO.get()),
-            "MJ Dynamo returned wrong drop item");
+                "MJ Dynamo returned wrong drop item");
+        buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.set(false);
         helper.succeed();
     }
 
@@ -5133,6 +5145,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(adaptors.is(buildcraft.transport.BCTransportItems.PLUG_POWER_ADAPTOR.get())
                         && adaptors.getCount() == 4,
                 "Power Adaptor recipe output");
+        buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.set(false);
         helper.succeed();
     }
 

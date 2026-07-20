@@ -3,6 +3,7 @@ package buildcraft.transport.client.render;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.PipeWireColor;
 import buildcraft.transport.PipeType;
+import buildcraft.transport.BCTransportConfig;
 import buildcraft.transport.block.PipeHolderBlock;
 import buildcraft.transport.item.FacadeAttachment;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -17,6 +18,7 @@ import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.client.renderer.state.level.CameraRenderState;
 import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.sprite.SpriteGetter;
 import net.minecraft.client.resources.model.sprite.SpriteId;
@@ -52,6 +54,23 @@ public final class PipeAttachmentRenderer
         state.stripesDirection = pipe.stripesDirection();
         state.pipeColor = dyeColor(pipe.pipeColor());
         state.shellColor = pipe.shellColor() == null ? 0 : dyeColor(pipe.shellColor());
+        state.shellBorder = !pipe.pipeType().carriesFluids()
+                || BCTransportConfig.FLUID_PIPE_COLOUR_BORDER.get();
+        var fluidBuffer = pipe.fluidBuffer();
+        int fluidAmount = fluidBuffer.getAmountAsInt(0);
+        state.fluidSprite = null;
+        state.fluidLevel = 0;
+        if (fluidAmount > 0 && !fluidBuffer.getResource(0).isEmpty()) {
+            var fluid = fluidBuffer.getResource(0).getFluid();
+            var fluidState = fluid.defaultFluidState();
+            var model = Minecraft.getInstance().getModelManager().getFluidStateModelSet().get(fluidState);
+            state.fluidSprite = model.stillMaterial().sprite();
+            state.fluidColor = pipe.getLevel() instanceof net.minecraft.client.renderer.block.BlockAndTintGetter tintGetter
+                    ? model.fluidTintSource().colorInWorld(
+                            fluidState, fluidState.createLegacyBlock(), tintGetter, pipe.getBlockPos())
+                    : model.fluidTintSource().color(fluidState);
+            state.fluidLevel = Math.clamp(fluidAmount / 1_000.0F, 0.0F, 1.0F);
+        }
         state.showPipeColor = pipe.pipeType() == PipeType.LAPIS_ITEM
                 || pipe.pipeType() == PipeType.DAIZULI_ITEM;
         state.travellingItems.clear();
@@ -99,6 +118,7 @@ public final class PipeAttachmentRenderer
                                  SubmitNodeCollector nodes, CameraRenderState camera) {
         submitWires(state, poseStack, nodes);
         submitShellColor(state, poseStack, nodes);
+        submitFluid(state, poseStack, nodes);
         submitPowerMeter(state, poseStack, nodes);
         submitPipeStateIndicators(state, poseStack, nodes);
         for (int index = 0; index < state.travellingItems.size(); index++) {
@@ -133,10 +153,71 @@ public final class PipeAttachmentRenderer
         }
     }
 
+    private void submitFluid(PipeAttachmentRenderState state, PoseStack poseStack,
+                             SubmitNodeCollector nodes) {
+        if (state.fluidSprite == null || state.fluidLevel <= 0) return;
+        int color = (state.fluidColor & 0x00FFFFFF) | 0xB0000000;
+        float top = 5.0F + 6.0F * state.fluidLevel;
+        nodes.submitCustomGeometry(poseStack, RenderTypes.entityTranslucent(Sheets.BLOCKS_MAPPER.sheet()),
+                (pose, vertices) -> {
+                    fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                            5, 5, 5, 11, top, 11);
+                    if (state.connected[Direction.WEST.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                0, 5, 5, 5, top, 11);
+                    if (state.connected[Direction.EAST.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                11, 5, 5, 16, top, 11);
+                    if (state.connected[Direction.NORTH.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                5, 5, 0, 11, top, 5);
+                    if (state.connected[Direction.SOUTH.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                5, 5, 11, 11, top, 16);
+                    if (state.connected[Direction.DOWN.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                5, 0, 5, 11, 5, 11);
+                    if (state.connected[Direction.UP.ordinal()])
+                        fluidCuboid(vertices, pose, state.fluidSprite, state.lightCoords, color,
+                                5, top, 5, 11, 16, 11);
+                });
+    }
+
+    private static void fluidCuboid(VertexConsumer vertices, PoseStack.Pose pose, TextureAtlasSprite sprite,
+                                    int light, int color, float x1, float y1, float z1,
+                                    float x2, float y2, float z2) {
+        wireQuad(vertices, pose, sprite, light, color, x1, y1, z1, x2, y1, z2, Direction.DOWN);
+        wireQuad(vertices, pose, sprite, light, color, x1, y2, z1, x2, y2, z2, Direction.UP);
+        wireQuad(vertices, pose, sprite, light, color, x1, y1, z1, x2, y2, z1, Direction.NORTH);
+        wireQuad(vertices, pose, sprite, light, color, x1, y1, z2, x2, y2, z2, Direction.SOUTH);
+        wireQuad(vertices, pose, sprite, light, color, x1, y1, z1, x1, y2, z2, Direction.WEST);
+        wireQuad(vertices, pose, sprite, light, color, x2, y1, z1, x2, y2, z2, Direction.EAST);
+    }
+
     private void submitShellColor(PipeAttachmentRenderState state, PoseStack poseStack, SubmitNodeCollector nodes) {
         if (state.shellColor == 0) return;
         TextureAtlasSprite white = sprites.get(Sheets.BLOCKS_MAPPER.apply(
                 Identifier.withDefaultNamespace("block/white_concrete")));
+        if (!state.shellBorder) {
+            int color = (state.shellColor & 0x00FFFFFF) | 0x70000000;
+            nodes.submitCustomGeometry(poseStack, RenderTypes.entityTranslucent(Sheets.BLOCKS_MAPPER.sheet()),
+                    (pose, vertices) -> {
+                        fluidCuboid(vertices, pose, white, state.lightCoords, color, 4, 4, 4, 12, 12, 12);
+                        if (state.connected[Direction.WEST.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 0, 4, 4, 4, 12, 12);
+                        if (state.connected[Direction.EAST.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 12, 4, 4, 16, 12, 12);
+                        if (state.connected[Direction.NORTH.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 4, 4, 0, 12, 12, 4);
+                        if (state.connected[Direction.SOUTH.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 4, 4, 12, 12, 12, 16);
+                        if (state.connected[Direction.DOWN.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 4, 0, 4, 12, 4, 12);
+                        if (state.connected[Direction.UP.ordinal()])
+                            fluidCuboid(vertices, pose, white, state.lightCoords, color, 4, 12, 4, 12, 16, 12);
+                    });
+            return;
+        }
         nodes.submitCustomGeometry(poseStack, RenderTypes.entityCutout(Sheets.BLOCKS_MAPPER.sheet()),
                 (pose, vertices) -> {
                     float west = state.connected[Direction.WEST.ordinal()] ? 0 : 4;

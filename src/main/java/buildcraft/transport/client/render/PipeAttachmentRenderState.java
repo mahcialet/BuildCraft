@@ -2,6 +2,7 @@ package buildcraft.transport.client.render;
 
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 import net.minecraft.world.phys.Vec3;
 
@@ -27,4 +28,8 @@ public final class PipeAttachmentRenderState extends BlockEntityRenderState {
     int pipeColor;
     boolean showPipeColor;
     int shellColor;
+    boolean shellBorder;
+    TextureAtlasSprite fluidSprite;
+    int fluidColor;
+    float fluidLevel;
 }
