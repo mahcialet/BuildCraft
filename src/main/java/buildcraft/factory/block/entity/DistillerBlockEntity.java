@@ -36,6 +36,7 @@ public final class DistillerBlockEntity extends BlockEntity {
     private long distillPower;
     private boolean active;
     private long lastNetworkSync = -100;
+    private boolean networkDirty;
 
     public DistillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCFactoryBlockEntities.DISTILLER.get(), pos, state);
@@ -59,6 +60,7 @@ public final class DistillerBlockEntity extends BlockEntity {
         if (level.isClientSide()) return;
         distiller.battery.tick(level, pos);
         distiller.process();
+        distiller.syncPending();
     }
 
     private void process() {
@@ -130,7 +132,11 @@ public final class DistillerBlockEntity extends BlockEntity {
 
     private void sync() {
         setChanged();
-        if (level != null) level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        networkDirty = false;
+        if (level != null) {
+            lastNetworkSync = level.getGameTime();
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 
     private void syncProgress() {
@@ -140,8 +146,22 @@ public final class DistillerBlockEntity extends BlockEntity {
         if (buildcraft.core.BCCoreConfig.networkUpdateDue(
                 now, lastNetworkSync, buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) {
             lastNetworkSync = now;
+            networkDirty = false;
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
+    }
+
+    private void syncPending() {
+        if (networkDirty) syncProgress();
+    }
+
+    @Override public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
+    getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
     }
 
     @Override protected void loadAdditional(ValueInput valueInput) {
@@ -177,12 +197,12 @@ public final class DistillerBlockEntity extends BlockEntity {
         }
         @Override public int insert(int index, FluidResource resource, int amount, TransactionContext transaction) {
             int inserted = super.insert(index, resource, amount, transaction);
-            if (inserted > 0) setChanged();
+            if (inserted > 0) { setChanged(); networkDirty = true; }
             return inserted;
         }
         @Override public int extract(int index, FluidResource resource, int amount, TransactionContext transaction) {
             int extracted = super.extract(index, resource, amount, transaction);
-            if (extracted > 0) setChanged();
+            if (extracted > 0) { setChanged(); networkDirty = true; }
             return extracted;
         }
     }

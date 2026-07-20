@@ -34,6 +34,8 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
     private final InputHandler inputHandler = new InputHandler();
     private final OutputHandler outputHandler = new OutputHandler();
     private int preparation;
+    private long lastNetworkSync = -100;
+    private boolean networkDirty;
 
     public HeatExchangerBlockEntity(BlockPos pos, BlockState state) {
         super(BCFactoryBlockEntities.HEAT_EXCHANGER.get(), pos, state);
@@ -60,6 +62,7 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
         List<BlockPos> structure = exchanger.findStructure(serverLevel);
         exchanger.applyParts(serverLevel, structure);
         if (!structure.isEmpty() && structure.getFirst().equals(pos)) exchanger.process(serverLevel, structure);
+        exchanger.syncPending(serverLevel);
     }
 
     private List<BlockPos> findStructure(ServerLevel level) {
@@ -106,6 +109,24 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
         }
     }
 
+    private void syncPending(ServerLevel level) {
+        if (!networkDirty || !buildcraft.core.BCCoreConfig.networkUpdateDue(
+                level.getGameTime(), lastNetworkSync,
+                buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        networkDirty = false;
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+    }
+
+    @Override public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
+    getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
     private void process(ServerLevel level, List<BlockPos> structure) {
         HeatExchangerBlockEntity end = level.getBlockEntity(structure.getLast()) instanceof HeatExchangerBlockEntity e
                 ? e : null;
@@ -126,6 +147,7 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
         if (preparation < PREPARE_TICKS) {
             preparation++;
             setChanged();
+            networkDirty = true;
         }
         if (preparation >= PREPARE_TICKS) {
             int maximum = THROUGHPUT[structure.size() - 3];
@@ -160,6 +182,7 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
         if (preparation > 0) {
             preparation--;
             setChanged();
+            networkDirty = true;
         }
     }
 
@@ -208,12 +231,12 @@ public final class HeatExchangerBlockEntity extends BlockEntity {
         }
         @Override public int insert(int index, FluidResource resource, int amount, TransactionContext transaction) {
             int inserted = super.insert(index, resource, amount, transaction);
-            if (inserted > 0) setChanged();
+            if (inserted > 0) { setChanged(); networkDirty = true; }
             return inserted;
         }
         @Override public int extract(int index, FluidResource resource, int amount, TransactionContext transaction) {
             int extracted = super.extract(index, resource, amount, transaction);
-            if (extracted > 0) setChanged();
+            if (extracted > 0) { setChanged(); networkDirty = true; }
             return extracted;
         }
     }

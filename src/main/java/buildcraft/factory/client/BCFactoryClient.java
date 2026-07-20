@@ -4,6 +4,7 @@ import buildcraft.factory.BCFactoryMenus;
 import buildcraft.factory.BCFactoryBlockEntities;
 import buildcraft.factory.client.render.TankRenderer;
 import buildcraft.factory.client.render.DistillerRenderer;
+import buildcraft.factory.client.render.HeatExchangerRenderer;
 import buildcraft.factory.client.screen.AutoWorkbenchScreen;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
@@ -21,5 +22,6 @@ public final class BCFactoryClient {
     private static void registerRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerBlockEntityRenderer(BCFactoryBlockEntities.TANK.get(), TankRenderer::new);
         event.registerBlockEntityRenderer(BCFactoryBlockEntities.DISTILLER.get(), DistillerRenderer::new);
+        event.registerBlockEntityRenderer(BCFactoryBlockEntities.HEAT_EXCHANGER.get(), HeatExchangerRenderer::new);
     }
 }
