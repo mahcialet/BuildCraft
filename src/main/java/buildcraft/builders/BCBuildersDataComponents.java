@@ -1,6 +1,7 @@
 package buildcraft.builders;
 
 import buildcraft.builders.snapshot.SnapshotData;
+import buildcraft.builders.snapshot.SnapshotReference;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.neoforged.bus.api.IEventBus;
@@ -14,7 +15,10 @@ public final class BCBuildersDataComponents {
             DeferredRegister.create(Registries.DATA_COMPONENT_TYPE, BCBuilders.MOD_ID);
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<SnapshotData>> SNAPSHOT =
             COMPONENTS.register("snapshot", () -> DataComponentType.<SnapshotData>builder()
-                    .persistent(SnapshotData.CODEC).build());
+            .persistent(SnapshotData.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<SnapshotReference>> SNAPSHOT_REFERENCE =
+        COMPONENTS.register("snapshot_reference", () -> DataComponentType.<SnapshotReference>builder()
+            .persistent(SnapshotReference.CODEC).build());
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BlockState>> SCHEMATIC_STATE =
             COMPONENTS.register("schematic_state", () -> DataComponentType.<BlockState>builder()
                     .persistent(BlockState.CODEC).build());

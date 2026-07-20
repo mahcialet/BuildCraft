@@ -36,8 +36,10 @@ public final class BCBuildersItems {
             ITEMS.registerItem("filler_planner", FillerPlannerItem::new);
 
     private BCBuildersItems() {}
-    public static ItemStack snapshotStack(SnapshotData snapshot) {
-        return SnapshotItem.apply(new ItemStack(snapshot.kind() == SnapshotKind.BLUEPRINT ? BLUEPRINT.get() : TEMPLATE.get()), snapshot);
+    public static ItemStack snapshotStack(net.minecraft.server.level.ServerLevel level, SnapshotData snapshot) {
+        ItemStack stack = new ItemStack(snapshot.kind() == SnapshotKind.BLUEPRINT ? BLUEPRINT.get() : TEMPLATE.get());
+        return snapshot.blocks().size() > BCBuildersConfig.BLUEPRINT_EXTERNAL_THRESHOLD.get()
+            ? SnapshotItem.applyExternal(stack, snapshot, level) : SnapshotItem.apply(stack, snapshot);
     }
     public static void register(IEventBus bus) {
         ITEMS.addAlias(id("architect"), id("architect_table"));

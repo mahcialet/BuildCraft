@@ -2445,6 +2445,29 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 .orElseThrow().value().assemble(templateRecipe);
         helper.assertTrue(craftedTemplate.is(buildcraft.builders.BCBuildersItems.TEMPLATE.get()),
                 "Template recipe output");
+
+        buildcraft.builders.BCBuildersConfig.BLUEPRINT_EXTERNAL_THRESHOLD.set(1);
+        ItemStack externalStack = buildcraft.builders.BCBuildersItems.snapshotStack(helper.getLevel(), blueprint);
+        buildcraft.builders.BCBuildersConfig.BLUEPRINT_EXTERNAL_THRESHOLD.set(20_000);
+        helper.assertTrue(!externalStack.has(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get()),
+                "large Blueprint was stored inline");
+        var reference = externalStack.get(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT_REFERENCE.get());
+        helper.assertTrue(reference != null, "large Blueprint external reference missing");
+        helper.assertValueEqual(reference.size(), blueprint.size(), "external Blueprint reference size");
+        helper.assertValueEqual(reference.offset(), blueprint.offset(), "external Blueprint reference offset");
+        helper.assertValueEqual(buildcraft.builders.item.SnapshotItem.resolve(externalStack, helper.getLevel()),
+                blueprint, "external Blueprint resolution");
+
+        BlockPos markerPos = helper.absolutePos(new BlockPos(7, 1, 1));
+        helper.getLevel().setBlock(markerPos,
+                buildcraft.builders.BCBuildersBlocks.CONSTRUCTION_MARKER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var marker = (buildcraft.builders.block.entity.ConstructionMarkerBlockEntity)
+                helper.getLevel().getBlockEntity(markerPos);
+        helper.assertTrue(marker.setBlueprint(externalStack), "Construction Marker rejected external Blueprint");
+        helper.assertValueEqual(marker.snapshotMin(), markerPos.offset(blueprint.offset()),
+                "external Blueprint marker minimum");
+        helper.assertValueEqual(marker.snapshotMax(), marker.snapshotMin().offset(blueprint.size()).offset(-1, -1, -1),
+                "external Blueprint marker maximum");
         helper.succeed();
     }
 

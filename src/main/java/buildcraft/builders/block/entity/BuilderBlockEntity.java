@@ -134,7 +134,8 @@ public final class BuilderBlockEntity extends buildcraft.core.block.entity.Owned
 
     private SnapshotData snapshot() {
         if (inventory.getAmountAsLong(0) <= 0) return null;
-        return inventory.getResource(0).toStack(1).get(BCBuildersDataComponents.SNAPSHOT.get());
+        return level == null ? null : buildcraft.builders.item.SnapshotItem.resolve(
+            inventory.getResource(0).toStack(1), level);
     }
     private static BlockPos local(SnapshotData snapshot, int index) {
         int x = index % snapshot.size().getX();

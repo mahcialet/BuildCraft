@@ -3,6 +3,7 @@ package buildcraft.builders.block.entity;
 import buildcraft.builders.BCBuildersBlockEntities;
 import buildcraft.builders.BCBuildersDataComponents;
 import buildcraft.builders.snapshot.SnapshotData;
+import buildcraft.builders.snapshot.SnapshotReference;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -23,9 +24,13 @@ public final class ConstructionMarkerBlockEntity extends BlockEntity {
         super(BCBuildersBlockEntities.CONSTRUCTION_MARKER.get(), pos, state);
     }
     public ItemStack blueprint() { return blueprint; }
-    public SnapshotData snapshot() { return blueprint.get(BCBuildersDataComponents.SNAPSHOT.get()); }
+    public boolean hasSnapshot() { return buildcraft.builders.item.SnapshotItem.hasSnapshot(blueprint); }
+    public SnapshotData snapshot() {
+        SnapshotData inline = blueprint.get(BCBuildersDataComponents.SNAPSHOT.get());
+        return inline != null || level == null ? inline : buildcraft.builders.item.SnapshotItem.resolve(blueprint, level);
+    }
     public boolean setBlueprint(ItemStack stack) {
-        if (!blueprint.isEmpty() || !stack.has(BCBuildersDataComponents.SNAPSHOT.get())) return false;
+        if (!blueprint.isEmpty() || !buildcraft.builders.item.SnapshotItem.hasSnapshot(stack)) return false;
         blueprint = stack.copyWithCount(1);
         sync();
         return true;
@@ -38,11 +43,18 @@ public final class ConstructionMarkerBlockEntity extends BlockEntity {
     }
     public BlockPos snapshotMin() {
         SnapshotData snapshot = snapshot();
-        return snapshot == null ? worldPosition : worldPosition.offset(snapshot.offset());
+        if (snapshot != null) return worldPosition.offset(snapshot.offset());
+        SnapshotReference reference = blueprint.get(BCBuildersDataComponents.SNAPSHOT_REFERENCE.get());
+        return reference == null ? worldPosition : worldPosition.offset(reference.offset());
     }
     public BlockPos snapshotMax() {
         SnapshotData snapshot = snapshot();
-        return snapshot == null ? worldPosition : snapshotMin().offset(snapshot.size()).offset(-1, -1, -1);
+        BlockPos size = snapshot == null ? null : snapshot.size();
+        if (size == null) {
+            SnapshotReference reference = blueprint.get(BCBuildersDataComponents.SNAPSHOT_REFERENCE.get());
+            size = reference == null ? null : reference.size();
+        }
+        return size == null ? worldPosition : snapshotMin().offset(size).offset(-1, -1, -1);
     }
 
     @Override

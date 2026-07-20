@@ -53,6 +53,8 @@ public final class BlueprintLibrarySavedData extends SavedData {
     private static String name(ItemStack stack) {
         SnapshotData snapshot = stack.get(BCBuildersDataComponents.SNAPSHOT.get());
         if (snapshot != null && !snapshot.name().isBlank()) return snapshot.name();
+        var reference = stack.get(BCBuildersDataComponents.SNAPSHOT_REFERENCE.get());
+        if (reference != null && !reference.name().isBlank()) return reference.name();
         var book = stack.get(DataComponents.WRITTEN_BOOK_CONTENT);
         if (book != null && !book.title().raw().isBlank()) return book.title().raw();
         return stack.getHoverName().getString();

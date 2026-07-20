@@ -125,7 +125,8 @@ public final class ArchitectTableBlockEntity extends buildcraft.core.block.entit
     }
 
     private void scan(BlockState machineState) {
-        if (level == null || areaMin == null || areaMax == null || inventory.getAmountAsLong(1) > 0) return;
+        if (!(level instanceof net.minecraft.server.level.ServerLevel server)
+                || areaMin == null || areaMax == null || inventory.getAmountAsLong(1) > 0) return;
         ItemResource input = inventory.getResource(0);
         if (input.isEmpty() || inventory.getAmountAsLong(0) <= 0) {
             resetScan();
@@ -135,7 +136,7 @@ public final class ArchitectTableBlockEntity extends buildcraft.core.block.entit
         if (input.getItem() == BCBuildersItems.BLUEPRINT.get()) kind = SnapshotKind.BLUEPRINT;
         else if (input.getItem() == BCBuildersItems.TEMPLATE.get()) kind = SnapshotKind.TEMPLATE;
         else { resetScan(); return; }
-        if (input.toStack(1).has(BCBuildersDataComponents.SNAPSHOT.get())) return;
+        if (buildcraft.builders.item.SnapshotItem.hasSnapshot(input.toStack(1))) return;
         if (scanningKind != kind) {
             resetScan();
             scanningKind = kind;
@@ -169,7 +170,7 @@ public final class ArchitectTableBlockEntity extends buildcraft.core.block.entit
                 palette, blocks, name, rotate, excavate, allowCreative, scanningCreativeOnly);
         snapshot = composeLinked(snapshot);
         if (rotate) snapshot = snapshot.normalized(captureRotation(facing));
-        ItemStack output = BCBuildersItems.snapshotStack(snapshot);
+        ItemStack output = BCBuildersItems.snapshotStack(server, snapshot);
         inventory.set(1, ItemResource.of(output), 1);
         long remaining = inventory.getAmountAsLong(0) - 1;
         inventory.set(0, remaining > 0 ? input : ItemResource.EMPTY, (int) Math.max(0, remaining));

@@ -60,7 +60,7 @@ public final class ConstructionMarkerBlock extends BaseEntityBlock {
     @Override protected InteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos,
             Player player, net.minecraft.world.InteractionHand hand, BlockHitResult hit) {
         if (level.getBlockEntity(pos) instanceof ConstructionMarkerBlockEntity marker
-                && stack.has(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get())) {
+                && buildcraft.builders.item.SnapshotItem.hasSnapshot(stack)) {
             if (!level.isClientSide() && marker.setBlueprint(stack) && !player.getAbilities().instabuild) stack.shrink(1);
             return InteractionResult.SUCCESS;
         }

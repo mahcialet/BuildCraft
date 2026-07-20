@@ -53,7 +53,7 @@ public final class ArchitectTableMenu extends AbstractContainerMenu {
             addSlot(new ResourceHandlerSlot(table.inventory(), table.inventory()::set, 0, 135, 35) {
                 @Override public boolean mayPlace(ItemStack stack) {
                     return (stack.is(BCBuildersItems.BLUEPRINT.get()) || stack.is(BCBuildersItems.TEMPLATE.get()))
-                            && !stack.has(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get());
+                            && !buildcraft.builders.item.SnapshotItem.hasSnapshot(stack);
                 }
             });
             addSlot(new ResourceHandlerSlot(table.inventory(), table.inventory()::set, 1, 194, 35) {

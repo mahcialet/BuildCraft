@@ -114,11 +114,12 @@ public final class BlueprintLibraryBlockEntity extends BlockEntity {
         inventory.set(slot, remaining > 0 ? inventory.getResource(slot) : ItemResource.EMPTY, (int) Math.max(0, remaining));
     }
     public static boolean isStorable(ItemStack stack) {
-        return stack.has(BCBuildersDataComponents.SNAPSHOT.get()) || stack.has(DataComponents.WRITTEN_BOOK_CONTENT);
+        return buildcraft.builders.item.SnapshotItem.hasSnapshot(stack)
+            || stack.has(DataComponents.WRITTEN_BOOK_CONTENT);
     }
     public static boolean canLoad(ItemStack blank, ItemStack stored) {
-        if (stored.has(BCBuildersDataComponents.SNAPSHOT.get())) {
-            return blank.getItem() == stored.getItem() && !blank.has(BCBuildersDataComponents.SNAPSHOT.get());
+        if (buildcraft.builders.item.SnapshotItem.hasSnapshot(stored)) {
+            return blank.getItem() == stored.getItem() && !buildcraft.builders.item.SnapshotItem.hasSnapshot(blank);
         }
         return stored.has(DataComponents.WRITTEN_BOOK_CONTENT)
                 && (blank.is(Items.WRITABLE_BOOK) || blank.is(Items.WRITTEN_BOOK));

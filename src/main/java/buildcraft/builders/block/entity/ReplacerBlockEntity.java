@@ -30,7 +30,8 @@ public final class ReplacerBlockEntity extends BlockEntity {
     private void replace() {
         if (inventory.getAmountAsLong(0) <= 0 || inventory.getAmountAsLong(1) <= 0 || inventory.getAmountAsLong(2) <= 0) return;
         ItemStack blueprintStack = inventory.getResource(0).toStack(1);
-        SnapshotData blueprint = blueprintStack.get(BCBuildersDataComponents.SNAPSHOT.get());
+        SnapshotData blueprint = level == null ? null
+            : buildcraft.builders.item.SnapshotItem.resolve(blueprintStack, level);
         BlockState from = inventory.getResource(1).toStack(1).get(BCBuildersDataComponents.SCHEMATIC_STATE.get());
         BlockState to = inventory.getResource(2).toStack(1).get(BCBuildersDataComponents.SCHEMATIC_STATE.get());
         if (blueprint == null || !blueprint.valid() || blueprint.kind() != SnapshotKind.BLUEPRINT || from == null || to == null) return;
@@ -43,7 +44,12 @@ public final class ReplacerBlockEntity extends BlockEntity {
         SnapshotData replaced = new SnapshotData(blueprint.kind(), blueprint.size(), blueprint.facing(),
                 blueprint.offset(), palette, blueprint.blocks(), blueprint.name(), blueprint.rotate(),
                 blueprint.excavate(), blueprint.allowCreative(), blueprint.creativeOnly());
-        blueprintStack.set(BCBuildersDataComponents.SNAPSHOT.get(), replaced);
+        if (level instanceof net.minecraft.server.level.ServerLevel server
+                && replaced.blocks().size() > buildcraft.builders.BCBuildersConfig.BLUEPRINT_EXTERNAL_THRESHOLD.get()) {
+            buildcraft.builders.item.SnapshotItem.applyExternal(blueprintStack, replaced, server);
+        } else {
+            buildcraft.builders.item.SnapshotItem.apply(blueprintStack, replaced);
+        }
         inventory.set(0, ItemResource.of(blueprintStack), 1);
         inventory.set(1, ItemResource.EMPTY, 0);
         inventory.set(2, ItemResource.EMPTY, 0);

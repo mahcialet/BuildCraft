@@ -21,8 +21,8 @@ public final class ConstructionMarkerRenderer implements BlockEntityRenderer<Con
     @Override public void extractRenderState(ConstructionMarkerBlockEntity marker, ConstructionMarkerRenderState state,
             float partialTicks, Vec3 cameraPosition, ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
         BlockEntityRenderer.super.extractRenderState(marker, state, partialTicks, cameraPosition, breakProgress);
-        state.min = marker.snapshot() == null ? null : marker.snapshotMin();
-        state.max = marker.snapshot() == null ? null : marker.snapshotMax();
+        state.min = marker.hasSnapshot() ? marker.snapshotMin() : null;
+        state.max = marker.hasSnapshot() ? marker.snapshotMax() : null;
         state.marker = Vec3.atCenterOf(marker.getBlockPos());
         var facing = marker.getBlockState().getValue(ConstructionMarkerBlock.FACING);
         state.direction = state.marker.add(facing.getStepX() * 0.6, facing.getStepY() * 0.6, facing.getStepZ() * 0.6);
@@ -41,7 +41,7 @@ public final class ConstructionMarkerRenderer implements BlockEntityRenderer<Con
     @Override public boolean shouldRenderOffScreen() { return true; }
     @Override public int getViewDistance() { return 96; }
     @Override public AABB getRenderBoundingBox(ConstructionMarkerBlockEntity marker) {
-        return marker.snapshot() == null ? new AABB(marker.getBlockPos())
+        return !marker.hasSnapshot() ? new AABB(marker.getBlockPos())
                 : new AABB(Vec3.atLowerCornerOf(marker.snapshotMin()),
                     Vec3.atLowerCornerOf(marker.snapshotMax()).add(1, 1, 1)).inflate(1);
     }

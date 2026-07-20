@@ -30,8 +30,7 @@ public final class ReplacerMenu extends AbstractContainerMenu {
         if (replacer != null) {
             addSlot(new ResourceHandlerSlot(replacer.inventory(), replacer.inventory()::set, 0, 80, 20) {
                 @Override public boolean mayPlace(ItemStack stack) {
-                    var snapshot = stack.get(BCBuildersDataComponents.SNAPSHOT.get());
-                    return snapshot != null && snapshot.kind() == SnapshotKind.BLUEPRINT;
+                    return buildcraft.builders.item.SnapshotItem.snapshotKind(stack) == SnapshotKind.BLUEPRINT;
                 }
             });
             for (int slot = 1; slot < 3; slot++) addSlot(new ResourceHandlerSlot(
@@ -59,7 +58,7 @@ public final class ReplacerMenu extends AbstractContainerMenu {
         Slot slot = slots.get(slotId); if (!slot.hasItem()) return ItemStack.EMPTY;
         ItemStack original = slot.getItem(); ItemStack moving = original.copy();
         if (slotId < MACHINE_SLOTS) { if (!moveItemStackTo(moving, MACHINE_SLOTS, slots.size(), true)) return ItemStack.EMPTY; }
-        else if (moving.has(BCBuildersDataComponents.SNAPSHOT.get())) { if (!moveItemStackTo(moving, 0, 1, false)) return ItemStack.EMPTY; }
+        else if (buildcraft.builders.item.SnapshotItem.hasSnapshot(moving)) { if (!moveItemStackTo(moving, 0, 1, false)) return ItemStack.EMPTY; }
         else if (!moveItemStackTo(moving, 1, 3, false)) return ItemStack.EMPTY;
         if (moving.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged(); slot.onTake(player, moving); return original;
     }
