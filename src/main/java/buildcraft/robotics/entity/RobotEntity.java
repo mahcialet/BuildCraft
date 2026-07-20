@@ -19,6 +19,7 @@ import buildcraft.robotics.HarvesterPhase;
 import buildcraft.robotics.MinerPhase;
 import buildcraft.robotics.PlanterPhase;
 import buildcraft.robotics.RobotCropHandlerRegistry;
+import buildcraft.robotics.FarmerPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -93,6 +94,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private PlanterPhase planterPhase = PlanterPhase.NONE;
     private int planterDelay;
     private int planterSearchAttempts;
+    private ItemStack farmerTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address farmerToolSource;
+    private BlockPos farmerGroundTarget;
+    private FarmerPhase farmerPhase = FarmerPhase.NONE;
+    private int farmerUseDelay;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -147,6 +153,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack minerTool() { return minerTool.copy(); }
     public PlanterPhase planterPhase() { return planterPhase; }
     public ItemStack planterSeed() { return planterSeed.copy(); }
+    public FarmerPhase farmerPhase() { return farmerPhase; }
+    public ItemStack farmerTool() { return farmerTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -209,6 +217,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.PLANTER
                     && planterPhase == PlanterPhase.NONE && tickCount % 20 == 0) {
                 beginPlanter(serverLevel);
+            } else if (board() == RobotBoardType.FARMER
+                    && farmerPhase == FarmerPhase.NONE && tickCount % 20 == 0) {
+                beginFarmer(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -235,6 +246,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (harvesterPhase != HarvesterPhase.NONE) tickHarvester(serverLevel);
         if (minerPhase != MinerPhase.NONE) tickMiner(serverLevel);
         if (planterPhase != PlanterPhase.NONE) tickPlanter(serverLevel);
+        if (farmerPhase != FarmerPhase.NONE) tickFarmer(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -1386,6 +1398,171 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         planterDelay = 0;
     }
 
+    private void beginFarmer(ServerLevel level) {
+        if (farmerTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findFarmerToolStation(level);
+            if (source.isEmpty()) return;
+            farmerToolSource = source.get();
+            farmerPhase = FarmerPhase.TO_TOOL;
+            leaveStation();
+        } else if (selectFarmerGround(level)) {
+            farmerPhase = FarmerPhase.TO_GROUND;
+            leaveStation();
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findFarmerToolStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.HOES)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadFarmerTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.HOES) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    farmerTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private static boolean isFarmerGround(ServerLevel level, BlockPos position) {
+        return level.getBlockState(position).is(net.minecraft.tags.BlockTags.DIRT)
+                && level.getBlockState(position.above()).canBeReplaced();
+    }
+
+    private boolean selectFarmerGround(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime()
+                ^ getUUID().getLeastSignificantBits() ^ 0x4641524D4552L);
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                if (!isFarmerGround(level, candidate)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        farmerGroundTarget = best;
+        farmerUseDelay = 0;
+        return best != null;
+    }
+
+    private void tickFarmer(ServerLevel level) {
+        if (farmerPhase == FarmerPhase.TO_TOOL) {
+            if (farmerToolSource == null) { farmerPhase = FarmerPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(farmerToolSource))) {
+                loadFarmerTool(level, farmerToolSource);
+                farmerPhase = FarmerPhase.RETURN_HOME;
+            }
+        } else if (farmerPhase == FarmerPhase.TO_GROUND) {
+            if (farmerGroundTarget == null
+                    || !BlockWorkRegistry.reclaim(level, farmerGroundTarget, getUUID())
+                    || !isFarmerGround(level, farmerGroundTarget)) {
+                releaseFarmerGround(level);
+                farmerPhase = FarmerPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(farmerGroundTarget.above()))) {
+                farmerUseDelay = 0;
+                farmerPhase = FarmerPhase.USING_TOOL;
+            }
+        } else if (farmerPhase == FarmerPhase.USING_TOOL) {
+            if (farmerGroundTarget == null || farmerTool.isEmpty()
+                    || !isFarmerGround(level, farmerGroundTarget)) {
+                releaseFarmerGround(level);
+                farmerPhase = FarmerPhase.RETURN_HOME;
+                return;
+            }
+            if (energy() < 8_000) {
+                releaseFarmerGround(level);
+                farmerPhase = FarmerPhase.RETURN_HOME;
+                return;
+            }
+            setEnergy(energy() - 8_000);
+            if (++farmerUseDelay <= 40) return;
+            boolean used = useFarmerTool(level);
+            releaseFarmerGround(level);
+            if (used && !farmerTool.isEmpty() && selectFarmerGround(level)) {
+                farmerPhase = FarmerPhase.TO_GROUND;
+                return;
+            }
+            farmerPhase = FarmerPhase.RETURN_HOME;
+        } else if (farmerPhase == FarmerPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                farmerPhase = FarmerPhase.NONE;
+                farmerToolSource = null;
+            }
+        }
+    }
+
+    private boolean useFarmerTool(ServerLevel level) {
+        if (farmerGroundTarget == null || farmerTool.isEmpty()) return false;
+        var player = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        player.setItemInHand(InteractionHand.MAIN_HAND, farmerTool);
+        net.minecraft.world.phys.BlockHitResult hit = new net.minecraft.world.phys.BlockHitResult(
+                Vec3.atCenterOf(farmerGroundTarget).add(0, 0.5, 0), Direction.UP,
+                farmerGroundTarget, false);
+        return farmerTool.useOn(new net.minecraft.world.item.context.UseOnContext(
+                player, InteractionHand.MAIN_HAND, hit)).consumesAction();
+    }
+
+    private void releaseFarmerGround(ServerLevel level) {
+        if (farmerGroundTarget != null) {
+            BlockWorkRegistry.release(level, farmerGroundTarget, getUUID());
+            farmerGroundTarget = null;
+        }
+        farmerUseDelay = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -1549,6 +1726,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseHarvesterBlock(serverLevel);
         releaseMinerBlock(serverLevel);
         releasePlanterGround(serverLevel);
+        releaseFarmerGround(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -1557,6 +1735,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!lumberjackTool.isEmpty()) spawnAtLocation(serverLevel, lumberjackTool.copy());
         if (!minerTool.isEmpty()) spawnAtLocation(serverLevel, minerTool.copy());
         if (!planterSeed.isEmpty()) spawnAtLocation(serverLevel, planterSeed.copy());
+        if (!farmerTool.isEmpty()) spawnAtLocation(serverLevel, farmerTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -1576,6 +1755,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseHarvesterBlock(level);
             releaseMinerBlock(level);
             releasePlanterGround(level);
+            releaseFarmerGround(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -1583,6 +1763,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!lumberjackTool.isEmpty()) spawnAtLocation(level, lumberjackTool.copy());
             if (!minerTool.isEmpty()) spawnAtLocation(level, minerTool.copy());
             if (!planterSeed.isEmpty()) spawnAtLocation(level, planterSeed.copy());
+            if (!farmerTool.isEmpty()) spawnAtLocation(level, farmerTool.copy());
             discard();
         }
         return true;
@@ -1653,6 +1834,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (planterGroundTarget != null) output.putLong("PlanterGround", planterGroundTarget.asLong());
         output.putInt("PlanterDelay", planterDelay);
         output.putInt("PlanterSearchAttempts", planterSearchAttempts);
+        if (!farmerTool.isEmpty()) output.store("FarmerTool", ItemStack.CODEC, farmerTool);
+        output.putInt("FarmerPhase", farmerPhase.ordinal());
+        if (farmerToolSource != null) {
+            output.putLong("FarmerSourcePos", farmerToolSource.pipePos().asLong());
+            output.putInt("FarmerSourceSide", farmerToolSource.side().get3DDataValue());
+        }
+        if (farmerGroundTarget != null) output.putLong("FarmerGround", farmerGroundTarget.asLong());
+        output.putInt("FarmerUseDelay", farmerUseDelay);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -1800,6 +1989,26 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if ((planterPhase == PlanterPhase.TO_GROUND || planterPhase == PlanterPhase.PLANTING)
                 && planterGroundTarget == null) planterPhase = PlanterPhase.RETURN_HOME;
+        farmerTool = input.read("FarmerTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int farmerOrdinal = input.getIntOr("FarmerPhase", FarmerPhase.NONE.ordinal());
+        FarmerPhase[] farmerPhases = FarmerPhase.values();
+        farmerPhase = farmerOrdinal >= 0 && farmerOrdinal < farmerPhases.length
+                ? farmerPhases[farmerOrdinal] : FarmerPhase.NONE;
+        if (input.getLong("FarmerSourcePos").isPresent()) {
+            farmerToolSource = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("FarmerSourcePos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "FarmerSourceSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("FarmerGround").isPresent()) {
+            farmerGroundTarget = BlockPos.of(input.getLongOr("FarmerGround", 0));
+        }
+        farmerUseDelay = Math.clamp(input.getIntOr("FarmerUseDelay", 0), 0, 41);
+        if (farmerPhase == FarmerPhase.TO_TOOL && farmerToolSource == null) {
+            farmerPhase = FarmerPhase.RETURN_HOME;
+        }
+        if ((farmerPhase == FarmerPhase.TO_GROUND || farmerPhase == FarmerPhase.USING_TOOL)
+                && farmerGroundTarget == null) farmerPhase = FarmerPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

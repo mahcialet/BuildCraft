@@ -113,6 +113,8 @@ public final class BCCoreGameTests {
             event.registerEnvironment(id("robotics_miner"));
         Holder<TestEnvironmentDefinition<?>> planterEnvironment =
             event.registerEnvironment(id("robotics_planter"));
+        Holder<TestEnvironmentDefinition<?>> farmerEnvironment =
+            event.registerEnvironment(id("robotics_farmer"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -122,6 +124,8 @@ public final class BCCoreGameTests {
             BCCoreGameTests::roboticsMinerRobot);
         registerTest(event, planterEnvironment, "robotics_planter_robot",
             BCCoreGameTests::roboticsPlanterRobot);
+        registerTest(event, farmerEnvironment, "robotics_farmer_robot",
+            BCCoreGameTests::roboticsFarmerRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7403,6 +7407,72 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Planter scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Planter work consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsFarmerRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 60, 1);
+        BlockPos sourceRelative = new BlockPos(2, 60, 1);
+        BlockPos targetRelative = new BlockPos(3, 60, 1);
+        BlockPos excludedRelative = new BlockPos(3, 60, 2);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(targetRelative, Blocks.DIRT);
+        helper.setBlock(excludedRelative, Blocks.DIRT);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        net.minecraft.world.Container sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        ItemStack finalUseHoe = new ItemStack(Items.WOODEN_HOE);
+        finalUseHoe.setDamageValue(finalUseHoe.getMaxDamage() - 1);
+        sourceChest.setItem(0, finalUseHoe);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.FARMER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Farmer failed to dock at its home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1_000 && (!helper.getBlockState(targetRelative).is(Blocks.FARMLAND)
+                || robot.farmerPhase() != buildcraft.robotics.FarmerPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(targetRelative).is(Blocks.FARMLAND),
+                "Farmer did not till zoned dirt: phase=" + robot.farmerPhase()
+                        + ", task=" + robot.taskState() + ", tool=" + robot.farmerTool());
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.DIRT),
+                "Farmer tilled dirt outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Farmer did not extract exactly one hoe");
+        helper.assertTrue(robot.farmerTool().isEmpty(), "Farmer retained a broken hoe");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Farmer did not return home");
+        helper.assertValueEqual(buildcraft.robotics.FarmerPhase.NONE, robot.farmerPhase(),
+                "Farmer scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Farmer work consumed no battery energy");
         helper.succeed();
     }
 
