@@ -77,6 +77,8 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     private Direction.Axis shapeAxis = Direction.Axis.Y;
     private int shapeRotation;
     private transient FillerShape2d.Mask shape2dMask;
+    private long lastNetworkSync = -100;
+    private int lastClientCursor = Integer.MIN_VALUE;
 
     public FillerBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.FILLER.get(), pos, state);
@@ -88,6 +90,14 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
     public @Nullable BlockPos areaMin() { return areaMin; }
     public @Nullable BlockPos areaMax() { return areaMax; }
     public int cursor() { return cursor; }
+    public @Nullable BlockPos cursorPosition() {
+        if (areaMin == null || areaMax == null) return null;
+        int sx = areaMax.getX() - areaMin.getX() + 1;
+        int sy = areaMax.getY() - areaMin.getY() + 1;
+        int volume = sx * sy * (areaMax.getZ() - areaMin.getZ() + 1);
+        if (cursor < 0 || cursor >= volume) return null;
+        return areaMin.offset(cursor % sx, (cursor / sx) % sy, cursor / (sx * sy));
+    }
     public boolean finished() { return finished; }
     public FillerPattern pattern() { return pattern; }
     public Direction verticalDirection() { return verticalDirection; }
@@ -105,6 +115,16 @@ public final class FillerBlockEntity extends BlockEntity implements IHasWork, IC
         filler.battery.tick(level, pos);
         filler.refreshArea(serverLevel);
         filler.fillNext(serverLevel);
+        filler.syncCursor(serverLevel);
+    }
+
+    private void syncCursor(ServerLevel level) {
+        if (cursor == lastClientCursor) return;
+        if (!buildcraft.core.BCCoreConfig.networkUpdateDue(level.getGameTime(), lastNetworkSync,
+                buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        lastClientCursor = cursor;
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
     }
 
     private void refreshArea(ServerLevel level) {

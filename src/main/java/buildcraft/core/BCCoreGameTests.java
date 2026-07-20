@@ -2604,6 +2604,14 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         builder.inventory().set(1, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.STONE), 1);
         builder.inventory().set(2, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.OAK_STAIRS), 1);
         builder.inventory().set(3, net.neoforged.neoforge.transfer.item.ItemResource.of(Items.GLASS), 1);
+        helper.assertValueEqual(builder.areaMin(), builderPos.offset(2, 0, 0),
+                "Builder render bounds minimum");
+        helper.assertValueEqual(builder.areaMax(), builderPos.offset(3, 0, 1),
+                "Builder render bounds maximum");
+        helper.assertValueEqual(builder.cursorPosition(), builderPos.offset(2, 0, 0),
+                "Builder render cursor position");
+        helper.assertTrue(builder.getUpdatePacket() != null,
+                "Builder did not expose a client update packet");
         BlockPos first = builderPos.offset(2, 0, 0);
         BlockPos stairs = builderPos.offset(3, 0, 0);
         BlockPos glass = builderPos.offset(3, 0, 1);

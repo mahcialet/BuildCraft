@@ -50,6 +50,8 @@ public final class ArchitectTableBlockEntity extends buildcraft.core.block.entit
     private boolean excavate = true;
     private boolean allowCreative;
     private boolean scanningCreativeOnly;
+    private long lastNetworkSync = -100;
+    private int lastClientCursor = Integer.MIN_VALUE;
 
     public ArchitectTableBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.ARCHITECT_TABLE.get(), pos, state);
@@ -95,6 +97,16 @@ public final class ArchitectTableBlockEntity extends buildcraft.core.block.entit
         if (!(level instanceof ServerLevel serverLevel)) return;
         table.refreshArea(serverLevel);
         table.scan(state);
+        table.syncScanProgress(serverLevel);
+    }
+
+    private void syncScanProgress(ServerLevel level) {
+        if (cursor == lastClientCursor) return;
+        if (!buildcraft.core.BCCoreConfig.networkUpdateDue(level.getGameTime(), lastNetworkSync,
+                buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        lastClientCursor = cursor;
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
     }
 
     public boolean configureArea(BlockPos min, BlockPos max) {

@@ -46,6 +46,9 @@ public final class BuilderBlockEntity extends buildcraft.core.block.entity.Owned
     private int activeHash;
     private boolean passIncorrect;
     private boolean finished;
+    private long lastNetworkSync = -100;
+    private int lastClientCursor = Integer.MIN_VALUE;
+    private ItemStack lastClientSnapshot = ItemStack.EMPTY;
 
     public BuilderBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.BUILDER.get(), pos, state);
@@ -63,6 +66,68 @@ public final class BuilderBlockEntity extends buildcraft.core.block.entity.Owned
         if (!(level instanceof ServerLevel serverLevel)) return;
         builder.battery.tick(level, pos);
         builder.buildNext(serverLevel);
+        builder.syncClientState(serverLevel);
+    }
+
+    public @org.jspecify.annotations.Nullable BlockPos areaMin() { return areaBounds()[0]; }
+    public @org.jspecify.annotations.Nullable BlockPos areaMax() { return areaBounds()[1]; }
+    public @org.jspecify.annotations.Nullable BlockPos cursorPosition() {
+        SnapshotGeometry geometry = snapshotGeometry();
+        if (geometry == null) return null;
+        int volume = geometry.size.getX() * geometry.size.getY() * geometry.size.getZ();
+        if (cursor < 0 || cursor >= volume) return null;
+        BlockPos local = new BlockPos(cursor % geometry.size.getX(),
+                (cursor / geometry.size.getX()) % geometry.size.getY(),
+                cursor / (geometry.size.getX() * geometry.size.getY()));
+        return worldPosition.offset(geometry.offset.rotate(rotation)).offset(local.rotate(rotation));
+    }
+
+    private BlockPos[] areaBounds() {
+        SnapshotGeometry geometry = snapshotGeometry();
+        if (geometry == null) return new BlockPos[] {null, null};
+        BlockPos origin = worldPosition.offset(geometry.offset.rotate(rotation));
+        BlockPos far = origin.offset(new BlockPos(
+                geometry.size.getX() - 1, geometry.size.getY() - 1, geometry.size.getZ() - 1).rotate(rotation));
+        return new BlockPos[] {
+                new BlockPos(Math.min(origin.getX(), far.getX()), Math.min(origin.getY(), far.getY()),
+                        Math.min(origin.getZ(), far.getZ())),
+                new BlockPos(Math.max(origin.getX(), far.getX()), Math.max(origin.getY(), far.getY()),
+                        Math.max(origin.getZ(), far.getZ()))
+        };
+    }
+
+    private @org.jspecify.annotations.Nullable SnapshotGeometry snapshotGeometry() {
+        if (inventory.getAmountAsInt(0) <= 0) return null;
+        ItemStack stack = inventory.getResource(0).toStack(1);
+        SnapshotData inline = stack.get(BCBuildersDataComponents.SNAPSHOT.get());
+        if (inline != null) return new SnapshotGeometry(inline.size(), inline.offset());
+        buildcraft.builders.snapshot.SnapshotReference reference =
+                stack.get(BCBuildersDataComponents.SNAPSHOT_REFERENCE.get());
+        return reference == null ? null : new SnapshotGeometry(reference.size(), reference.offset());
+    }
+
+    private record SnapshotGeometry(BlockPos size, BlockPos offset) {}
+
+    private void syncClientState(ServerLevel level) {
+        ItemStack current = inventory.getAmountAsInt(0) <= 0
+                ? ItemStack.EMPTY : inventory.getResource(0).toStack(1);
+        boolean snapshotChanged = !ItemStack.isSameItemSameComponents(current, lastClientSnapshot);
+        if (!snapshotChanged && cursor == lastClientCursor) return;
+        if (!buildcraft.core.BCCoreConfig.networkUpdateDue(level.getGameTime(), lastNetworkSync,
+                buildcraft.core.BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        lastClientSnapshot = current.copy();
+        lastClientCursor = cursor;
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+    }
+
+    @Override public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
+    getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
     }
 
     private void buildNext(ServerLevel level) {
