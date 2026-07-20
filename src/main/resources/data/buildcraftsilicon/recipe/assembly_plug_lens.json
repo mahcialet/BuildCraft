@@ -1,0 +1,1 @@
+{"type":"buildcraftsilicon:assembly","ingredients":["minecraft:glass"],"result":{"id":"buildcraftsilicon:plug_lens","components":{"buildcraftsilicon:lens_filter":false,"minecraft:item_model":"buildcraftsilicon:plug_lens"}},"mj":500}

@@ -107,6 +107,7 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> fillerGateEnvironment = event.registerEnvironment(id("filler_gate_patterns"));
         Holder<TestEnvironmentDefinition<?>> roboticsGateListEnvironment = event.registerEnvironment(id("robotics_gate_lists"));
         Holder<TestEnvironmentDefinition<?>> transportCreativeEnvironment = event.registerEnvironment(id("transport_creative"));
+        Holder<TestEnvironmentDefinition<?>> siliconLensEnvironment = event.registerEnvironment(id("silicon_lens_variants"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -245,6 +246,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         registerTest(event, fillerGateEnvironment, "builders_filler_gate_patterns", BCCoreGameTests::buildersFillerGatePatterns);
         registerTest(event, roboticsGateListEnvironment, "robotics_gate_list_parameters", BCCoreGameTests::roboticsGateListParameters);
         registerTest(event, transportCreativeEnvironment, "transport_creative_pipe_entries", BCCoreGameTests::transportCreativePipeEntries);
+        registerTest(event, siliconLensEnvironment, "silicon_lens_variants", BCCoreGameTests::siliconLensVariants);
         registerTest(event, environment, "silicon_pipe_attachments", BCCoreGameTests::siliconPipeAttachments);
         registerTest(event, environment, "silicon_pulsar_gate", BCCoreGameTests::siliconPulsarGate);
         registerTest(event, environment, "transport_wood_fluid_pipe", BCCoreGameTests::transportWoodFluidPipe);
@@ -6000,6 +6002,43 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         }
         helper.assertValueEqual(java.util.EnumSet.allOf(buildcraft.transport.PipeType.class), types,
                 "creative pipe list does not contain every registered PipeType");
+        helper.succeed();
+    }
+
+    private static void siliconLensVariants(GameTestHelper helper) {
+        var variants = buildcraft.silicon.BCSiliconItems.lensVariants();
+        helper.assertValueEqual(34, variants.size(), "creative tab did not expose all historical Lens variants");
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        for (ItemStack stack : variants) {
+            var color = java.util.Optional.ofNullable(stack.get(
+                    buildcraft.silicon.BCSiliconDataComponents.LENS_COLOR.get()));
+            boolean filter = stack.getOrDefault(
+                    buildcraft.silicon.BCSiliconDataComponents.LENS_FILTER.get(), false);
+            helper.assertTrue(keys.add(color.map(DyeColor::getName).orElse("clear") + ":" + filter),
+                    "creative tab contains a duplicate Lens variant");
+            var attachment = (buildcraft.transport.item.LensAttachment) stack.getItem();
+            helper.assertValueEqual(color, attachment.lensColor(stack),
+                    "Lens attachment lost its optional colour");
+        }
+
+        var clearLensInput = new buildcraft.silicon.recipe.AssemblyRecipeInput(
+                java.util.List.of(new ItemStack(Blocks.GLASS)), null);
+        ItemStack clearLens = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                buildcraft.silicon.BCSiliconRecipes.ASSEMBLY_TYPE.get(), clearLensInput, helper.getLevel())
+                .orElseThrow().value().assemble(clearLensInput);
+        helper.assertTrue(clearLens.is(buildcraft.silicon.BCSiliconItems.PLUG_LENS.get())
+                        && clearLens.get(buildcraft.silicon.BCSiliconDataComponents.LENS_COLOR.get()) == null
+                        && !clearLens.getOrDefault(buildcraft.silicon.BCSiliconDataComponents.LENS_FILTER.get(), false),
+                "clear Lens assembly recipe returned the wrong variant");
+        var clearFilterInput = new buildcraft.silicon.recipe.AssemblyRecipeInput(
+                java.util.List.of(new ItemStack(Blocks.GLASS), new ItemStack(Blocks.IRON_BARS)), null);
+        ItemStack clearFilter = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                buildcraft.silicon.BCSiliconRecipes.ASSEMBLY_TYPE.get(), clearFilterInput, helper.getLevel())
+                .orElseThrow().value().assemble(clearFilterInput);
+        helper.assertTrue(clearFilter.getOrDefault(
+                        buildcraft.silicon.BCSiliconDataComponents.LENS_FILTER.get(), false)
+                        && clearFilter.get(buildcraft.silicon.BCSiliconDataComponents.LENS_COLOR.get()) == null,
+                "clear Filter assembly recipe returned the wrong variant");
         helper.succeed();
     }
 

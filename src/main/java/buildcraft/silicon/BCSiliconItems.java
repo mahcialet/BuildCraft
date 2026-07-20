@@ -56,13 +56,25 @@ public final class BCSiliconItems {
     public static final DeferredItem<?> PROGRAMMING_TABLE =
         ITEMS.registerSimpleBlockItem("programming_table", BCSiliconBlocks.PROGRAMMING_TABLE);
 
-    public static ItemStack lens(DyeColor color, boolean filter) {
+    public static ItemStack lens(@org.jspecify.annotations.Nullable DyeColor color, boolean filter) {
         ItemStack stack = new ItemStack(PLUG_LENS.get());
-        stack.set(BCSiliconDataComponents.LENS_COLOR.get(), color);
+        if (color != null) stack.set(BCSiliconDataComponents.LENS_COLOR.get(), color);
         stack.set(BCSiliconDataComponents.LENS_FILTER.get(), filter);
         stack.set(DataComponents.ITEM_MODEL, Identifier.fromNamespaceAndPath(
-                BCSilicon.MOD_ID, "plug_" + (filter ? "filter_" : "lens_") + color.getName()));
+                BCSilicon.MOD_ID, "plug_" + (filter ? "filter" : "lens")
+                        + (color == null ? "" : "_" + color.getName())));
         return stack;
+    }
+
+    public static java.util.List<ItemStack> lensVariants() {
+        java.util.List<ItemStack> variants = new java.util.ArrayList<>(34);
+        variants.add(lens(null, false));
+        variants.add(lens(null, true));
+        for (DyeColor color : DyeColor.values()) {
+            variants.add(lens(color, false));
+            variants.add(lens(color, true));
+        }
+        return java.util.List.copyOf(variants);
     }
 
     public static ItemStack facade(BlockState state) {

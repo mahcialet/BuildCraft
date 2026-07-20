@@ -672,7 +672,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private Optional<DyeColor> paintWithLens(Direction side, Optional<DyeColor> color) {
         ItemStack stack = attachment(side);
         if (stack.getItem() instanceof LensAttachment lens && !lens.isFilter(stack)) {
-            return Optional.of(lens.lensColor(stack));
+            return lens.lensColor(stack);
         }
         return color;
     }
@@ -680,13 +680,13 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private boolean lensAllows(Direction side, Optional<DyeColor> color) {
         ItemStack stack = attachment(side);
         if (!(stack.getItem() instanceof LensAttachment lens) || !lens.isFilter(stack)) return true;
-        return color.isEmpty() || color.get() == lens.lensColor(stack);
+        return color.equals(lens.lensColor(stack));
     }
 
     private int lensPriority(Direction side, Optional<DyeColor> color) {
         ItemStack stack = attachment(side);
         if (!(stack.getItem() instanceof LensAttachment lens) || !lens.isFilter(stack)) return 0;
-        return color.filter(lens.lensColor(stack)::equals).isPresent() ? 1 : -1;
+        return color.equals(lens.lensColor(stack)) ? 1 : -1;
     }
 
     private @Nullable Direction chooseDestination(ServerLevel level, Direction from, Optional<Direction> blocked,
