@@ -1026,6 +1026,14 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
             helper.absolutePos(BlockPos.ZERO), net.minecraft.core.Direction.UP
         ), "oil ignored the disabled burning setting");
         buildcraft.energy.BCEnergyConfig.OIL_CAN_BURN.set(true);
+        helper.assertFalse(BCEnergyFluids.OIL_BLOCK.get().isSticky(),
+            "oil should retain its historical non-dense default");
+        buildcraft.energy.BCEnergyConfig.OIL_IS_DENSE.set(true);
+        helper.assertTrue(BCEnergyFluids.OIL_BLOCK.get().isSticky()
+                && BCEnergyFluids.refineryFluid("oil_residue").heat(0).block().get().isSticky()
+                && !BCEnergyFluids.refineryFluid("fuel_light").heat(0).block().get().isSticky(),
+            "dense-oil setting did not target only historical sticky fluids");
+        buildcraft.energy.BCEnergyConfig.OIL_IS_DENSE.set(false);
         helper.assertTrue(BCEnergyFluids.OIL_BUCKET.get().getContent() == BCEnergyFluids.OIL.get(),
             "oil bucket has the wrong fluid");
         helper.assertTrue(BCEnergyFluids.FUEL_LIGHT_BUCKET.get().getContent() == BCEnergyFluids.FUEL_LIGHT.get(),

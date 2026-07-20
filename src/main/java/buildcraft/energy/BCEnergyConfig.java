@@ -10,6 +10,7 @@ public final class BCEnergyConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_OIL_GENERATION;
     public static final ModConfigSpec.BooleanValue ENABLE_OIL_SPOUTS;
     public static final ModConfigSpec.BooleanValue OIL_CAN_BURN;
+    public static final ModConfigSpec.BooleanValue OIL_IS_DENSE;
     public static final ModConfigSpec.BooleanValue ENABLE_RF_ENGINE;
     public static final ModConfigSpec.BooleanValue ENABLE_MJ_DYNAMO;
     public static final ModConfigSpec.DoubleValue OIL_GENERATION_RATE;
@@ -24,6 +25,7 @@ public final class BCEnergyConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("general");
+        OIL_IS_DENSE = builder.define("oilIsDense", false);
         ENABLE_RF_ENGINE = builder.define("enableRfEngine", false);
         ENABLE_MJ_DYNAMO = builder.define("enableMjDynamo", false);
         builder.pop();

@@ -74,6 +74,7 @@ public final class BCEnergyFluids {
     public static final DeferredBlock<BuildCraftLiquidBlock> OIL_BLOCK = BLOCKS.registerBlock("fluid_block_oil_heat_0",
         properties -> new BuildCraftLiquidBlock(BCEnergyFluids::oil,
             () -> BCEnergyConfig.OIL_CAN_BURN.get(),
+            () -> BCEnergyConfig.OIL_IS_DENSE.get(),
             properties.mapColor(net.minecraft.world.level.material.MapColor.COLOR_BLACK)
                 .replaceable().noCollision().strength(100).pushReaction(PushReaction.DESTROY)
                 .noLootTable().liquid()));
@@ -184,7 +185,11 @@ public final class BCEnergyFluids {
         sourceRef.set(source);
         flowingRef.set(flowing);
         var block = BLOCKS.registerBlock("fluid_block_" + baseName + "_heat_" + heat,
-            properties -> new BuildCraftLiquidBlock(() -> source.get(), flammable,
+            properties -> new BuildCraftLiquidBlock(() -> source.get(),
+                () -> flammable && BCEnergyConfig.OIL_CAN_BURN.get(),
+                () -> BCEnergyConfig.OIL_IS_DENSE.get()
+                    && (baseName.equals("oil_residue") || baseName.equals("oil_heavy")
+                        || baseName.equals("oil_dense")),
                 properties.mapColor(color).replaceable().noCollision().strength(100)
                     .pushReaction(PushReaction.DESTROY).noLootTable().liquid()));
         blockRef.set(block);
