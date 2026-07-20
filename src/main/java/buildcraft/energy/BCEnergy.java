@@ -12,6 +12,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
+import net.neoforged.neoforge.common.NeoForge;
 
 /** Energy module bootstrap, beginning with its always-present fluid foundation. */
 @Mod(BCEnergy.MOD_ID)
@@ -25,6 +26,8 @@ public final class BCEnergy {
         BCEnergyBlockEntities.register(modBus);
         BCEnergyMenus.register(modBus);
         BCEnergyItems.register(modBus);
+        NeoForge.EVENT_BUS.addListener(buildcraft.energy.gen.OilBiomeReplacement::serverStarting);
+        NeoForge.EVENT_BUS.addListener(buildcraft.energy.gen.OilBiomeReplacement::serverStopped);
         modBus.addListener(this::addCreativeTabContents);
         modBus.addListener(this::commonSetup);
         EnumSpring.OIL.setLiquidBlock(() -> BCEnergyFluids.OIL_BLOCK.get().defaultBlockState());

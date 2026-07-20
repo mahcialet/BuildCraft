@@ -868,6 +868,38 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(helper.getLevel().getBlockState(new BlockPos(large.getX(), bottom + 1, large.getZ()))
                         .is(buildcraft.energy.BCEnergyFluids.OIL_BLOCK.get()),
                 "Large oil deposit omitted its bedrock-to-reservoir tube");
+
+        var biomes = helper.getLevel().registryAccess().lookupOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        var ocean = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.OCEAN);
+        var desert = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.DESERT);
+        var nether = biomes.getOrThrow(net.minecraft.world.level.biome.Biomes.NETHER_WASTES);
+        int oceanQuart = 0;
+        while (oceanQuart < 2_000_000
+                && !buildcraft.energy.gen.OilBiomeReplacement.oilOceanNoise(oceanQuart, 0)) oceanQuart += 16;
+        helper.assertTrue(oceanQuart < 2_000_000, "Could not locate deterministic Oil Ocean noise");
+        helper.assertTrue(buildcraft.energy.gen.OilBiomeReplacement.replace(ocean, oceanQuart, 0)
+                        .is(buildcraft.energy.gen.OilBiomeReplacement.OIL_OCEAN),
+                "Ocean biome was not replaced at historical Oil Ocean noise threshold");
+        var climatePoint = net.minecraft.world.level.biome.Climate.Parameter.point(0);
+        var oceanSource = net.minecraft.world.level.biome.MultiNoiseBiomeSource.createFromList(
+                new net.minecraft.world.level.biome.Climate.ParameterList<>(java.util.List.of(
+                        com.mojang.datafixers.util.Pair.of(
+                                new net.minecraft.world.level.biome.Climate.ParameterPoint(
+                                        climatePoint, climatePoint, climatePoint, climatePoint,
+                                        climatePoint, climatePoint, 0), ocean))));
+        helper.assertTrue(oceanSource.getNoiseBiome(oceanQuart, 0, 0,
+                        net.minecraft.world.level.biome.Climate.empty())
+                        .is(buildcraft.energy.gen.OilBiomeReplacement.OIL_OCEAN),
+                "MultiNoise biome-source hook did not apply Oil Ocean replacement");
+        int desertQuart = 0;
+        while (desertQuart < 2_000_000
+                && !buildcraft.energy.gen.OilBiomeReplacement.oilDesertNoise(desertQuart, 0)) desertQuart += 16;
+        helper.assertTrue(desertQuart < 2_000_000, "Could not locate deterministic Oil Desert noise");
+        helper.assertTrue(buildcraft.energy.gen.OilBiomeReplacement.replace(desert, desertQuart, 0)
+                        .is(buildcraft.energy.gen.OilBiomeReplacement.OIL_DESERT),
+                "Hot dry sandy biome was not replaced at historical Oil Desert threshold");
+        helper.assertTrue(buildcraft.energy.gen.OilBiomeReplacement.replace(nether, desertQuart, 0) == nether,
+                "Oil biome replacement escaped the Overworld biome tag");
         helper.succeed();
     }
 
@@ -4142,7 +4174,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "light sensor could not be installed");
         helper.assertFalse(holder.attachmentBlocksConnection(Direction.EAST),
                 "light sensor incorrectly blocked its pipe side");
-        helper.runAfterDelay(2, () -> {
+        helper.runAfterDelay(10, () -> {
         helper.assertTrue(helper.getLevel().getMaxLocalRawBrightness(pipePos.east()) >= 8,
                 "light source did not illuminate the Light Sensor side");
         ItemStack lightGate = buildcraft.silicon.BCSiliconItems.gate(

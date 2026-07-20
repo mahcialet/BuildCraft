@@ -2,6 +2,9 @@ modLoader="javafml"
 loaderVersion="[1,)"
 license="MPL-2.0"
 
+[[mixins]]
+config="buildcraft.mixins.json"
+
 [[mods]]
 modId="buildcraftcore"
 version="${file.jarVersion}"
