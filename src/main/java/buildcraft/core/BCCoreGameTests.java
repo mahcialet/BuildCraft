@@ -109,11 +109,15 @@ public final class BCCoreGameTests {
             event.registerEnvironment(id("robotics_lumberjack"));
         Holder<TestEnvironmentDefinition<?>> harvesterEnvironment =
             event.registerEnvironment(id("robotics_harvester"));
+        Holder<TestEnvironmentDefinition<?>> minerEnvironment =
+            event.registerEnvironment(id("robotics_miner"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
         registerTest(event, harvesterEnvironment, "robotics_harvester_robot",
             BCCoreGameTests::roboticsHarvesterRobot);
+        registerTest(event, minerEnvironment, "robotics_miner_robot",
+            BCCoreGameTests::roboticsMinerRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7232,6 +7236,103 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 new net.minecraft.world.phys.AABB(mature).inflate(3),
                 item -> item.getItem().is(Items.WHEAT) || item.getItem().is(Items.WHEAT_SEEDS)).isEmpty(),
                 "Harvester did not preserve crop drops");
+        helper.succeed();
+    }
+
+    private static void roboticsMinerRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 36, 1);
+        BlockPos sourceRelative = new BlockPos(2, 36, 1);
+        BlockPos receiverRelative = new BlockPos(3, 36, 1);
+        BlockPos ironRelative = new BlockPos(4, 36, 1);
+        BlockPos diamondRelative = new BlockPos(5, 36, 1);
+        BlockPos excludedRelative = new BlockPos(4, 36, 2);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        helper.setBlock(ironRelative, Blocks.IRON_ORE);
+        helper.setBlock(diamondRelative, Blocks.DIAMOND_ORE);
+        helper.setBlock(excludedRelative, Blocks.IRON_ORE);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        BlockPos iron = helper.absolutePos(ironRelative);
+        BlockPos diamond = helper.absolutePos(diamondRelative);
+        workZone.set(iron.getX(), iron.getZ(), true);
+        workZone.set(diamond.getX(), diamond.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        net.minecraft.world.Container sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenPickaxe = new ItemStack(Items.STONE_PICKAXE);
+        nearlyBrokenPickaxe.setDamageValue(nearlyBrokenPickaxe.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenPickaxe);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.MINER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Miner failed to dock at its home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1_500 && (!helper.getBlockState(ironRelative).isAir()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.minerPhase() != buildcraft.robotics.MinerPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(ironRelative).isAir(),
+                "Miner did not mine the reachable zoned ore: phase=" + robot.minerPhase()
+                        + ", task=" + robot.taskState() + ", tool=" + robot.minerTool());
+        helper.assertTrue(helper.getBlockState(diamondRelative).is(Blocks.DIAMOND_ORE),
+                "Miner ignored its pickaxe harvest tier");
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.IRON_ORE),
+                "Miner mined ore outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Miner did not extract exactly one pickaxe");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.STONE_PICKAXE)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Miner did not apply durability and unload its worn pickaxe");
+        helper.assertTrue(robot.minerTool().isEmpty(), "Miner retained its unloaded pickaxe");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Miner did not return home");
+        helper.assertValueEqual(buildcraft.robotics.MinerPhase.NONE, robot.minerPhase(),
+                "Miner scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY - 1_000_000,
+                "Miner work consumed insufficient battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class,
+                new net.minecraft.world.phys.AABB(iron).inflate(2),
+                item -> item.getItem().is(Items.RAW_IRON)).isEmpty(),
+                "Miner did not preserve ore drops");
         helper.succeed();
     }
 

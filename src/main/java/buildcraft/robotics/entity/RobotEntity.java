@@ -16,6 +16,7 @@ import buildcraft.robotics.FluidCarrierPhase;
 import buildcraft.robotics.LumberjackPhase;
 import buildcraft.robotics.BlockWorkRegistry;
 import buildcraft.robotics.HarvesterPhase;
+import buildcraft.robotics.MinerPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -79,6 +80,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos harvesterBlockTarget;
     private HarvesterPhase harvesterPhase = HarvesterPhase.NONE;
     private int harvesterDelay;
+    private ItemStack minerTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address minerStationTarget;
+    private BlockPos minerBlockTarget;
+    private MinerPhase minerPhase = MinerPhase.NONE;
+    private float minerBreakProgress;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -129,6 +135,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public LumberjackPhase lumberjackPhase() { return lumberjackPhase; }
     public ItemStack lumberjackTool() { return lumberjackTool.copy(); }
     public HarvesterPhase harvesterPhase() { return harvesterPhase; }
+    public MinerPhase minerPhase() { return minerPhase; }
+    public ItemStack minerTool() { return minerTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -185,6 +193,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.HARVESTER
                     && harvesterPhase == HarvesterPhase.NONE && tickCount % 20 == 0) {
                 beginHarvester(serverLevel);
+            } else if (board() == RobotBoardType.MINER
+                    && minerPhase == MinerPhase.NONE && tickCount % 20 == 0) {
+                beginMiner(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -209,6 +220,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (fluidCarrierPhase != FluidCarrierPhase.NONE) tickFluidCarrier(serverLevel);
         if (lumberjackPhase != LumberjackPhase.NONE) tickLumberjack(serverLevel);
         if (harvesterPhase != HarvesterPhase.NONE) tickHarvester(serverLevel);
+        if (minerPhase != MinerPhase.NONE) tickMiner(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -993,6 +1005,223 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         harvesterDelay = 0;
     }
 
+    private void beginMiner(ServerLevel level) {
+        if (minerTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findMinerToolStation(level, true);
+            if (source.isEmpty()) return;
+            minerStationTarget = source.get();
+            minerPhase = MinerPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (minerTool.isDamageableItem() && minerTool.getDamageValue() >= minerTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findMinerToolStation(level, false);
+            if (receiver.isEmpty()) return;
+            minerStationTarget = receiver.get();
+            minerPhase = MinerPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        if (selectMinerBlock(level)) {
+            minerPhase = MinerPhase.TO_BLOCK;
+            leaveStation();
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findMinerToolStation(ServerLevel level, boolean provider) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
+                        return false;
+                    }
+                    if (!provider) {
+                        if (!config.matches(minerTool)) return false;
+                        try (Transaction transaction = Transaction.openRoot()) {
+                            return handler.insert(ItemResource.of(minerTool), 1, transaction) == 1;
+                        }
+                    }
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.PICKAXES)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadMinerTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.PICKAXES)
+                    || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    minerTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadMinerTool(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (minerTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives() || !config.matches(minerTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(minerTool), 1, transaction) == 1) {
+                minerTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private static boolean isOre(net.minecraft.world.level.block.state.BlockState state) {
+        net.minecraft.tags.TagKey<net.minecraft.world.level.block.Block> commonOres =
+                net.minecraft.tags.TagKey.create(net.minecraft.core.registries.Registries.BLOCK,
+                        net.minecraft.resources.Identifier.fromNamespaceAndPath("c", "ores"));
+        return state.is(commonOres)
+                || state.is(net.minecraft.tags.BlockTags.COAL_ORES)
+                || state.is(net.minecraft.tags.BlockTags.COPPER_ORES)
+                || state.is(net.minecraft.tags.BlockTags.IRON_ORES)
+                || state.is(net.minecraft.tags.BlockTags.GOLD_ORES)
+                || state.is(net.minecraft.tags.BlockTags.REDSTONE_ORES)
+                || state.is(net.minecraft.tags.BlockTags.EMERALD_ORES)
+                || state.is(net.minecraft.tags.BlockTags.LAPIS_ORES)
+                || state.is(net.minecraft.tags.BlockTags.DIAMOND_ORES)
+                || state.is(net.minecraft.world.level.block.Blocks.NETHER_QUARTZ_ORE)
+                || state.is(net.minecraft.world.level.block.Blocks.ANCIENT_DEBRIS);
+    }
+
+    private boolean selectMinerBlock(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime()
+                ^ getUUID().getLeastSignificantBits() ^ 0x4D494E4552L);
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                net.minecraft.world.level.block.state.BlockState state = level.getBlockState(candidate);
+                if (!isOre(state) || !minerTool.isCorrectToolForDrops(state)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        minerBlockTarget = best;
+        return best != null;
+    }
+
+    private void tickMiner(ServerLevel level) {
+        if (minerPhase == MinerPhase.TO_TOOL) {
+            if (minerStationTarget == null) { minerPhase = MinerPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(minerStationTarget))) {
+                loadMinerTool(level, minerStationTarget);
+                minerPhase = MinerPhase.RETURN_HOME;
+            }
+        } else if (minerPhase == MinerPhase.TO_UNLOAD_TOOL) {
+            if (minerStationTarget == null) { minerPhase = MinerPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(minerStationTarget))) {
+                unloadMinerTool(level, minerStationTarget);
+                minerPhase = MinerPhase.RETURN_HOME;
+            }
+        } else if (minerPhase == MinerPhase.TO_BLOCK) {
+            if (minerBlockTarget == null || !BlockWorkRegistry.reclaim(level, minerBlockTarget, getUUID())) {
+                releaseMinerBlock(level);
+                minerPhase = MinerPhase.RETURN_HOME;
+                return;
+            }
+            net.minecraft.world.level.block.state.BlockState state = level.getBlockState(minerBlockTarget);
+            if (!isOre(state) || !minerTool.isCorrectToolForDrops(state)) {
+                releaseMinerBlock(level);
+                minerPhase = MinerPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(minerBlockTarget))) {
+                int breakResult = progressMinerBlock(level);
+                if (breakResult == 0) return;
+                releaseMinerBlock(level);
+                if (breakResult > 0 && !minerTool.isEmpty() && selectMinerBlock(level)) return;
+                minerPhase = MinerPhase.RETURN_HOME;
+            }
+        } else if (minerPhase == MinerPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                minerPhase = MinerPhase.NONE;
+                minerStationTarget = null;
+            }
+        }
+    }
+
+    private int progressMinerBlock(ServerLevel level) {
+        final long energyPerTick = 66_667;
+        if (minerBlockTarget == null || minerTool.isEmpty() || energy() < energyPerTick) return -1;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(minerBlockTarget);
+        float hardness = state.getDestroySpeed(level, minerBlockTarget);
+        if (!isOre(state) || !minerTool.isCorrectToolForDrops(state) || hardness < 0) return -1;
+        minerBreakProgress += hardness == 0 ? 1.1F : minerTool.getDestroySpeed(state) / hardness / 30.0F;
+        setEnergy(energy() - energyPerTick);
+        level.destroyBlockProgress(getId(), minerBlockTarget,
+                Math.min(9, Math.max(0, (int) (minerBreakProgress * 10))));
+        if (minerBreakProgress <= 1.0F) return 0;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack usedTool = minerTool.copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, usedTool);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer, minerBlockTarget, state);
+        if (event.isCanceled()) return -1;
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, minerBlockTarget, level.getBlockEntity(minerBlockTarget), fakePlayer, usedTool);
+        level.removeBlock(minerBlockTarget, false);
+        for (ItemStack drop : drops) net.minecraft.world.level.block.Block.popResource(level, minerBlockTarget, drop);
+        minerTool.hurtAndBreak(1, level, null, item -> {});
+        minerBreakProgress = 0;
+        return 1;
+    }
+
+    private void releaseMinerBlock(ServerLevel level) {
+        if (minerBlockTarget != null) {
+            BlockWorkRegistry.release(level, minerBlockTarget, getUUID());
+            level.destroyBlockProgress(getId(), minerBlockTarget, -1);
+            minerBlockTarget = null;
+        }
+        minerBreakProgress = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -1154,12 +1383,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releasePickerTarget(serverLevel);
         releaseLumberjackBlock(serverLevel);
         releaseHarvesterBlock(serverLevel);
+        releaseMinerBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
             if (!stack.isEmpty()) spawnAtLocation(serverLevel, stack.copy());
         }
         if (!lumberjackTool.isEmpty()) spawnAtLocation(serverLevel, lumberjackTool.copy());
+        if (!minerTool.isEmpty()) spawnAtLocation(serverLevel, minerTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -1177,11 +1408,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releasePickerTarget(level);
             releaseLumberjackBlock(level);
             releaseHarvesterBlock(level);
+            releaseMinerBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
             }
             if (!lumberjackTool.isEmpty()) spawnAtLocation(level, lumberjackTool.copy());
+            if (!minerTool.isEmpty()) spawnAtLocation(level, minerTool.copy());
             discard();
         }
         return true;
@@ -1235,6 +1468,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         output.putInt("HarvesterPhase", harvesterPhase.ordinal());
         if (harvesterBlockTarget != null) output.putLong("HarvesterBlock", harvesterBlockTarget.asLong());
         output.putInt("HarvesterDelay", harvesterDelay);
+        if (!minerTool.isEmpty()) output.store("MinerTool", ItemStack.CODEC, minerTool);
+        output.putInt("MinerPhase", minerPhase.ordinal());
+        if (minerStationTarget != null) {
+            output.putLong("MinerStationPos", minerStationTarget.pipePos().asLong());
+            output.putInt("MinerStationSide", minerStationTarget.side().get3DDataValue());
+        }
+        if (minerBlockTarget != null) output.putLong("MinerBlock", minerBlockTarget.asLong());
+        output.putFloat("MinerBreakProgress", minerBreakProgress);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -1341,6 +1582,26 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         harvesterDelay = Math.clamp(input.getIntOr("HarvesterDelay", 0), 0, 21);
         if ((harvesterPhase == HarvesterPhase.TO_BLOCK || harvesterPhase == HarvesterPhase.HARVESTING)
                 && harvesterBlockTarget == null) harvesterPhase = HarvesterPhase.RETURN_HOME;
+        minerTool = input.read("MinerTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int minerOrdinal = input.getIntOr("MinerPhase", MinerPhase.NONE.ordinal());
+        MinerPhase[] minerPhases = MinerPhase.values();
+        minerPhase = minerOrdinal >= 0 && minerOrdinal < minerPhases.length
+                ? minerPhases[minerOrdinal] : MinerPhase.NONE;
+        if (input.getLong("MinerStationPos").isPresent()) {
+            minerStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("MinerStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "MinerStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("MinerBlock").isPresent()) {
+            minerBlockTarget = BlockPos.of(input.getLongOr("MinerBlock", 0));
+        }
+        minerBreakProgress = Math.clamp(input.getFloatOr("MinerBreakProgress", 0), 0, 1.1F);
+        if ((minerPhase == MinerPhase.TO_TOOL || minerPhase == MinerPhase.TO_UNLOAD_TOOL)
+                && minerStationTarget == null) minerPhase = MinerPhase.RETURN_HOME;
+        if (minerPhase == MinerPhase.TO_BLOCK && minerBlockTarget == null) {
+            minerPhase = MinerPhase.RETURN_HOME;
+        }
         ContainerHelper.loadAllItems(input, inventory);
     }
 
