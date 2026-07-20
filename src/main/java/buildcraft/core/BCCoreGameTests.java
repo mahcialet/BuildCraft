@@ -6870,10 +6870,16 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
         var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
                 helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        var pickerWorkZone = new buildcraft.robotics.zone.ZonePlan();
+        pickerWorkZone.set(helper.absolutePos(new BlockPos(1, 3, 1)).getX(),
+                helper.absolutePos(new BlockPos(1, 3, 1)).getZ(), true);
+        var pickerLoadZone = new buildcraft.robotics.zone.ZonePlan();
+        pickerLoadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
         ItemStack homeStationStack = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
         homeStationStack.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
                 new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.BOTH,
-                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE)), java.util.List.of(),
+                        pickerWorkZone, pickerLoadZone));
         helper.assertTrue(home.installAttachment(Direction.UP, homeStationStack),
                 "Picker home station installation failed");
         ItemStack receiverStationStack = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
@@ -6890,8 +6896,13 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 dropPosition.x, dropPosition.y, dropPosition.z, new ItemStack(Items.COBBLESTONE, 20));
         var dirtDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
                 dropPosition.x, dropPosition.y, dropPosition.z + 1, new ItemStack(Items.DIRT, 9));
+        Vec3 excludedPosition = Vec3.atCenterOf(helper.absolutePos(new BlockPos(1, 3, 2)));
+        var outsideZoneDrop = new net.minecraft.world.entity.item.ItemEntity(helper.getLevel(),
+                excludedPosition.x, excludedPosition.y, excludedPosition.z,
+                new ItemStack(Items.COBBLESTONE, 7));
         helper.getLevel().addFreshEntity(cobblestoneDrop);
         helper.getLevel().addFreshEntity(dirtDrop);
+        helper.getLevel().addFreshEntity(outsideZoneDrop);
         java.util.UUID auditRobot = java.util.UUID.randomUUID();
         var auditTarget = buildcraft.robotics.DroppedItemRegistry.reserveClosest(helper.getLevel(),
                 dropPosition, 250, auditRobot, item -> item.getItem().is(Items.COBBLESTONE)).orElseThrow();
@@ -6920,6 +6931,8 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
         helper.assertTrue(cobblestoneDrop.isRemoved(), "Picker did not consume the selected drop");
         helper.assertTrue(dirtDrop.isAlive() && dirtDrop.getItem().getCount() == 9,
                 "Picker ignored its home station item filter");
+        helper.assertTrue(outsideZoneDrop.isAlive() && outsideZoneDrop.getItem().getCount() == 7,
+                "Picker ignored its configured work zone");
         helper.assertTrue(receiverChest.getItem(0).is(Items.COBBLESTONE)
                         && receiverChest.getItem(0).getCount() == 20,
             "Picker did not unload collected items");
@@ -7033,6 +7046,23 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 buildcraft.robotics.RobotStationConfig.DEFAULT);
         helper.assertTrue(editedConfig.fluidFilters().contains(water),
                 "filled-container interaction did not add station fluid filter");
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(home.getBlockPos().getX() + 2, home.getBlockPos().getZ() + 3, true);
+        ItemStack zoneMap = new ItemStack(buildcraft.core.BCCoreItems.MAP_LOCATION.get());
+        buildcraft.robotics.zone.ZoneMapLocation.set(zoneMap, workZone, "Robot work area");
+        player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, zoneMap);
+        buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                .useAttachment(home, Direction.UP, home.attachment(Direction.UP), player);
+        player.setShiftKeyDown(true);
+        buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get()
+                .useAttachment(home, Direction.UP, home.attachment(Direction.UP), player);
+        player.setShiftKeyDown(false);
+        editedConfig = home.attachment(Direction.UP).getOrDefault(
+                buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                buildcraft.robotics.RobotStationConfig.DEFAULT);
+        helper.assertTrue(workZone.equals(editedConfig.workZone())
+                        && workZone.equals(editedConfig.loadUnloadZone()),
+                "Zone Map interaction did not assign work and load/unload areas");
         helper.succeed();
     }
 

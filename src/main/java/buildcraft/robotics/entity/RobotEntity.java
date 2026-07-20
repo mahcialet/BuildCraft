@@ -191,7 +191,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private void beginDelivery(ServerLevel level) {
         Optional<RequesterRegistry.Reservation> reservation =
-                RequesterRegistry.reserveClosest(level, position(), getUUID(), 128);
+                RequesterRegistry.reserveClosest(level, position(), getUUID(), 128,
+                        target -> inside(workZone(level), target));
         if (reservation.isEmpty()) return;
         Optional<RobotStationRegistry.Address> source = findDeliverySource(level, reservation.get().request());
         if (source.isEmpty()) {
@@ -207,6 +208,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private Optional<RobotStationRegistry.Address> findDeliverySource(ServerLevel level, ItemStack requested) {
         return RobotStationRegistry.loadedStations(level).stream()
                 .map(RobotStationRegistry.Station::address)
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> sourceContains(level, address, requested))
                 .min(java.util.Comparator.comparingDouble(address ->
                         sourcePosition(address).distanceToSqr(position())));
@@ -246,6 +248,18 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 RobotStationConfig.DEFAULT);
     }
 
+    private buildcraft.robotics.zone.ZonePlan workZone(ServerLevel level) {
+        return stationAddress == null ? null : stationConfig(level, stationAddress).workZone();
+    }
+
+    private buildcraft.robotics.zone.ZonePlan loadUnloadZone(ServerLevel level) {
+        return stationAddress == null ? null : stationConfig(level, stationAddress).effectiveLoadUnloadZone();
+    }
+
+    private static boolean inside(buildcraft.robotics.zone.ZonePlan zone, BlockPos position) {
+        return zone == null || zone.contains(position);
+    }
+
     private void beginCarrier(ServerLevel level) {
         Optional<RobotStationRegistry.Address> target = isEmpty()
                 ? findCarrierLoadStation(level) : findCarrierUnloadStation(level, null);
@@ -259,6 +273,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         return RobotStationRegistry.loadedStations(level).stream()
                 .map(RobotStationRegistry.Station::address)
                 .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     if (!config.mode().provides()) return false;
@@ -280,6 +295,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         return RobotStationRegistry.loadedStations(level).stream()
                 .map(RobotStationRegistry.Station::address)
                 .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> canUnloadAt(level, address))
                 .min(java.util.Comparator.comparingDouble(address ->
                         sourcePosition(address).distanceToSqr(position())));
@@ -392,7 +408,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         RobotStationConfig homeConfig = stationConfig(level, stationAddress);
         Optional<net.minecraft.world.entity.item.ItemEntity> target = DroppedItemRegistry.reserveClosest(
                 level, position(), 250, getUUID(), item ->
-                        homeConfig.matches(item.getItem()) && inventoryCapacity(item.getItem()) > 0);
+                        inside(workZone(level), item.blockPosition())
+                                && homeConfig.matches(item.getItem()) && inventoryCapacity(item.getItem()) > 0);
         if (target.isEmpty()) return;
         pickerTarget = target.get().getUUID();
         pickerPhase = PickerPhase.TO_ITEM;
@@ -482,6 +499,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         return RobotStationRegistry.loadedStations(level).stream()
                 .map(RobotStationRegistry.Station::address)
                 .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     if (!config.mode().provides()) return false;
@@ -505,6 +523,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         return RobotStationRegistry.loadedStations(level).stream()
                 .map(RobotStationRegistry.Station::address)
                 .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
                     RobotStationConfig config = stationConfig(level, address);
                     if (!config.mode().receives() || !config.matches(carried)) return false;

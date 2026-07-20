@@ -29,7 +29,18 @@ public final class RobotStationItem extends Item implements PipeAttachment {
         RobotStationConfig config = stack.getOrDefault(
                 BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), RobotStationConfig.DEFAULT);
         RobotStationConfig updated;
-        if (held.isEmpty()) {
+        buildcraft.api.items.MapLocationType mapType = held.getOrDefault(
+                buildcraft.core.BCCoreDataComponents.MAP_LOCATION_TYPE.get(),
+                buildcraft.api.items.MapLocationType.CLEAN);
+        boolean zoneInteraction = held.is(buildcraft.core.BCCoreItems.MAP_LOCATION.get())
+                && (mapType == buildcraft.api.items.MapLocationType.ZONE
+                    || mapType == buildcraft.api.items.MapLocationType.CLEAN);
+        if (zoneInteraction) {
+            buildcraft.robotics.zone.ZonePlan zone = mapType == buildcraft.api.items.MapLocationType.ZONE
+                    ? buildcraft.robotics.zone.ZoneMapLocation.get(held) : null;
+            updated = player.isShiftKeyDown()
+                    ? config.withLoadUnloadZone(zone) : config.withWorkZone(zone);
+        } else if (held.isEmpty()) {
             updated = config.cycleMode();
         } else {
             net.neoforged.neoforge.transfer.ResourceHandler<
@@ -44,9 +55,19 @@ public final class RobotStationItem extends Item implements PipeAttachment {
         if (!player.level().isClientSide()) {
             stack.set(BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(), updated);
             pipe.setAttachment(side, stack);
-            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
-                    "message.buildcraftrobotics.robot_station.config",
-                    updated.mode().getSerializedName(), updated.filters().size(), updated.fluidFilters().size()));
+            if (zoneInteraction) {
+                buildcraft.robotics.zone.ZonePlan assigned = player.isShiftKeyDown()
+                        ? updated.loadUnloadZone() : updated.workZone();
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                        player.isShiftKeyDown()
+                                ? "message.buildcraftrobotics.robot_station.load_unload_zone"
+                                : "message.buildcraftrobotics.robot_station.work_zone",
+                        assigned == null ? 0 : assigned.size()));
+            } else {
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable(
+                        "message.buildcraftrobotics.robot_station.config",
+                        updated.mode().getSerializedName(), updated.filters().size(), updated.fluidFilters().size()));
+            }
         }
         return net.minecraft.world.InteractionResult.SUCCESS;
     }
