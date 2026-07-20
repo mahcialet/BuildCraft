@@ -7490,6 +7490,14 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void mjEnergyConversion(GameTestHelper helper) {
+        helper.assertValueEqual(BCCoreConfig.MJ_PER_RF.getDefault(), 0.1,
+                "configured MJ/RF conversion default");
+        helper.assertValueEqual(MjAPI.getRfConversion().mjPerRf, 100_000L,
+                "configured MJ/RF conversion was not installed");
+        BCCoreConfig.MJ_PER_RF.set(0.05);
+        helper.assertValueEqual(MjAPI.getRfConversion().mjPerRf, 50_000L,
+                "live MJ/RF conversion setting was not applied");
+        BCCoreConfig.MJ_PER_RF.set(0.1);
         MjRfConversion conversion = MjRfConversion.createDefault();
         helper.assertValueEqual(conversion.mjPerRf, 100_000L, "default MJ conversion");
         helper.assertTrue(conversion.usingDefaultValue, "default MJ conversion marker");

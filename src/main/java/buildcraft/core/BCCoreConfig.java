@@ -11,6 +11,7 @@ public final class BCCoreConfig {
     public static final ModConfigSpec.DoubleValue MINING_MULTIPLIER;
     public static final ModConfigSpec.IntValue MINING_MAX_DEPTH;
     public static final ModConfigSpec.IntValue NETWORK_UPDATE_RATE;
+    public static final ModConfigSpec.DoubleValue MJ_PER_RF;
     public static final ModConfigSpec.BooleanValue WORLDGEN_ENABLED;
     public static final ModConfigSpec.BooleanValue GENERATE_WATER_SPRINGS;
 
@@ -35,6 +36,9 @@ public final class BCCoreConfig {
         NETWORK_UPDATE_RATE = builder
             .comment("How often, in ticks, changing machine and pipe state is synchronized to clients.")
             .defineInRange("updateFactor", 10, 1, 100);
+        MJ_PER_RF = builder
+            .comment("MJ consumed or produced per NeoForge energy unit (RF/FE).")
+            .defineInRange("mjPerRf", 0.1, 0.0001, 0.2);
         builder.pop();
         builder.push("worldgen");
         WORLDGEN_ENABLED = builder
@@ -48,6 +52,15 @@ public final class BCCoreConfig {
     }
 
     private BCCoreConfig() {}
+
+    public static buildcraft.api.mj.IMjToRfStatus rfStatus() {
+        return new buildcraft.api.mj.IMjToRfStatus() {
+            @Override public buildcraft.api.mj.MjRfConversion getConversion() {
+                return buildcraft.api.mj.MjRfConversion.createParsed(MJ_PER_RF.get());
+            }
+            @Override public boolean isAutoconvertEnabled() { return false; }
+        };
+    }
 
     public static boolean networkUpdateDue(long gameTime, long previousUpdate, int interval, boolean force) {
         return force || gameTime - previousUpdate >= Math.max(1, interval);
