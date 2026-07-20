@@ -1026,7 +1026,20 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, sealantInput, helper.getLevel())
                 .orElseThrow().value().assemble(sealantInput);
         helper.assertTrue(sealant.is(buildcraft.transport.BCTransportItems.WATERPROOF),
-                "Oil Residue recipe returned wrong Pipe Sealant item");
+            "Oil Residue recipe returned wrong Pipe Sealant item");
+        for (net.minecraft.world.item.Item ingredient : java.util.List.of(
+                net.minecraft.world.item.Items.SLIME_BALL, net.minecraft.world.item.Items.GREEN_DYE)) {
+            net.minecraft.world.item.crafting.CraftingInput legacySealantInput =
+                net.minecraft.world.item.crafting.CraftingInput.of(1, 1,
+                    java.util.List.of(new ItemStack(ingredient)));
+            ItemStack legacySealant = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, legacySealantInput, helper.getLevel())
+                .orElseThrow().value().assemble(legacySealantInput);
+            helper.assertTrue(legacySealant.is(buildcraft.transport.BCTransportItems.WATERPROOF),
+                "Legacy Pipe Sealant ingredient returned wrong item: " + ingredient);
+            helper.assertValueEqual(legacySealant.getCount(), 1,
+                "Legacy Pipe Sealant recipe output count");
+        }
         helper.assertValueEqual(sealant.getCount(), 8, "Oil Residue Pipe Sealant recipe output count");
         helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getDensity(), 900,
             "oil density");
