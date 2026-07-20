@@ -7490,6 +7490,8 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void mjEnergyConversion(GameTestHelper helper) {
+        helper.assertFalse(BCCoreConfig.COLOR_BLIND_MODE.getDefault(),
+            "color-blind display mode default");
         helper.assertValueEqual(BCCoreConfig.POWER_MODE.getDefault(), BCCoreConfig.PowerMode.MJ_ONLY,
             "configured power mode default");
         helper.assertFalse(MjAPI.isRfAutoConversionEnabled(), "MJ_ONLY unexpectedly enabled RF conversion");

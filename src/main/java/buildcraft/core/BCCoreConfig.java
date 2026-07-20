@@ -5,6 +5,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 /** Gameplay settings shared by the modern BuildCraft modules. */
 public final class BCCoreConfig {
     public static final ModConfigSpec SPEC;
+    public static final ModConfigSpec CLIENT_SPEC;
     public static final ModConfigSpec.BooleanValue PUMPS_CONSUME_WATER;
     public static final ModConfigSpec.IntValue MARKER_MAX_DISTANCE;
     public static final ModConfigSpec.IntValue PUMP_MAX_DISTANCE;
@@ -15,6 +16,7 @@ public final class BCCoreConfig {
     public static final ModConfigSpec.EnumValue<PowerMode> POWER_MODE;
     public static final ModConfigSpec.BooleanValue WORLDGEN_ENABLED;
     public static final ModConfigSpec.BooleanValue GENERATE_WATER_SPRINGS;
+    public static final ModConfigSpec.BooleanValue COLOR_BLIND_MODE;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -53,6 +55,14 @@ public final class BCCoreConfig {
                 .define("generateWaterSprings", true);
         builder.pop();
         SPEC = builder.build();
+
+        ModConfigSpec.Builder clientBuilder = new ModConfigSpec.Builder();
+        clientBuilder.push("display");
+        COLOR_BLIND_MODE = clientBuilder
+            .comment("Use additional symbols where BuildCraft normally distinguishes routes by colour.")
+            .define("colorBlindMode", false);
+        clientBuilder.pop();
+        CLIENT_SPEC = clientBuilder.build();
     }
 
     private BCCoreConfig() {}

@@ -30,6 +30,7 @@ public final class BuildCraft {
 
     public BuildCraft(IEventBus modBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.COMMON, buildcraft.core.BCCoreConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.CLIENT, buildcraft.core.BCCoreConfig.CLIENT_SPEC);
         buildcraft.api.mj.MjAPI.setRfStatus(buildcraft.core.BCCoreConfig.rfStatus());
         BCCoreBlocks.register(modBus);
         BCCoreFeatures.register(modBus);

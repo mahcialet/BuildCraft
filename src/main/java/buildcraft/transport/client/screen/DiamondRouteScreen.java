@@ -1,6 +1,7 @@
 package buildcraft.transport.client.screen;
 
 import buildcraft.transport.BCTransport;
+import buildcraft.core.BCCoreConfig;
 import buildcraft.transport.menu.DiamondRouteMenu;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -13,6 +14,9 @@ public final class DiamondRouteScreen extends AbstractContainerScreen<DiamondRou
     private static final Identifier TEXTURE = Identifier.fromNamespaceAndPath(
         BCTransport.MOD_ID, "textures/gui/filter.png"
     );
+    private static final Identifier COLOR_BLIND_TEXTURE = Identifier.fromNamespaceAndPath(
+        BCTransport.MOD_ID, "textures/gui/filter_cb.png"
+    );
 
     public DiamondRouteScreen(DiamondRouteMenu menu, Inventory inventory, Component title) {
         super(menu, inventory, title, 175, 225);
@@ -24,7 +28,8 @@ public final class DiamondRouteScreen extends AbstractContainerScreen<DiamondRou
 
     @Override
     public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos, topPos, 0, 0,
+        Identifier texture = BCCoreConfig.COLOR_BLIND_MODE.get() ? COLOR_BLIND_TEXTURE : TEXTURE;
+        graphics.blit(RenderPipelines.GUI_TEXTURED, texture, leftPos, topPos, 0, 0,
             imageWidth, imageHeight, 256, 256);
     }
 }
