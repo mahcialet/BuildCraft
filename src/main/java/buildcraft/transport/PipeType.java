@@ -29,7 +29,6 @@ public enum PipeType implements StringRepresentable {
     IRON_FLUID("iron_fluid", "pipe_iron_fluid", "Iron Fluid Pipe"),
     CLAY_FLUID("clay_fluid", "pipe_clay_fluid", "Clay Fluid Pipe"),
     VOID_FLUID("void_fluid", "pipe_void_fluid", "Void Fluid Pipe"),
-    OBSIDIAN_FLUID("obsidian_fluid", "pipe_obsidian_fluid", "Obsidian Fluid Pipe"),
     DIAMOND_FLUID("diamond_fluid", "pipe_diamond_fluid", "Diamond Fluid Pipe"),
     DIAMOND_WOOD_FLUID("diamond_wood_fluid", "pipe_diamond_wood_fluid", "Diamond Wooden Fluid Pipe"),
     COBBLESTONE_POWER("cobblestone_power", "pipe_cobble_power", "Cobblestone Power Pipe"),
@@ -80,7 +79,6 @@ public enum PipeType implements StringRepresentable {
         if (carriesFluids() != other.carriesFluids()) return false;
         if (carriesFluids()) {
             if (isWoodenFluidExtraction() && other.isWoodenFluidExtraction()) return false;
-            if (this == OBSIDIAN_FLUID && other == OBSIDIAN_FLUID) return false;
             return this == other || isWoodenFluidExtraction() || other.isWoodenFluidExtraction()
                 || isGeneralFluidConnector() || other.isGeneralFluidConnector();
         }
@@ -168,7 +166,7 @@ public enum PipeType implements StringRepresentable {
     public boolean carriesFluids() {
         return this == COBBLESTONE_FLUID || this == STONE_FLUID || this == QUARTZ_FLUID
             || this == WOOD_FLUID || this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID
-                || this == CLAY_FLUID || this == VOID_FLUID || this == OBSIDIAN_FLUID || this == DIAMOND_FLUID
+            || this == CLAY_FLUID || this == VOID_FLUID || this == DIAMOND_FLUID
             || this == DIAMOND_WOOD_FLUID;
     }
     public boolean isWoodenFluidExtraction() {
@@ -176,7 +174,7 @@ public enum PipeType implements StringRepresentable {
     }
     private boolean isGeneralFluidConnector() {
         return this == GOLD_FLUID || this == SANDSTONE_FLUID || this == IRON_FLUID
-                || this == CLAY_FLUID || this == VOID_FLUID || this == OBSIDIAN_FLUID || this == DIAMOND_FLUID;
+            || this == CLAY_FLUID || this == VOID_FLUID || this == DIAMOND_FLUID;
     }
     public boolean connectsFluidHandlers() { return carriesFluids() && this != SANDSTONE_FLUID; }
     public int fluidTransferRate() {
@@ -189,7 +187,7 @@ public enum PipeType implements StringRepresentable {
             case SANDSTONE_FLUID -> 20;
             case IRON_FLUID -> 40;
             case CLAY_FLUID -> 40;
-            case VOID_FLUID, OBSIDIAN_FLUID -> 80;
+            case VOID_FLUID -> 80;
             case DIAMOND_FLUID -> 80;
             case DIAMOND_WOOD_FLUID -> 80;
             default -> 0;

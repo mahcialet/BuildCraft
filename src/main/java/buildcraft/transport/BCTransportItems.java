@@ -43,7 +43,6 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_IRON_FLUID = pipe(PipeType.IRON_FLUID);
     public static final DeferredItem<PipeItem> PIPE_CLAY_FLUID = pipe(PipeType.CLAY_FLUID);
     public static final DeferredItem<PipeItem> PIPE_VOID_FLUID = pipe(PipeType.VOID_FLUID);
-    public static final DeferredItem<PipeItem> PIPE_OBSIDIAN_FLUID = pipe(PipeType.OBSIDIAN_FLUID);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_FLUID = pipe(PipeType.DIAMOND_FLUID);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_FLUID = pipe(PipeType.DIAMOND_WOOD_FLUID);
     public static final DeferredItem<PipeItem> PIPE_COBBLE_POWER = pipe(PipeType.COBBLESTONE_POWER);
@@ -68,6 +67,23 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_BLUE = wire(PipeWireColor.BLUE);
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_GREEN = wire(PipeWireColor.GREEN);
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_YELLOW = wire(PipeWireColor.YELLOW);
+
+    public static java.util.List<PipeItem> pipeItems() {
+        return java.util.List.of(
+                PIPE_STRUCTURE.get(), PIPE_COBBLE_ITEM.get(), PIPE_STONE_ITEM.get(), PIPE_QUARTZ_ITEM.get(),
+                PIPE_WOOD_ITEM.get(), PIPE_GOLD_ITEM.get(), PIPE_IRON_ITEM.get(), PIPE_CLAY_ITEM.get(),
+                PIPE_SANDSTONE_ITEM.get(), PIPE_VOID_ITEM.get(), PIPE_OBSIDIAN_ITEM.get(), PIPE_LAPIS_ITEM.get(),
+                PIPE_DAIZULI_ITEM.get(), PIPE_DIAMOND_WOOD_ITEM.get(), PIPE_EMZULI_ITEM.get(),
+                PIPE_DIAMOND_ITEM.get(), PIPE_STRIPES_ITEM.get(), PIPE_COBBLE_FLUID.get(), PIPE_STONE_FLUID.get(),
+                PIPE_QUARTZ_FLUID.get(), PIPE_WOOD_FLUID.get(), PIPE_GOLD_FLUID.get(), PIPE_SANDSTONE_FLUID.get(),
+                PIPE_IRON_FLUID.get(), PIPE_CLAY_FLUID.get(), PIPE_VOID_FLUID.get(), PIPE_DIAMOND_FLUID.get(),
+                PIPE_DIAMOND_WOOD_FLUID.get(), PIPE_COBBLE_POWER.get(), PIPE_STONE_POWER.get(),
+                PIPE_QUARTZ_POWER.get(), PIPE_WOOD_POWER.get(), PIPE_SANDSTONE_POWER.get(), PIPE_IRON_POWER.get(),
+                PIPE_GOLD_POWER.get(), PIPE_DIAMOND_POWER.get(), PIPE_DIAMOND_WOOD_POWER.get(),
+                PIPE_COBBLE_RF.get(), PIPE_STONE_RF.get(), PIPE_QUARTZ_RF.get(), PIPE_WOOD_RF.get(),
+                PIPE_SANDSTONE_RF.get(), PIPE_IRON_RF.get(), PIPE_GOLD_RF.get(), PIPE_DIAMOND_RF.get(),
+                PIPE_DIAMOND_WOOD_RF.get());
+    }
 
     private BCTransportItems() {
     }
