@@ -46,5 +46,6 @@
   "gui.buildcraftenergy.engine": "BuildCraft Engine",
   "gui.buildcraftenergy.engine.heat": "Heat: %s C",
   "gui.buildcraftenergy.engine.power": "Stored: %s MJ",
-  "gui.buildcraftenergy.engine.output": "Output: %s MJ/t"
+  "gui.buildcraftenergy.engine.output": "Output: %s MJ/t",
+  "item.buildcraftenergy.glob_of_oil": "Glob of Oil"
 }

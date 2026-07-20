@@ -800,6 +800,10 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void energyFluids(GameTestHelper helper) {
+        helper.assertValueEqual("buildcraftenergy:glob_of_oil",
+                net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(
+                        buildcraft.energy.BCEnergyItems.GLOB_OF_OIL.get()).toString(),
+                "Glob of Oil compatibility identifier");
         helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getDensity(), 900,
             "oil density");
         helper.assertValueEqual(BCEnergyFluids.OIL.get().getFluidType().getViscosity(), 2_000,
@@ -4137,9 +4141,15 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(!helper.getLevel().getBlockState(otherWoodPos).getValue(
                 buildcraft.transport.block.PipeHolderBlock.EAST), "wood fluid pipes connected to each other");
 
+        var sealantInput = net.minecraft.world.item.crafting.CraftingInput.of(1, 1,
+                java.util.List.of(new ItemStack(Items.SLIME_BALL)));
+        ItemStack sealant = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, sealantInput, helper.getLevel())
+                .orElseThrow().value().assemble(sealantInput);
+        helper.assertTrue(sealant.is(buildcraft.transport.BCTransportItems.WATERPROOF.get()),
+                "slime did not craft historical Pipe Sealant");
         var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
-                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_WOOD_ITEM.get()),
-                new ItemStack(Items.SLIME_BALL)));
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_WOOD_ITEM.get()), sealant));
         ItemStack recipeOutput = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
                 .orElseThrow().value().assemble(recipeInput);
@@ -4229,7 +4239,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     private static void assertFluidUpgradeRecipe(GameTestHelper helper, net.minecraft.world.item.Item inputPipe,
             net.minecraft.world.item.Item outputPipe) {
         var input = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
-                new ItemStack(inputPipe), new ItemStack(Items.SLIME_BALL)));
+                new ItemStack(inputPipe), new ItemStack(buildcraft.transport.BCTransportItems.WATERPROOF.get())));
         ItemStack output = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
                 net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel())
                 .orElseThrow().value().assemble(input);

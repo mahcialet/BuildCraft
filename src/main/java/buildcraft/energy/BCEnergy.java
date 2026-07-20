@@ -78,7 +78,8 @@ public final class BCEnergy {
                     event.accept(bucket);
                 }
             }
-            event.accept(BCEnergyItems.MJ_DYNAMO.get());
+        event.accept(BCEnergyItems.MJ_DYNAMO.get());
+        event.accept(BCEnergyItems.GLOB_OF_OIL.get());
         }
         if (event.getTabKey().equals(CreativeModeTabs.FUNCTIONAL_BLOCKS)) {
             event.accept(BCEnergyFluids.OIL_BUCKET.get());

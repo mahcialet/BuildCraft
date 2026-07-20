@@ -10,6 +10,7 @@ public final class BCTransportItems {
     private static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(BCTransport.MOD_ID);
     public static final DeferredItem<?> FILTERED_BUFFER =
         ITEMS.registerSimpleBlockItem("filtered_buffer", BCTransportBlocks.FILTERED_BUFFER);
+    public static final DeferredItem<?> WATERPROOF = ITEMS.registerSimpleItem("waterproof");
     public static final DeferredItem<PipeItem> PIPE_STRUCTURE = pipe(PipeType.STRUCTURE);
     public static final DeferredItem<PipeItem> PIPE_COBBLE_ITEM = pipe(PipeType.COBBLESTONE_ITEM);
     public static final DeferredItem<PipeItem> PIPE_STONE_ITEM = pipe(PipeType.STONE_ITEM);

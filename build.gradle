@@ -136,9 +136,10 @@ tasks.named('processResources', ProcessResources) {
         into 'assets/buildcraftenergy/textures/block/fluids'
     }
     from('buildcraft_resources/assets/buildcraftenergy/textures/items') {
-        include 'bucketOil.png', 'bucketFuel.png'
+        include 'bucketOil.png', 'bucketFuel.png', 'glob_oil.png'
         rename 'bucketOil.png', 'oil_bucket.png'
         rename 'bucketFuel.png', 'fuel_light_bucket.png'
+        rename 'glob_oil.png', 'glob_of_oil.png'
         into 'assets/buildcraftenergy/textures/item'
     }
     from('buildcraft_resources/assets/buildcraftenergy/textures/blocks/engine/stone') {
@@ -193,6 +194,11 @@ tasks.named('processResources', ProcessResources) {
     from('buildcraft_resources/assets/buildcrafttransport/textures/blocks/filtered_buffer') {
         include 'default.png'
         into 'assets/buildcrafttransport/textures/block/filtered_buffer'
+    }
+    from('buildcraft_resources/assets/buildcrafttransport/textures/items') {
+        include 'pipewaterproof.png'
+        rename 'pipewaterproof.png', 'waterproof.png'
+        into 'assets/buildcrafttransport/textures/item'
     }
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tank') {
         include 'end.png', 'side.png', 'side_joined_below.png'
