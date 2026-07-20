@@ -115,13 +115,15 @@ public enum PipeType implements StringRepresentable {
     }
     public boolean isWoodenRfInput() { return this == WOOD_RF || this == DIAMOND_WOOD_RF; }
     public int rfTransferRate() {
+        if (BCTransportConfig.DISABLE_RF_PIPE.get()) return 0;
+        int base = BCTransportConfig.BASE_RF_RATE.get();
         return switch (this) {
-            case COBBLESTONE_RF -> 40;
-            case STONE_RF -> 80;
-            case WOOD_RF, SANDSTONE_RF -> 160;
-            case QUARTZ_RF, IRON_RF -> 320;
-            case GOLD_RF -> 1_280;
-            case DIAMOND_RF, DIAMOND_WOOD_RF -> 2_560;
+            case COBBLESTONE_RF -> base;
+            case STONE_RF -> base * 2;
+            case WOOD_RF, SANDSTONE_RF -> base * 4;
+            case QUARTZ_RF, IRON_RF -> base * 8;
+            case GOLD_RF -> base * 32;
+            case DIAMOND_RF, DIAMOND_WOOD_RF -> base * 64;
             default -> 0;
         };
     }
@@ -140,15 +142,15 @@ public enum PipeType implements StringRepresentable {
         return this == IRON_POWER || this == DIAMOND_POWER || this == IRON_RF || this == DIAMOND_RF;
     }
     public long powerTransferPerTick() {
+        long base = (long) BCTransportConfig.BASE_POWER_RATE.get() * buildcraft.api.mj.MjAPI.MJ;
         return switch (this) {
-            case COBBLESTONE_POWER -> 4_000_000L;
-            case STONE_POWER -> 8_000_000L;
-            case QUARTZ_POWER -> 32_000_000L;
-            case WOOD_POWER -> 16_000_000L;
-            case SANDSTONE_POWER -> 16_000_000L;
-            case IRON_POWER -> 32_000_000L;
-            case GOLD_POWER -> 128_000_000L;
-            case DIAMOND_POWER, DIAMOND_WOOD_POWER -> 256_000_000L;
+            case COBBLESTONE_POWER -> base;
+            case STONE_POWER -> base * 2;
+            case QUARTZ_POWER -> base * 8;
+            case WOOD_POWER, SANDSTONE_POWER -> base * 4;
+            case IRON_POWER -> base * 8;
+            case GOLD_POWER -> base * 32;
+            case DIAMOND_POWER, DIAMOND_WOOD_POWER -> base * 64;
             default -> 0;
         };
     }
@@ -178,18 +180,12 @@ public enum PipeType implements StringRepresentable {
     }
     public boolean connectsFluidHandlers() { return carriesFluids() && this != SANDSTONE_FLUID; }
     public int fluidTransferRate() {
+        int base = BCTransportConfig.BASE_FLUID_RATE.get();
         return switch (this) {
-            case COBBLESTONE_FLUID -> 10;
-            case STONE_FLUID -> 20;
-            case QUARTZ_FLUID -> 40;
-            case WOOD_FLUID -> 10;
-            case GOLD_FLUID -> 80;
-            case SANDSTONE_FLUID -> 20;
-            case IRON_FLUID -> 40;
-            case CLAY_FLUID -> 40;
-            case VOID_FLUID -> 80;
-            case DIAMOND_FLUID -> 80;
-            case DIAMOND_WOOD_FLUID -> 80;
+            case COBBLESTONE_FLUID, WOOD_FLUID -> base;
+            case STONE_FLUID, SANDSTONE_FLUID -> base * 2;
+            case QUARTZ_FLUID, IRON_FLUID, CLAY_FLUID -> base * 4;
+            case GOLD_FLUID, VOID_FLUID, DIAMOND_FLUID, DIAMOND_WOOD_FLUID -> base * 8;
             default -> 0;
         };
     }

@@ -5,6 +5,7 @@ import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.IMjRedstoneReceiver;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.BCTransportBlockEntities;
+import buildcraft.transport.BCTransportConfig;
 import buildcraft.transport.BCTransportDataComponents;
 import buildcraft.transport.PipeWireColor;
 import buildcraft.transport.PipeType;
@@ -1167,14 +1168,15 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel serverLevel)
             || (pipeType() != PipeType.WOOD_ITEM && pipeType() != PipeType.DIAMOND_WOOD_ITEM
                 && pipeType() != PipeType.EMZULI_ITEM)
-            || extractionDirection == null || power < MjAPI.MJ) return power;
+            || extractionDirection == null || power < BCTransportConfig.MJ_PER_ITEM.get()) return power;
         var source = serverLevel.getCapability(
             Capabilities.Item.BLOCK, worldPosition.relative(extractionDirection), extractionDirection.getOpposite()
         );
         if (source == null) return power;
         int emzuliPreset = pipeType() == PipeType.EMZULI_ITEM ? selectedEmzuliPreset() : -1;
         if (pipeType() == PipeType.EMZULI_ITEM && emzuliPreset < 0) return power;
-        int remaining = pipeType() == PipeType.DIAMOND_WOOD_ITEM ? 1 : (int) Math.min(512, power / MjAPI.MJ);
+        long costPerItem = BCTransportConfig.MJ_PER_ITEM.get();
+        int remaining = pipeType() == PipeType.DIAMOND_WOOD_ITEM ? 1 : (int) Math.min(512, power / costPerItem);
         List<ItemStack> extractedStacks = new ArrayList<>();
         int extractedCount = 0;
         try (Transaction transaction = Transaction.openRoot()) {
@@ -1204,15 +1206,17 @@ public final class PipeHolderBlockEntity extends BlockEntity {
                 sync();
             }
         }
-        return power - extractedCount * MjAPI.MJ;
+        return power - extractedCount * costPerItem;
     }
 
     private long extractFluid(long power, boolean simulate) {
-        if (!(level instanceof ServerLevel serverLevel) || extractionDirection == null || power < 1_000) return power;
+        long costPerMillibucket = BCTransportConfig.MJ_PER_MILLIBUCKET.get();
+        if (!(level instanceof ServerLevel serverLevel) || extractionDirection == null
+            || power < costPerMillibucket) return power;
         var source = serverLevel.getCapability(Capabilities.Fluid.BLOCK,
                 worldPosition.relative(extractionDirection), extractionDirection.getOpposite());
         if (source == null) return power;
-        int remaining = (int) Math.min(pipeType().fluidTransferRate(), power / 1_000);
+        int remaining = (int) Math.min(pipeType().fluidTransferRate(), power / costPerMillibucket);
         int extractedTotal = 0;
         try (Transaction transaction = Transaction.openRoot()) {
             for (int slot = 0; slot < source.size() && remaining > 0; slot++) {
@@ -1229,7 +1233,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             if (!simulate && extractedTotal > 0) transaction.commit();
         }
         if (!simulate && extractedTotal > 0) sync();
-        return power - extractedTotal * 1_000L;
+        return power - extractedTotal * costPerMillibucket;
     }
 
     private boolean matchesDiamondFluidFilter(FluidResource resource) {

@@ -3,6 +3,8 @@ package buildcraft.transport;
 import buildcraft.core.BCCreativeTabs;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
 import buildcraft.transport.client.BCTransportClient;
@@ -11,7 +13,8 @@ import buildcraft.transport.client.BCTransportClient;
 public final class BCTransport {
     public static final String MOD_ID = "buildcrafttransport";
 
-    public BCTransport(IEventBus modBus) {
+    public BCTransport(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.COMMON, BCTransportConfig.SPEC);
         BCTransportDataComponents.register(modBus);
         BCTransportRecipes.register(modBus);
         BCTransportBlocks.register(modBus);

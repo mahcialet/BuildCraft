@@ -4,6 +4,7 @@ import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeSavedData;
 import buildcraft.core.marker.VolumeBoxSavedData;
 import buildcraft.core.AdvancementUtil;
+import buildcraft.core.BCCoreConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -21,7 +22,6 @@ import java.util.List;
 
 /** Connects the valid marker line closest to the player's crosshair. */
 public final class ItemMarkerConnector extends Item {
-    public static final double MAX_MARKER_DISTANCE_SQUARED = 64.0 * 64.0;
     public static final double MAX_REACH = 3.0;
     public static final double MAX_LINE_DISTANCE = 0.3;
 
@@ -62,7 +62,8 @@ public final class ItemMarkerConnector extends Item {
             BlockPos a = markers.get(first);
             for (int second = first + 1; second < markers.size(); second++) {
                 BlockPos b = markers.get(second);
-                if (a.distSqr(b) > MAX_MARKER_DISTANCE_SQUARED) continue;
+                double maxDistance = BCCoreConfig.MARKER_MAX_DISTANCE.get();
+                if (a.distSqr(b) > maxDistance * maxDistance) continue;
                 BlockPos from;
                 BlockPos to;
                 if (paths.canConnect(a, b)) {

@@ -14,6 +14,8 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
 import buildcraft.core.client.BCCoreClient;
 import buildcraft.core.block.entity.OwnedBlockEntity;
 import net.minecraft.world.entity.LivingEntity;
@@ -26,7 +28,8 @@ public final class BuildCraft {
     /** The historical core module namespace, retained for world compatibility. */
     public static final String MOD_ID = "buildcraftcore";
 
-    public BuildCraft(IEventBus modBus) {
+    public BuildCraft(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.COMMON, buildcraft.core.BCCoreConfig.SPEC);
         BCCoreBlocks.register(modBus);
         BCCoreFeatures.register(modBus);
         BCCoreDataComponents.register(modBus);

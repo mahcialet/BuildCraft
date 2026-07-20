@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.level.saveddata.SavedDataType;
 import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
+import buildcraft.core.BCCoreConfig;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,7 +18,6 @@ import java.util.Optional;
 
 /** Dimension-local authoritative graph for volume markers. */
 public final class VolumeSavedData extends SavedData {
-    public static final int MAX_DISTANCE = 64;
     public static final Codec<VolumeSavedData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
         VolumeConnection.CODEC.listOf().optionalFieldOf("connections", List.of()).forGetter(data -> data.connections),
         BlockPos.CODEC.listOf().optionalFieldOf("markers", List.of()).forGetter(data -> data.markers)
@@ -119,7 +119,7 @@ public final class VolumeSavedData extends SavedData {
         java.util.Set<Direction.Axis> taken = existing == null ? java.util.Set.of() : existing.connectedAxes();
         for (Direction direction : Direction.values()) {
             if (taken.contains(direction.getAxis())) continue;
-            for (int distance = 1; distance <= MAX_DISTANCE; distance++) {
+        for (int distance = 1; distance <= BCCoreConfig.MARKER_MAX_DISTANCE.get(); distance++) {
                 BlockPos candidate = from.relative(direction, distance);
                 if (markers.contains(candidate)) {
                     if (canConnect(from, candidate)) valid.add(candidate);
@@ -134,7 +134,7 @@ public final class VolumeSavedData extends SavedData {
         Direction.Axis axis = VolumeConnection.alignedAxis(from, to);
         if (axis == null) return false;
         int distance = Math.abs(to.get(axis) - from.get(axis));
-        if (distance > MAX_DISTANCE) return false;
+        if (distance > BCCoreConfig.MARKER_MAX_DISTANCE.get()) return false;
         Direction.AxisDirection axisDirection = to.get(axis) > from.get(axis)
             ? Direction.AxisDirection.POSITIVE : Direction.AxisDirection.NEGATIVE;
         Direction direction = Direction.get(axisDirection, axis);

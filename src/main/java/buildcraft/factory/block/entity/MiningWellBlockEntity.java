@@ -4,6 +4,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.factory.BCFactoryBlockEntities;
 import buildcraft.factory.BCFactoryBlocks;
+import buildcraft.core.BCCoreConfig;
 import buildcraft.lib.mj.MjBatteryReceiver;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -34,7 +35,6 @@ import java.util.List;
 public final class MiningWellBlockEntity extends BlockEntity implements buildcraft.api.core.IHasWork {
     public static final long BATTERY_CAPACITY = 500 * MjAPI.MJ;
     public static final long MAX_POWER_PER_TICK = 10 * MjAPI.MJ;
-    private static final int MAX_DEPTH = 512;
 
     private final MjBattery battery = new MjBattery(BATTERY_CAPACITY);
     private final MjBatteryReceiver receiver = new MjBatteryReceiver(battery);
@@ -80,7 +80,8 @@ public final class MiningWellBlockEntity extends BlockEntity implements buildcra
             return;
         }
         long required = state.getFluidState().isEmpty()
-                ? Math.max(MjAPI.MJ, (long) Math.floor(32 * MjAPI.MJ * (hardness + 1)))
+            ? Math.max(MjAPI.MJ, (long) Math.floor(
+                32 * MjAPI.MJ * (hardness + 1) * BCCoreConfig.MINING_MULTIPLIER.get()))
                 : MjAPI.MJ;
         long used = battery.extractPower(0, Math.min(MAX_POWER_PER_TICK, required - progress), false);
         if (used <= 0) return;
@@ -113,7 +114,7 @@ public final class MiningWellBlockEntity extends BlockEntity implements buildcra
     }
 
     private BlockPos findTarget(ServerLevel level) {
-        int minimum = Math.max(level.getMinY(), worldPosition.getY() - MAX_DEPTH);
+        int minimum = Math.max(level.getMinY(), worldPosition.getY() - BCCoreConfig.MINING_MAX_DEPTH.get());
         for (int y = worldPosition.getY() - 1; y >= minimum; y--) {
             BlockPos pos = new BlockPos(worldPosition.getX(), y, worldPosition.getZ());
             BlockState state = level.getBlockState(pos);
@@ -170,7 +171,8 @@ public final class MiningWellBlockEntity extends BlockEntity implements buildcra
     public void clearTubes() {
         if (!(level instanceof ServerLevel serverLevel)) return;
         for (int y = worldPosition.getY() - 1;
-                y >= Math.max(serverLevel.getMinY(), worldPosition.getY() - MAX_DEPTH); y--) {
+                y >= Math.max(serverLevel.getMinY(),
+                    worldPosition.getY() - BCCoreConfig.MINING_MAX_DEPTH.get()); y--) {
             BlockPos pos = new BlockPos(worldPosition.getX(), y, worldPosition.getZ());
             if (!serverLevel.getBlockState(pos).is(BCFactoryBlocks.TUBE.get())) break;
             serverLevel.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);

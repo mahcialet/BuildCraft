@@ -1,6 +1,7 @@
 package buildcraft.core.client.render;
 
 import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
+import buildcraft.core.BCCoreConfig;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.blockentity.BlockEntityRenderer;
@@ -39,7 +40,9 @@ public final class VolumeMarkerRenderer implements BlockEntityRenderer<VolumeMar
             Vec3 center = Vec3.atCenterOf(state.blockPos);
             for (Direction direction : Direction.values()) {
                 if (!state.axes.contains(direction.getAxis())) {
-                    Vec3 end = center.add(direction.getStepX() * 64.0, direction.getStepY() * 64.0, direction.getStepZ() * 64.0);
+            double maxDistance = BCCoreConfig.MARKER_MAX_DISTANCE.get();
+            Vec3 end = center.add(direction.getStepX() * maxDistance, direction.getStepY() * maxDistance,
+                direction.getStepZ() * maxDistance);
                     Gizmos.line(center, end, SIGNAL_COLOR, 2.0F);
                 }
             }
@@ -64,6 +67,6 @@ public final class VolumeMarkerRenderer implements BlockEntityRenderer<VolumeMar
     public AABB getRenderBoundingBox(VolumeMarkerBlockEntity blockEntity) {
         BlockPos min = blockEntity.min(), max = blockEntity.max();
         AABB box = new AABB(min.getX(), min.getY(), min.getZ(), max.getX() + 1, max.getY() + 1, max.getZ() + 1);
-        return blockEntity.showingSignals() ? box.inflate(64.0) : box.inflate(1.0);
+        return blockEntity.showingSignals() ? box.inflate(BCCoreConfig.MARKER_MAX_DISTANCE.get()) : box.inflate(1.0);
     }
 }

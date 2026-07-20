@@ -6,6 +6,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraft.resources.Identifier;
 import net.neoforged.neoforge.common.world.chunk.RegisterTicketControllersEvent;
@@ -21,7 +23,8 @@ public final class BCBuilders {
                 }
             });
 
-    public BCBuilders(IEventBus modBus) {
+    public BCBuilders(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.COMMON, BCBuildersConfig.SPEC);
         BCBuildersBlocks.register(modBus);
         BCBuildersBlockEntities.register(modBus);
         BCBuildersItems.register(modBus);

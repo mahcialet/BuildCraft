@@ -4,6 +4,7 @@ import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.factory.BCFactoryBlockEntities;
 import buildcraft.factory.BCFactoryBlocks;
+import buildcraft.core.BCCoreConfig;
 import buildcraft.lib.mj.MjBatteryReceiver;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -30,8 +31,6 @@ import java.util.Set;
 public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlockEntity implements buildcraft.api.core.IHasWork {
     public static final int CAPACITY = 16_000;
     public static final long POWER_PER_SOURCE = 10 * MjAPI.MJ;
-    private static final int MAX_DEPTH = 512;
-    private static final int MAX_DISTANCE = 64;
     private static final Direction[] LIQUID_SEARCH = {
         Direction.UP, Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST
     };
@@ -78,7 +77,7 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
         clearTubes();
         intake = null;
         if (level == null) return;
-        for (int depth = 1; depth <= MAX_DEPTH; depth++) {
+        for (int depth = 1; depth <= BCCoreConfig.MINING_MAX_DEPTH.get(); depth++) {
             BlockPos candidate = worldPosition.below(depth);
             BlockState state = level.getBlockState(candidate);
             if (!state.getFluidState().isEmpty()) {
@@ -104,7 +103,8 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
         queue.add(intake);
         while (!queue.isEmpty() && checked.size() < 4_096) {
             BlockPos current = queue.removeFirst();
-            if (!checked.add(current) || current.distSqr(intake) > MAX_DISTANCE * MAX_DISTANCE) continue;
+            int maxDistance = BCCoreConfig.PUMP_MAX_DISTANCE.get();
+            if (!checked.add(current) || current.distSqr(intake) > maxDistance * maxDistance) continue;
             var fluidState = level.getFluidState(current);
             if (fluidState.isEmpty() || fluidState.getType() != fluid) continue;
             if (fluidState.isSource()) sources.addLast(current);
@@ -129,7 +129,7 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
 
     private void clearTubes() {
         if (level == null) return;
-        for (int depth = 1; depth <= MAX_DEPTH; depth++) {
+        for (int depth = 1; depth <= BCCoreConfig.MINING_MAX_DEPTH.get(); depth++) {
             BlockPos candidate = worldPosition.below(depth);
             if (!level.getBlockState(candidate).is(BCFactoryBlocks.TUBE.get())) break;
             level.setBlock(candidate, Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
@@ -169,7 +169,7 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
     }
 
     private boolean isInfiniteWaterSource(BlockPos pos, Fluid fluid) {
-        if (level == null || fluid != Fluids.WATER) return false;
+        if (level == null || fluid != Fluids.WATER || BCCoreConfig.PUMPS_CONSUME_WATER.get()) return false;
         int adjacent = 0;
         for (Direction direction : Direction.Plane.HORIZONTAL) {
             if (level.getFluidState(pos.relative(direction)).isSource()

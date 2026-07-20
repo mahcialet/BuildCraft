@@ -5,6 +5,8 @@ import buildcraft.api.core.IHasWork;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.api.mj.MjBattery;
 import buildcraft.builders.BCBuildersBlockEntities;
+import buildcraft.builders.BCBuildersConfig;
+import buildcraft.core.BCCoreConfig;
 import buildcraft.builders.BCBuildersBlocks;
 import buildcraft.builders.BCBuilders;
 import buildcraft.builders.block.QuarryBlock;
@@ -113,7 +115,8 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         int sizeZ = max.getZ() - min.getZ() + 1;
         if (sizeX < 3 || sizeZ < 3 || sizeY < 1 || sizeX > MAX_HORIZONTAL_SIZE
                 || sizeZ > MAX_HORIZONTAL_SIZE || max.getY() < worldPosition.getY()) return false;
-        BlockPos adjustedMax = new BlockPos(max.getX(), Math.max(max.getY(), min.getY() + 4), max.getZ());
+        BlockPos adjustedMax = new BlockPos(max.getX(),
+            Math.max(max.getY(), min.getY() + BCBuildersConfig.QUARRY_FRAME_MIN_HEIGHT.get()), max.getZ());
         if (min.equals(areaMin) && adjustedMax.equals(areaMax)) return true;
         releaseTickets();
         clearFrames();
@@ -203,7 +206,8 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
             return;
         }
         float hardness = state.getDestroySpeed(level, target);
-        long required = Math.max(MjAPI.MJ, (long) Math.floor(32 * MjAPI.MJ * (hardness + 1)));
+        long required = Math.max(MjAPI.MJ, (long) Math.floor(
+            32 * MjAPI.MJ * (hardness + 1) * BCCoreConfig.MINING_MULTIPLIER.get()));
         long accepted = battery.extractPower(0, Math.min(MAX_POWER_PER_TICK, required - progress), false);
         progress += accepted;
         if (progress < required) { setChanged(); return; }
@@ -231,9 +235,16 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         Vec3 destination = Vec3.atCenterOf(target).add(0, 0.75, 0);
         if (head == null) head = destination;
         Vec3 delta = destination.subtract(head);
+        if (!BCBuildersConfig.QUARRY_FRAME_MOVE_BOTH.get()) {
+            if (Math.abs(delta.x) > 0.05) delta = new Vec3(delta.x, 0, 0);
+            else if (Math.abs(delta.z) > 0.05) delta = new Vec3(0, 0, delta.z);
+            else delta = new Vec3(0, delta.y, 0);
+        }
         double distance = delta.length();
         if (distance <= 0.05) { head = destination; return true; }
-        head = head.add(delta.scale(Math.min(0.35, distance) / distance));
+        double configured = BCBuildersConfig.QUARRY_MAX_FRAME_SPEED.get();
+        double maxPerTick = configured < 0.1 ? 0.5 : configured / 20.0;
+        head = head.add(delta.scale(Math.min(maxPerTick, distance) / distance));
         sync();
         return false;
     }
@@ -243,7 +254,8 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         int depth = areaMax.getZ() - areaMin.getZ() - 1;
         int layerSize = width * depth;
         int top = areaMax.getY() - 1;
-        int layers = top - level.getMinY() + 1;
+        int minimum = Math.max(level.getMinY(), top - BCCoreConfig.MINING_MAX_DEPTH.get() + 1);
+        int layers = top - minimum + 1;
         int total = layerSize * layers;
         while (miningCursor < total) {
             int index = miningCursor++;
