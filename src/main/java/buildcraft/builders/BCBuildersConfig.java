@@ -8,6 +8,8 @@ public final class BCBuildersConfig {
     public static final ModConfigSpec.IntValue QUARRY_FRAME_MIN_HEIGHT;
     public static final ModConfigSpec.IntValue BLUEPRINT_EXTERNAL_THRESHOLD;
     public static final ModConfigSpec.BooleanValue QUARRY_FRAME_MOVE_BOTH;
+    public static final ModConfigSpec.IntValue QUARRY_MAX_TASKS_PER_TICK;
+    public static final ModConfigSpec.IntValue QUARRY_TASK_POWER_DIVISOR;
     public static final ModConfigSpec.DoubleValue QUARRY_MAX_FRAME_SPEED;
     public static final ModConfigSpec.DoubleValue QUARRY_MAX_BLOCK_MINE_RATE;
 
@@ -18,6 +20,8 @@ public final class BCBuildersConfig {
         QUARRY_FRAME_MIN_HEIGHT = builder.defineInRange("quarryFrameMinHeight", 4, 1, 256);
         QUARRY_MAX_FRAME_SPEED = builder.defineInRange("quarryMaxFrameSpeed", 0.0, 0.0, 5120.0);
         QUARRY_MAX_BLOCK_MINE_RATE = builder.defineInRange("quarryMaxBlockMineRate", 0.0, 0.0, 1000.0);
+        QUARRY_MAX_TASKS_PER_TICK = builder.defineInRange("quarryMaxTasksPerTick", 4, 0, 20);
+        QUARRY_TASK_POWER_DIVISOR = builder.defineInRange("quarryPowerDivisor", 2, 0, 100);
         builder.pop();
         builder.push("display");
         QUARRY_FRAME_MOVE_BOTH = builder.define("quarryFrameMoveBoth", false);

@@ -9527,6 +9527,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.configuredMineDelayTicks(), 40L,
                 "Quarry mining-rate setting did not convert blocks/second to ticks");
         buildcraft.builders.BCBuildersConfig.QUARRY_MAX_BLOCK_MINE_RATE.set(0.0);
+        buildcraft.builders.BCBuildersConfig.QUARRY_MAX_TASKS_PER_TICK.set(0);
+        helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.configuredMaxTasksPerTick(), 1,
+                "Quarry zero task setting must retain one progress task");
+        buildcraft.builders.BCBuildersConfig.QUARRY_MAX_TASKS_PER_TICK.set(4);
+        helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.configuredMaxTasksPerTick(), 4,
+                "Quarry task setting was not applied");
+        helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.effectiveTaskPower(120, 0, 2),
+                120L, "Quarry first task power");
+        helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.effectiveTaskPower(120, 1, 2),
+                80L, "Quarry second task power divisor");
+        helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.effectiveTaskPower(120, 2, 2),
+                60L, "Quarry third task power divisor");
         helper.assertTrue(
             net.minecraft.core.registries.BuiltInRegistries.BLOCK.getValue(
                 Identifier.fromNamespaceAndPath("buildcraftbuilders", "architect")

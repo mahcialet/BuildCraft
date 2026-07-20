@@ -75,6 +75,8 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
     private long progress;
     private long nextMineTick;
     private Vec3 head;
+    private long tickPowerBudget;
+    private int tickTaskIndex;
 
     public QuarryBlockEntity(BlockPos pos, BlockState state) {
         super(BCBuildersBlockEntities.QUARRY.get(), pos, state);
@@ -107,7 +109,15 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
             quarry.blockedColumns.clear();
         }
         if (quarry.stage == Stage.BUILDING) quarry.buildFrame(serverLevel);
-        else if (quarry.stage == Stage.MINING) quarry.mine(serverLevel);
+        else if (quarry.stage == Stage.MINING) {
+            quarry.tickPowerBudget = MAX_POWER_PER_TICK;
+            int maxTasks = configuredMaxTasksPerTick();
+            for (quarry.tickTaskIndex = 0; quarry.tickTaskIndex < maxTasks
+                    && quarry.stage == Stage.MINING && quarry.tickPowerBudget > 0; quarry.tickTaskIndex++) {
+                quarry.mine(serverLevel);
+                if (quarry.target != null) break;
+            }
+        }
     }
 
     public boolean configureArea(BlockPos min, BlockPos max) {
@@ -209,7 +219,15 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         float hardness = state.getDestroySpeed(level, target);
         long required = Math.max(MjAPI.MJ, (long) Math.floor(
             32 * MjAPI.MJ * (hardness + 1) * BCCoreConfig.MINING_MULTIPLIER.get()));
-        long accepted = battery.extractPower(0, Math.min(MAX_POWER_PER_TICK, required - progress), false);
+        long needed = Math.min(MAX_POWER_PER_TICK, required - progress);
+        int divisor = BCBuildersConfig.QUARRY_TASK_POWER_DIVISOR.get();
+        long requested = needed;
+        if (divisor > 0 && tickTaskIndex > 0) {
+            requested = (needed * (divisor + tickTaskIndex) + divisor - 1) / divisor;
+        }
+        long extracted = battery.extractPower(0, Math.min(tickPowerBudget, requested), false);
+        tickPowerBudget -= extracted;
+        long accepted = effectiveTaskPower(extracted, tickTaskIndex, divisor);
         progress += accepted;
         if (progress < required) { setChanged(); return; }
         long mineDelay = configuredMineDelayTicks();
@@ -233,6 +251,15 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         target = null;
         progress = 0;
         sync();
+    }
+
+    public static int configuredMaxTasksPerTick() {
+        return Math.max(1, BCBuildersConfig.QUARRY_MAX_TASKS_PER_TICK.get());
+    }
+
+    public static long effectiveTaskPower(long extracted, int taskIndex, int divisor) {
+        if (extracted <= 0 || divisor <= 0 || taskIndex <= 0) return extracted;
+        return extracted * divisor / (divisor + taskIndex);
     }
 
     private boolean moveHead() {
