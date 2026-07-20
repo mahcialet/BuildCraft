@@ -26,6 +26,8 @@ public final class BCCreativeTabs {
             .icon(() -> new ItemStack(BCCoreItems.GEAR_DIAMOND.get()))
             .displayItems((parameters, output) -> {
                 output.accept(BCCoreItems.WRENCH.get());
+                output.accept(BCCoreItems.GUIDE.get());
+                output.accept(BCCoreItems.GUIDE_NOTE.get());
                 output.accept(BCCoreItems.MARKER_PATH.get());
                 output.accept(BCCoreItems.MARKER_VOLUME.get());
                 output.accept(BCCoreItems.MARKER_CONNECTOR.get());

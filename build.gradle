@@ -77,6 +77,18 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('processResources', ProcessResources) {
+    // The pinned BuildCraftGuide submodule is the historical in-game manual.
+    from('BuildCraftGuide/guide_resources')
+    from('buildcraft_resources/assets/buildcraftlib/textures/items/guide_book.png') {
+        into 'assets/buildcraftcore/textures/item'
+        rename 'guide_book.png', 'guide.png'
+    }
+    from('buildcraft_resources/assets/buildcraftlib/textures/items/guide_note.png') {
+        into 'assets/buildcraftcore/textures/item'
+    }
+    from('buildcraft_resources/assets/buildcraftlib/textures/gui/guide') {
+        into 'assets/buildcraftcore/textures/gui/guide'
+    }
     from('buildcraft_resources/assets/buildcraftcore/textures/items/goggles.png') {
         into 'assets/buildcraftcore/textures/item'
     }

@@ -2,6 +2,8 @@ package buildcraft.core.item;
 
 import buildcraft.api.tools.IToolWrench;
 import buildcraft.api.tools.IWrenchable;
+import buildcraft.core.AdvancementUtil;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
@@ -27,6 +29,9 @@ public final class ItemWrench extends Item implements IToolWrench {
         if (currentState.getBlock() instanceof IWrenchable wrenchable) {
             InteractionResult customResult = wrenchable.onWrenched(context);
             if (customResult.consumesAction()) {
+                if (!context.getLevel().isClientSide() && context.getPlayer() instanceof ServerPlayer player) {
+                    AdvancementUtil.award(player, "buildcraftcore:wrenched");
+                }
                 wrenchUsed(context);
                 return customResult;
             }
@@ -52,6 +57,9 @@ public final class ItemWrench extends Item implements IToolWrench {
                 0.5F,
                 0.8F
             );
+            if (context.getPlayer() instanceof ServerPlayer player) {
+                AdvancementUtil.award(player, "buildcraftcore:wrenched");
+            }
         }
         wrenchUsed(context);
         return InteractionResult.SUCCESS;

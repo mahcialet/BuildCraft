@@ -10,6 +10,8 @@ import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import buildcraft.core.BCCoreMenus;
 import buildcraft.core.client.screen.ListScreen;
 import buildcraft.core.client.render.VolumeBoxRenderer;
+import buildcraft.core.client.guide.GuideScreen;
+import buildcraft.core.item.GuideClientHooks;
 import buildcraft.core.client.ClientVolumeBoxes;
 import buildcraft.core.network.VolumeBoxesPayload;
 import net.neoforged.neoforge.client.network.event.RegisterClientPayloadHandlersEvent;
@@ -24,6 +26,8 @@ public final class BCCoreClient {
     }
 
     public static void register(IEventBus modBus) {
+        GuideClientHooks.install((stack, note) -> net.minecraft.client.Minecraft.getInstance()
+            .setScreen(new GuideScreen(stack, note)));
         modBus.addListener(BCCoreClient::registerRenderers);
         modBus.addListener(BCCoreClient::registerScreens);
         modBus.addListener(BCCoreClient::registerPayloadHandlers);

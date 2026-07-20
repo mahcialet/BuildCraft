@@ -3,6 +3,7 @@ package buildcraft.core.item;
 import buildcraft.api.items.IList;
 import buildcraft.api.items.ListData;
 import buildcraft.core.BCCoreDataComponents;
+import buildcraft.core.AdvancementUtil;
 import buildcraft.core.menu.ListMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -38,6 +39,7 @@ public final class ItemList extends Item implements IList {
     @Override
     public InteractionResult use(Level level, Player player, InteractionHand hand) {
         if (!level.isClientSide() && player instanceof ServerPlayer serverPlayer) {
+            AdvancementUtil.award(serverPlayer, "buildcraftcore:list");
             serverPlayer.openMenu(ListMenu.provider(hand), buffer -> buffer.writeEnum(hand));
         }
         return InteractionResult.SUCCESS;

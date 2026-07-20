@@ -37,6 +37,12 @@ public final class BCCoreDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> LIST_USED =
         COMPONENTS.register("list_used", () -> DataComponentType.<Boolean>builder()
             .persistent(Codec.BOOL).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> GUIDE_BOOK =
+        COMPONENTS.register("guide_book", () -> DataComponentType.<String>builder()
+            .persistent(Codec.STRING).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<String>> GUIDE_NOTE =
+        COMPONENTS.register("guide_note", () -> DataComponentType.<String>builder()
+            .persistent(Codec.STRING).build());
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<SimpleFluidContent>> FRAGILE_FLUID =
         COMPONENTS.register("fragile_fluid", () -> DataComponentType.<SimpleFluidContent>builder()
             .persistent(SimpleFluidContent.CODEC)

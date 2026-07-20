@@ -11,6 +11,8 @@ import buildcraft.core.item.ItemVolumeBox;
 import buildcraft.core.item.ItemFragileFluidContainer;
 import buildcraft.core.item.ItemBlockSpring;
 import buildcraft.core.item.ItemBlockEngine;
+import buildcraft.core.item.ItemGuide;
+import buildcraft.core.item.ItemGuideNote;
 import buildcraft.api.items.FluidItemDrops;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
@@ -29,6 +31,12 @@ public final class BCCoreItems {
 
     public static final DeferredItem<ItemWrench> WRENCH = ITEMS.registerItem(
         "wrench", ItemWrench::new, properties -> properties.stacksTo(1)
+    );
+    public static final DeferredItem<ItemGuide> GUIDE = ITEMS.registerItem(
+        "guide", ItemGuide::new, properties -> properties.stacksTo(1)
+    );
+    public static final DeferredItem<ItemGuideNote> GUIDE_NOTE = ITEMS.registerItem(
+        "guide_note", ItemGuideNote::new, properties -> properties.stacksTo(1)
     );
     public static final DeferredItem<ItemMarkerConnector> MARKER_CONNECTOR = ITEMS.registerItem(
         "marker_connector", ItemMarkerConnector::new, properties -> properties.stacksTo(1)

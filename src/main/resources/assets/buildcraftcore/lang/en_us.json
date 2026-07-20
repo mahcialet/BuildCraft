@@ -1,1 +1,25 @@
-{"itemGroup.buildcraftcore.main":"BuildCraft","item.buildcraftcore.wrench":"Wrench","item.buildcraftcore.gear_wood":"Wood Gear","item.buildcraftcore.gear_stone":"Stone Gear","item.buildcraftcore.gear_iron":"Iron Gear","item.buildcraftcore.gear_gold":"Gold Gear","block.buildcraftcore.decorated.paper":"Paper Decoration","item.buildcraftcore.paintbrush":"Paintbrush","item.buildcraftcore.list":"List","item.buildcraftcore.volume_box":"Volume Box","item.buildcraftcore.fragile_fluid_shard.filled":"Fragile %s Shard","item.buildcraftcore.goggles":"Goggles","block.buildcraftcore.power_tester":"Power Tester","chat.buildcraftcore.power_tester":"Last: %s, this tick: %s, total: %s","block.buildcraftcore.spring.oil":"Oil Spring","gui.buildcraftcore.list.label":"List label","gui.buildcraftcore.list.material":"Match item material (combine with type for exact common tag)","buildcraft.item.nonclean.usage":"Shift-right-click in the air to clear"}
+{
+  "itemGroup.buildcraftcore.main": "BuildCraft",
+  "item.buildcraftcore.wrench": "Wrench",
+  "item.buildcraftcore.gear_wood": "Wood Gear",
+  "item.buildcraftcore.gear_stone": "Stone Gear",
+  "item.buildcraftcore.gear_iron": "Iron Gear",
+  "item.buildcraftcore.gear_gold": "Gold Gear",
+  "block.buildcraftcore.decorated.paper": "Paper Decoration",
+  "item.buildcraftcore.paintbrush": "Paintbrush",
+  "item.buildcraftcore.list": "List",
+  "item.buildcraftcore.volume_box": "Volume Box",
+  "item.buildcraftcore.fragile_fluid_shard.filled": "Fragile %s Shard",
+  "item.buildcraftcore.goggles": "Goggles",
+  "block.buildcraftcore.power_tester": "Power Tester",
+  "chat.buildcraftcore.power_tester": "Last: %s, this tick: %s, total: %s",
+  "block.buildcraftcore.spring.oil": "Oil Spring",
+  "gui.buildcraftcore.list.label": "List label",
+  "gui.buildcraftcore.list.material": "Match item material (combine with type for exact common tag)",
+  "buildcraft.item.nonclean.usage": "Shift-right-click in the air to clear",
+  "item.buildcraftcore.guide": "BuildCraft Guide Book",
+  "item.buildcraftcore.guide_note": "BuildCraft Guide Book Note",
+  "gui.buildcraftcore.guide.title": "BuildCraft Guide",
+  "gui.buildcraftcore.guide.search": "Search pages...",
+  "gui.buildcraftcore.guide.select": "Select a page from the index"
+}

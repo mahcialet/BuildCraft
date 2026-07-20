@@ -3,8 +3,10 @@ package buildcraft.core.item;
 import buildcraft.core.marker.PathSavedData;
 import buildcraft.core.marker.VolumeSavedData;
 import buildcraft.core.marker.VolumeBoxSavedData;
+import buildcraft.core.AdvancementUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
@@ -36,13 +38,19 @@ public final class ItemMarkerConnector extends Item {
         VolumeSavedData volumes = VolumeSavedData.get(serverLevel);
         Candidate candidate = findVolumeCandidate(volumes, eye, look);
         boolean connected = candidate != null && volumes.connect(candidate.from(), candidate.to());
+        String advancement = connected ? "buildcraftcore:markers" : null;
         if (!connected) {
             PathSavedData paths = PathSavedData.get(serverLevel);
             candidate = findCandidate(paths, eye, look);
             connected = candidate != null && paths.connect(candidate.from(), candidate.to());
+            if (connected) advancement = "buildcraftcore:path_markers";
         }
-        if (!connected) connected = VolumeBoxSavedData.get(serverLevel).interact(player);
+        if (!connected) {
+            connected = VolumeBoxSavedData.get(serverLevel).interact(player);
+            if (connected) advancement = "buildcraftcore:markers";
+        }
         if (!connected) return InteractionResult.FAIL;
+        if (player instanceof ServerPlayer serverPlayer) AdvancementUtil.award(serverPlayer, advancement);
         level.playSound(null, player.blockPosition(), SoundEvents.UI_BUTTON_CLICK.value(), SoundSource.PLAYERS, 0.5F, 1.2F);
         return InteractionResult.SUCCESS;
     }
