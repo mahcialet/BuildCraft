@@ -6456,6 +6456,31 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "removed facade lost its block state");
         helper.assertTrue(holder.installAttachment(Direction.SOUTH, removed),
                 "state-preserving facade could not be reinstalled");
+        helper.assertTrue(holder.attachmentBlocksConnection(Direction.SOUTH),
+                "solid facade did not block its pipe connection");
+
+        var swapInput = net.minecraft.world.item.crafting.CraftingInput.of(
+                1, 1, java.util.List.of(facade.copyWithCount(1)));
+        ItemStack hollowFacade = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, swapInput, helper.getLevel())
+                .orElseThrow(() -> new AssertionError("facade swap recipe was not loaded"))
+                .value().assemble(swapInput);
+        helper.assertTrue(hollowFacade.getOrDefault(
+                buildcraft.silicon.BCSiliconDataComponents.FACADE_HOLLOW.get(), false),
+                "facade swap recipe did not produce hollow facade");
+        helper.assertValueEqual(Blocks.OAK_PLANKS.defaultBlockState(),
+                hollowFacade.get(buildcraft.silicon.BCSiliconDataComponents.FACADE_STATE.get()),
+                "facade swap recipe lost appearance state");
+        helper.assertTrue(holder.installAttachment(Direction.EAST, hollowFacade),
+                "hollow facade could not be installed");
+        helper.assertFalse(holder.attachmentBlocksConnection(Direction.EAST),
+                "hollow facade blocked its pipe connection");
+        var reverseSwapInput = net.minecraft.world.item.crafting.CraftingInput.of(
+                1, 1, java.util.List.of(hollowFacade));
+        ItemStack solidFacade = buildcraft.silicon.recipe.FacadeSwapRecipe.INSTANCE.assemble(reverseSwapInput);
+        helper.assertFalse(solidFacade.getOrDefault(
+                buildcraft.silicon.BCSiliconDataComponents.FACADE_HOLLOW.get(), false),
+                "second facade swap did not restore solid facade");
 
         var invalid = new buildcraft.silicon.recipe.AssemblyRecipeInput(java.util.List.of(
                 new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get(), 3),

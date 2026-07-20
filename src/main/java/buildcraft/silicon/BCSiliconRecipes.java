@@ -3,6 +3,7 @@ package buildcraft.silicon;
 import buildcraft.silicon.recipe.AssemblyRecipe;
 import buildcraft.silicon.recipe.AssemblyTableRecipe;
 import buildcraft.silicon.recipe.FacadeRecipe;
+import buildcraft.silicon.recipe.FacadeSwapRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.resources.Identifier;
@@ -25,6 +26,9 @@ public final class BCSiliconRecipes {
     public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FacadeRecipe>> FACADE_SERIALIZER =
             SERIALIZERS.register("facade", () -> new RecipeSerializer<>(
                     FacadeRecipe.MAP_CODEC, FacadeRecipe.STREAM_CODEC));
+    public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<FacadeSwapRecipe>> FACADE_SWAP_SERIALIZER =
+            SERIALIZERS.register("facade_swap", () -> new RecipeSerializer<>(
+                    FacadeSwapRecipe.MAP_CODEC, FacadeSwapRecipe.STREAM_CODEC));
     private BCSiliconRecipes() {}
     public static void register(IEventBus bus) { TYPES.register(bus); SERIALIZERS.register(bus); }
 }

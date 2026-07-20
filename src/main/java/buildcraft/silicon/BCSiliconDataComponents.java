@@ -46,6 +46,9 @@ public final class BCSiliconDataComponents {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BlockState>> FACADE_STATE =
             COMPONENTS.register("facade_state", () -> DataComponentType.<BlockState>builder()
                     .persistent(BlockState.CODEC).build());
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Boolean>> FACADE_HOLLOW =
+            COMPONENTS.register("facade_hollow", () -> DataComponentType.<Boolean>builder()
+                    .persistent(Codec.BOOL).build());
 
     private BCSiliconDataComponents() {}
     public static void register(IEventBus bus) { COMPONENTS.register(bus); }

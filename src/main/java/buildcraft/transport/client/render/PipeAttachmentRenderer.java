@@ -76,11 +76,15 @@ public final class PipeAttachmentRenderer
             if (stack.isEmpty()) {
                 state.attachments[side.ordinal()] = null;
                 state.facades[side.ordinal()] = false;
+                state.hollowFacades[side.ordinal()] = false;
             } else {
                 boolean facade = stack.getItem() instanceof FacadeAttachment;
                 if (facade) {
                     var attachment = (FacadeAttachment) stack.getItem();
+                    state.hollowFacades[side.ordinal()] = attachment.isHollow(stack);
                     stack = new net.minecraft.world.item.ItemStack(attachment.facadeState(stack).getBlock());
+                } else {
+                    state.hollowFacades[side.ordinal()] = false;
                 }
                 ItemStackRenderState itemState = new ItemStackRenderState();
                 itemModels.updateForTopItem(itemState, stack, ItemDisplayContext.FIXED,
@@ -113,11 +117,28 @@ public final class PipeAttachmentRenderer
                     .5 + side.getStepZ() * offset);
             poseStack.mulPose(new Quaternionf().rotationTo(0, 0, 1,
                     side.getStepX(), side.getStepY(), side.getStepZ()));
-            if (state.facades[side.ordinal()]) poseStack.scale(1.01F, 1.01F, .08F);
-            else poseStack.scale(.34F, .34F, .34F);
-            item.submit(poseStack, nodes, state.lightCoords, OverlayTexture.NO_OVERLAY, 0);
+            if (state.hollowFacades[side.ordinal()]) {
+                submitFacadePart(item, poseStack, nodes, state.lightCoords, -.375F, 0, .25F, 1.01F);
+                submitFacadePart(item, poseStack, nodes, state.lightCoords, .375F, 0, .25F, 1.01F);
+                submitFacadePart(item, poseStack, nodes, state.lightCoords, 0, -.375F, .5F, .25F);
+                submitFacadePart(item, poseStack, nodes, state.lightCoords, 0, .375F, .5F, .25F);
+            } else {
+                if (state.facades[side.ordinal()]) poseStack.scale(1.01F, 1.01F, .08F);
+                else poseStack.scale(.34F, .34F, .34F);
+                item.submit(poseStack, nodes, state.lightCoords, OverlayTexture.NO_OVERLAY, 0);
+            }
             poseStack.popPose();
         }
+    }
+
+    private static void submitFacadePart(ItemStackRenderState item, PoseStack poseStack,
+                                         SubmitNodeCollector nodes, int lightCoords,
+                                         float x, float y, float width, float height) {
+        poseStack.pushPose();
+        poseStack.translate(x, y, 0);
+        poseStack.scale(width, height, .08F);
+        item.submit(poseStack, nodes, lightCoords, OverlayTexture.NO_OVERLAY, 0);
+        poseStack.popPose();
     }
 
     private void submitWires(PipeAttachmentRenderState state, PoseStack poseStack, SubmitNodeCollector nodes) {

@@ -2,6 +2,8 @@ package buildcraft.silicon.item;
 
 import buildcraft.silicon.BCSiliconDataComponents;
 import buildcraft.transport.item.FacadeAttachment;
+import buildcraft.transport.block.entity.PipeHolderBlockEntity;
+import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
@@ -13,6 +15,16 @@ public final class FacadeItem extends PipePlugItem implements FacadeAttachment {
     @Override
     public BlockState facadeState(ItemStack stack) {
         return stack.getOrDefault(BCSiliconDataComponents.FACADE_STATE.get(), Blocks.STONE.defaultBlockState());
+    }
+
+    @Override
+    public boolean isHollow(ItemStack stack) {
+        return stack.getOrDefault(BCSiliconDataComponents.FACADE_HOLLOW.get(), false);
+    }
+
+    @Override
+    public boolean blocksConnection(PipeHolderBlockEntity pipe, Direction side, ItemStack stack) {
+        return !isHollow(stack);
     }
 
     @Override
