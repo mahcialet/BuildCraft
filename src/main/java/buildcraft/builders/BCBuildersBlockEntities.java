@@ -2,6 +2,7 @@ package buildcraft.builders;
 
 import buildcraft.api.core.MachineAPI;
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjCapabilityHelper;
 import buildcraft.builders.block.entity.FillerBlockEntity;
 import buildcraft.builders.block.entity.ArchitectTableBlockEntity;
 import buildcraft.builders.block.entity.BuilderBlockEntity;
@@ -60,6 +61,8 @@ public final class BCBuildersBlockEntities {
                 (table, side) -> table.inventory());
         event.registerBlockEntity(Capabilities.Item.BLOCK, BUILDER.get(), (builder, side) -> builder.inventory());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, BUILDER.get(), (builder, side) -> builder.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, BUILDER.get(),
+            (builder, side) -> new MjCapabilityHelper(builder.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, BUILDER.get(), (builder, side) -> builder.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, BUILDER.get(), (builder, side) -> builder.mjReceiver());
         event.registerBlockEntity(MachineAPI.CAP_HAS_WORK, BUILDER.get(), (builder, side) -> builder);
@@ -67,6 +70,8 @@ public final class BCBuildersBlockEntities {
         event.registerBlockEntity(Capabilities.Item.BLOCK, REPLACER.get(), (replacer, side) -> replacer.inventory());
         event.registerBlockEntity(Capabilities.Item.BLOCK, QUARRY.get(), (quarry, side) -> quarry.outputHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, QUARRY.get(), (quarry, side) -> quarry.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, QUARRY.get(),
+            (quarry, side) -> new MjCapabilityHelper(quarry.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, QUARRY.get(), (quarry, side) -> quarry.mjReceiver());
         event.registerBlockEntity(MachineAPI.CAP_HAS_WORK, QUARRY.get(), (quarry, side) -> quarry);
         event.registerBlockEntity(MachineAPI.CAP_CONTROLLABLE, QUARRY.get(), (quarry, side) -> quarry);
@@ -74,6 +79,8 @@ public final class BCBuildersBlockEntities {
                 (library, side) -> library.inventory());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, FILLER.get(),
                 (filler, side) -> filler.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, FILLER.get(),
+            (filler, side) -> new MjCapabilityHelper(filler.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, FILLER.get(),
                 (filler, side) -> filler.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, FILLER.get(),

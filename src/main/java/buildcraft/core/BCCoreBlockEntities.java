@@ -7,7 +7,9 @@ import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
 import buildcraft.core.block.entity.PowerTesterBlockEntity;
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjCapabilityHelper;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -59,6 +61,8 @@ public final class BCCoreBlockEntities {
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, POWER_TESTER.get(), (tester, side) -> tester);
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, POWER_TESTER.get(),
+            (tester, side) -> new MjCapabilityHelper(tester).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, POWER_TESTER.get(), (tester, side) -> tester);
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_REDSTONE.get(),
             (engine, side) -> engine.connector(side));

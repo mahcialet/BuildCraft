@@ -7,6 +7,7 @@ import buildcraft.api.fuels.IFuelManager;
 import buildcraft.api.mj.IMjConnector;
 import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.RfMjReceiverAdapter;
 import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.EngineBlockEntity;
 import buildcraft.energy.BCEnergyBlockEntities;
@@ -29,6 +30,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import org.jspecify.annotations.Nullable;
 
 /** Liquid-fuel combustion engine with fuel, coolant, and residue tanks. */
@@ -216,7 +218,12 @@ public final class CombustionEngineBlockEntity extends BlockEntity implements En
         IMjReceiver receiver = level.getCapability(
             MjAPI.CAP_RECEIVER, worldPosition.relative(direction), direction.getOpposite()
         );
-        return receiver != null && receiver.canConnect(connector) && connector.canConnect(receiver) ? receiver : null;
+        if (receiver != null && receiver.canConnect(connector) && connector.canConnect(receiver)) return receiver;
+        if (!MjAPI.isRfAutoConversionEnabled()) return null;
+        var energy = level.getCapability(
+            Capabilities.Energy.BLOCK, worldPosition.relative(direction), direction.getOpposite()
+        );
+        return energy == null ? null : new RfMjReceiverAdapter(energy, MjAPI.getRfConversion());
     }
 
     @Override

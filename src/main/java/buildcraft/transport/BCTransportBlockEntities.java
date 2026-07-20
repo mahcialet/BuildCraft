@@ -1,6 +1,7 @@
 package buildcraft.transport;
 
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjCapabilityHelper;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
 import buildcraft.transport.block.entity.FilteredBufferBlockEntity;
 import net.minecraft.core.registries.Registries;
@@ -37,7 +38,13 @@ public final class BCTransportBlockEntities {
             (holder, side) -> {
                 var attachment = holder.attachmentEnergyHandler(side);
                 if (attachment != null) return attachment;
-                return side != null && holder.pipeType().isWoodenRfInput() ? holder.rfSide(side) : null;
+                if (side != null && holder.pipeType().isWoodenRfInput()) return holder.rfSide(side);
+                buildcraft.api.mj.IMjReceiver receiver = holder.attachmentMjReceiver(side);
+                if (receiver == null) {
+                    receiver = holder.pipeType().isWoodenPowerInput()
+                        ? (buildcraft.api.mj.IMjReceiver) holder.mjConnector() : holder.mjReceiver();
+                }
+                return receiver == null ? null : new MjCapabilityHelper(receiver).energy();
             });
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side == null ? null : holder.fluidBuffer(side));

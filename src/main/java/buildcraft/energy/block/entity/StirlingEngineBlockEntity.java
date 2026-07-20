@@ -4,6 +4,7 @@ import buildcraft.api.enums.EnumPowerStage;
 import buildcraft.api.mj.IMjConnector;
 import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.RfMjReceiverAdapter;
 import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.EngineBlockEntity;
 import buildcraft.energy.BCEnergyBlockEntities;
@@ -25,6 +26,7 @@ import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import net.neoforged.neoforge.transfer.item.ItemResource;
 import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
+import net.neoforged.neoforge.capabilities.Capabilities;
 import org.jspecify.annotations.Nullable;
 
 /** Solid-fuel Stirling engine, historically stored as the stone engine variant. */
@@ -147,7 +149,12 @@ public final class StirlingEngineBlockEntity extends BlockEntity implements Engi
         IMjReceiver receiver = level.getCapability(
             MjAPI.CAP_RECEIVER, worldPosition.relative(direction), direction.getOpposite()
         );
-        return receiver != null && receiver.canConnect(connector) && connector.canConnect(receiver) ? receiver : null;
+        if (receiver != null && receiver.canConnect(connector) && connector.canConnect(receiver)) return receiver;
+        if (!MjAPI.isRfAutoConversionEnabled()) return null;
+        var energy = level.getCapability(
+            Capabilities.Energy.BLOCK, worldPosition.relative(direction), direction.getOpposite()
+        );
+        return energy == null ? null : new RfMjReceiverAdapter(energy, MjAPI.getRfConversion());
     }
 
     @Override

@@ -5,4 +5,8 @@ public interface IMjToRfStatus {
     MjRfConversion getConversion();
 
     boolean isAutoconvertEnabled();
+
+    default boolean isDisplayingRf() {
+        return false;
+    }
 }

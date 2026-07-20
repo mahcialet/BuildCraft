@@ -33,7 +33,14 @@ public final class MjAPI {
     }
 
     public static String formatMj(long microJoules) {
+        if (rfStatus.isDisplayingRf()) {
+            return MJ_DISPLAY_FORMAT.format(microJoules / (double) getRfConversion().mjPerRf);
+        }
         return MJ_DISPLAY_FORMAT.format(microJoules / (double) MJ);
+    }
+
+    public static String displayedPowerUnit() {
+        return rfStatus.isDisplayingRf() ? "RF" : "MJ";
     }
 
     public static MjRfConversion getRfConversion() {

@@ -1,6 +1,7 @@
 package buildcraft.silicon;
 
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjCapabilityHelper;
 import buildcraft.silicon.block.entity.AssemblyTableBlockEntity;
 import buildcraft.silicon.block.entity.LaserBlockEntity;
 import buildcraft.silicon.block.entity.AdvancedCraftingTableBlockEntity;
@@ -43,6 +44,8 @@ public final class BCSiliconBlockEntities {
     }
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, LASER.get(), (laser, side) -> laser.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, LASER.get(),
+            (laser, side) -> new MjCapabilityHelper(laser.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, LASER.get(), (laser, side) -> laser.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, LASER.get(), (laser, side) -> laser.mjReceiver());
         event.registerBlockEntity(Capabilities.Item.BLOCK, ASSEMBLY_TABLE.get(),

@@ -7490,6 +7490,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void mjEnergyConversion(GameTestHelper helper) {
+        helper.assertValueEqual(BCCoreConfig.POWER_MODE.getDefault(), BCCoreConfig.PowerMode.MJ_ONLY,
+            "configured power mode default");
+        helper.assertFalse(MjAPI.isRfAutoConversionEnabled(), "MJ_ONLY unexpectedly enabled RF conversion");
+        BCCoreConfig.POWER_MODE.set(BCCoreConfig.PowerMode.MJ_AUTOCONVERT_RF);
+        helper.assertTrue(MjAPI.isRfAutoConversionEnabled(), "MJ_AUTOCONVERT_RF did not enable conversion");
+        helper.assertFalse(BCCoreConfig.displayRf(), "MJ_AUTOCONVERT_RF unexpectedly enabled RF display");
+        BCCoreConfig.POWER_MODE.set(BCCoreConfig.PowerMode.DISPLAY_RF);
+        helper.assertTrue(MjAPI.isRfAutoConversionEnabled(), "DISPLAY_RF did not enable conversion");
+        helper.assertTrue(BCCoreConfig.displayRf(), "DISPLAY_RF did not enable RF display");
+        helper.assertValueEqual(MjAPI.formatMj(MjAPI.MJ), "10", "DISPLAY_RF power value");
+        helper.assertValueEqual(MjAPI.displayedPowerUnit(), "RF", "DISPLAY_RF power unit");
+        BCCoreConfig.POWER_MODE.set(BCCoreConfig.PowerMode.MJ_ONLY);
         helper.assertValueEqual(BCCoreConfig.MJ_PER_RF.getDefault(), 0.1,
                 "configured MJ/RF conversion default");
         helper.assertValueEqual(MjAPI.getRfConversion().mjPerRf, 100_000L,
@@ -7506,6 +7518,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         MjBattery battery = new MjBattery(MjAPI.MJ);
         MjRedstoneBatteryReceiver receiver = new MjRedstoneBatteryReceiver(battery);
         MjEnergyAdapter energy = new MjEnergyAdapter(receiver, receiver, conversion);
+        MjBattery rfBattery = new MjBattery(MjAPI.MJ);
+        MjRedstoneBatteryReceiver rfBatteryReceiver = new MjRedstoneBatteryReceiver(rfBattery);
+        buildcraft.api.mj.RfMjReceiverAdapter rfReceiver = new buildcraft.api.mj.RfMjReceiverAdapter(
+            new MjEnergyAdapter(rfBatteryReceiver, rfBatteryReceiver, conversion), conversion);
+        helper.assertValueEqual(rfReceiver.getPowerRequested(), MjAPI.MJ,
+            "RF target MJ request");
+        helper.assertValueEqual(rfReceiver.receivePower(250_000, true), 50_000L,
+            "RF target simulated remainder");
+        helper.assertValueEqual(rfBattery.getStored(), 0L, "RF target simulation changed storage");
+        helper.assertValueEqual(rfReceiver.receivePower(250_000, false), 50_000L,
+            "RF target accepted remainder");
+        helper.assertValueEqual(rfBattery.getStored(), 200_000L, "RF target accepted energy");
         try (net.neoforged.neoforge.transfer.transaction.Transaction transaction =
             net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
             helper.assertValueEqual(energy.insert(4, transaction), 4, "aborted energy insertion");

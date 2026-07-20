@@ -95,7 +95,8 @@ public class MjBattery {
     }
 
     public String getDebugString() {
-        return MjAPI.formatMj(microJoules) + " / " + MjAPI.formatMj(capacity) + " MJ";
+        return MjAPI.formatMj(microJoules) + " / " + MjAPI.formatMj(capacity) + " "
+            + MjAPI.displayedPowerUnit();
     }
 
     private static void requireRange(long min, long max) {

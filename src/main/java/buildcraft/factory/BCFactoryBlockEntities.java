@@ -9,6 +9,7 @@ import buildcraft.factory.block.entity.DistillerBlockEntity;
 import buildcraft.factory.block.entity.HeatExchangerBlockEntity;
 import buildcraft.factory.block.entity.AutoWorkbenchBlockEntity;
 import buildcraft.api.mj.MjAPI;
+import buildcraft.api.mj.MjCapabilityHelper;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -68,6 +69,8 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PUMP.get(),
             (pump, side) -> pump.outputFluidHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, PUMP.get(), (pump, side) -> pump.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, PUMP.get(),
+            (pump, side) -> new MjCapabilityHelper(pump.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, PUMP.get(), (pump, side) -> pump.mjReceiver());
         event.registerBlockEntity(buildcraft.api.core.MachineAPI.CAP_HAS_WORK,
@@ -75,18 +78,24 @@ public final class BCFactoryBlockEntities {
         event.registerBlockEntity(Capabilities.Item.BLOCK, MINING_WELL.get(),
                 (well, side) -> well.outputHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, MINING_WELL.get(), (well, side) -> well.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, MINING_WELL.get(),
+            (well, side) -> new MjCapabilityHelper(well.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, MINING_WELL.get(), (well, side) -> well.mjReceiver());
         event.registerBlockEntity(buildcraft.api.core.MachineAPI.CAP_HAS_WORK,
                 MINING_WELL.get(), (well, side) -> well);
         event.registerBlockEntity(Capabilities.Item.BLOCK, CHUTE.get(), (chute, side) -> chute.inputHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, CHUTE.get(), (chute, side) -> chute.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, CHUTE.get(),
+            (chute, side) -> new MjCapabilityHelper(chute.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, CHUTE.get(), (chute, side) -> chute.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, CHUTE.get(), (chute, side) -> chute.mjReceiver());
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, DISTILLER.get(),
                 (distiller, side) -> distiller.fluidHandler(side));
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, DISTILLER.get(),
                 (distiller, side) -> distiller.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, DISTILLER.get(),
+            (distiller, side) -> new MjCapabilityHelper(distiller.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, DISTILLER.get(),
                 (distiller, side) -> distiller.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, DISTILLER.get(),
@@ -97,6 +106,8 @@ public final class BCFactoryBlockEntities {
             (workbench, side) -> workbench.itemHandler());
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, AUTO_WORKBENCH.get(),
             (workbench, side) -> workbench.mjReceiver());
+        event.registerBlockEntity(Capabilities.Energy.BLOCK, AUTO_WORKBENCH.get(),
+            (workbench, side) -> new MjCapabilityHelper(workbench.mjReceiver()).energy());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, AUTO_WORKBENCH.get(),
             (workbench, side) -> workbench.mjReceiver());
         event.registerBlockEntity(MjAPI.CAP_READABLE, AUTO_WORKBENCH.get(),

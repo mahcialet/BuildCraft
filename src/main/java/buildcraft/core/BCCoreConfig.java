@@ -12,6 +12,7 @@ public final class BCCoreConfig {
     public static final ModConfigSpec.IntValue MINING_MAX_DEPTH;
     public static final ModConfigSpec.IntValue NETWORK_UPDATE_RATE;
     public static final ModConfigSpec.DoubleValue MJ_PER_RF;
+    public static final ModConfigSpec.EnumValue<PowerMode> POWER_MODE;
     public static final ModConfigSpec.BooleanValue WORLDGEN_ENABLED;
     public static final ModConfigSpec.BooleanValue GENERATE_WATER_SPRINGS;
 
@@ -39,6 +40,9 @@ public final class BCCoreConfig {
         MJ_PER_RF = builder
             .comment("MJ consumed or produced per NeoForge energy unit (RF/FE).")
             .defineInRange("mjPerRf", 0.1, 0.0001, 0.2);
+        POWER_MODE = builder
+            .comment("Controls RF/FE interoperability: MJ_ONLY disables conversion, MJ_AUTOCONVERT_RF enables conversion, and DISPLAY_RF also displays power as RF.")
+            .defineEnum("powerMode", PowerMode.MJ_ONLY);
         builder.pop();
         builder.push("worldgen");
         WORLDGEN_ENABLED = builder
@@ -58,8 +62,19 @@ public final class BCCoreConfig {
             @Override public buildcraft.api.mj.MjRfConversion getConversion() {
                 return buildcraft.api.mj.MjRfConversion.createParsed(MJ_PER_RF.get());
             }
-            @Override public boolean isAutoconvertEnabled() { return false; }
+            @Override public boolean isAutoconvertEnabled() { return POWER_MODE.get() != PowerMode.MJ_ONLY; }
+            @Override public boolean isDisplayingRf() { return displayRf(); }
         };
+    }
+
+    public static boolean displayRf() {
+        return POWER_MODE.get() == PowerMode.DISPLAY_RF;
+    }
+
+    public enum PowerMode {
+        MJ_ONLY,
+        MJ_AUTOCONVERT_RF,
+        DISPLAY_RF
     }
 
     public static boolean networkUpdateDue(long gameTime, long previousUpdate, int interval, boolean force) {
