@@ -20,6 +20,7 @@ public final class BCEnergy {
 
     public BCEnergy(IEventBus modBus) {
         BCEnergyFluids.register(modBus);
+        BCEnergyFeatures.register(modBus);
         BCEnergyBlocks.register(modBus);
         BCEnergyBlockEntities.register(modBus);
         BCEnergyMenus.register(modBus);

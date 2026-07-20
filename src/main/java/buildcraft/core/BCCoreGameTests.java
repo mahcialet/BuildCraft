@@ -181,6 +181,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
         registerTest(event, diagnosticsEnvironment, "core_goggles_power_tester", BCCoreGameTests::coreGogglesPowerTester);
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
+        registerTest(event, environment, "energy_oil_worldgen", BCCoreGameTests::energyOilWorldgen);
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
         registerTest(event, environment, "redstone_engine", BCCoreGameTests::redstoneEngine);
@@ -840,6 +841,33 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
             transaction.commit();
         }
         helper.assertTrue(shard.isEmpty(), "Drained fragile shard was not consumed");
+        helper.succeed();
+    }
+
+    private static void energyOilWorldgen(GameTestHelper helper) {
+        BlockPos medium = helper.absolutePos(new BlockPos(8, 4, 8));
+        helper.assertTrue(buildcraft.energy.gen.OilDepositFeature.placeMediumForTest(
+                helper.getLevel(), medium, 0xBCE11L), "Medium oil deposit placed no blocks");
+        helper.assertTrue(helper.getLevel().getBlockState(new BlockPos(medium.getX(), 20, medium.getZ()))
+                        .is(buildcraft.energy.BCEnergyFluids.OIL_BLOCK.get()),
+                "Medium oil deposit omitted its underground reservoir centre");
+        int surface = helper.getLevel().getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.WORLD_SURFACE,
+                medium.getX(), medium.getZ()) - 1;
+        helper.assertTrue(helper.getLevel().getBlockState(new BlockPos(medium.getX(), surface, medium.getZ()))
+                        .is(buildcraft.energy.BCEnergyFluids.OIL_BLOCK.get()),
+                "Medium oil deposit omitted its surface lake/spout");
+
+        BlockPos large = medium;
+        helper.assertTrue(buildcraft.energy.gen.OilDepositFeature.placeLargeForTest(
+                helper.getLevel(), large, 0xBCE12L), "Large oil deposit placed no blocks");
+        int bottom = helper.getLevel().getMinY();
+        BlockState spring = helper.getLevel().getBlockState(new BlockPos(large.getX(), bottom, large.getZ()));
+        helper.assertTrue(spring.is(BCCoreBlocks.SPRING.get()), "Large oil deposit omitted its bedrock spring");
+        helper.assertValueEqual(EnumSpring.OIL, spring.getValue(BlockSpring.SPRING_TYPE),
+                "Large deposit generated the wrong spring variant");
+        helper.assertTrue(helper.getLevel().getBlockState(new BlockPos(large.getX(), bottom + 1, large.getZ()))
+                        .is(buildcraft.energy.BCEnergyFluids.OIL_BLOCK.get()),
+                "Large oil deposit omitted its bedrock-to-reservoir tube");
         helper.succeed();
     }
 
