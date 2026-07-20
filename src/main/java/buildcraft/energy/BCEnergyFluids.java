@@ -72,7 +72,8 @@ public final class BCEnergyFluids {
         FLUIDS.register("flowing_fuel_light", () -> new BaseFlowingFluid.Flowing(FUEL_LIGHT_PROPERTIES));
 
     public static final DeferredBlock<BuildCraftLiquidBlock> OIL_BLOCK = BLOCKS.registerBlock("fluid_block_oil_heat_0",
-        properties -> new BuildCraftLiquidBlock(BCEnergyFluids::oil, true,
+        properties -> new BuildCraftLiquidBlock(BCEnergyFluids::oil,
+            () -> BCEnergyConfig.OIL_CAN_BURN.get(),
             properties.mapColor(net.minecraft.world.level.material.MapColor.COLOR_BLACK)
                 .replaceable().noCollision().strength(100).pushReaction(PushReaction.DESTROY)
                 .noLootTable().liquid()));

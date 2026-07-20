@@ -4,6 +4,7 @@ import buildcraft.api.enums.EnumSpring;
 import buildcraft.core.BCCoreBlocks;
 import buildcraft.core.block.BlockSpring;
 import buildcraft.energy.BCEnergyFluids;
+import buildcraft.energy.BCEnergyConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
@@ -19,10 +20,7 @@ import java.util.Random;
 public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
     private static final long MAGIC_GEN_NUMBER = 0xD046B4E40C7D07CFL;
     private static final int MAX_CHUNK_RADIUS = 5;
-    private static final double LARGE_CHANCE = 0.0004;
-    private static final double MEDIUM_CHANCE = 0.001;
-
-    private enum DepositType { LARGE, MEDIUM }
+    private enum DepositType { LARGE, MEDIUM, SMALL }
 
     public OilDepositFeature() {
         super(NoneFeatureConfiguration.CODEC);
@@ -30,6 +28,7 @@ public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
 
     @Override
     public boolean place(FeaturePlaceContext<NoneFeatureConfiguration> context) {
+        if (!BCEnergyConfig.ENABLE_OIL_GENERATION.get()) return false;
         WorldGenLevel level = context.level();
         int targetChunkX = context.origin().getX() >> 4;
         int targetChunkZ = context.origin().getZ() >> 4;
@@ -42,9 +41,16 @@ public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
                 int x = sourceChunkX * 16 + 8 + random.nextInt(16);
                 int z = sourceChunkZ * 16 + 8 + random.nextInt(16);
                 DepositType type;
-                if (random.nextDouble() <= LARGE_CHANCE) type = DepositType.LARGE;
-                else if (random.nextDouble() <= MEDIUM_CHANCE) type = DepositType.MEDIUM;
-                else continue;
+                double rate = BCEnergyConfig.OIL_GENERATION_RATE.get();
+                if (random.nextDouble() <= BCEnergyConfig.LARGE_OIL_CHANCE.get() / 100.0 * rate) {
+                    type = DepositType.LARGE;
+                } else if (random.nextDouble() <= BCEnergyConfig.MEDIUM_OIL_CHANCE.get() / 100.0 * rate) {
+                    type = DepositType.MEDIUM;
+                } else if ((level.getBiome(new BlockPos(x, 0, z)).is(OilBiomeReplacement.OIL_OCEAN)
+                        || level.getBiome(new BlockPos(x, 0, z)).is(OilBiomeReplacement.OIL_DESERT))
+                    && random.nextDouble() <= BCEnergyConfig.SMALL_OIL_CHANCE.get() / 100.0 * rate) {
+                    type = DepositType.SMALL;
+                } else continue;
                 placed |= placeDeposit(level, targetChunkX, targetChunkZ, new BlockPos(x, 0, z), random, type);
             }
         }
@@ -60,23 +66,30 @@ public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
 
     private static boolean placeDeposit(WorldGenLevel level, int targetChunkX, int targetChunkZ,
                                         BlockPos horizontalCenter, Random random, DepositType type) {
-        int lakeRadius = type == DepositType.LARGE ? 4 : 2;
-        int tendrilRadius = type == DepositType.LARGE ? 25 + random.nextInt(20) : 5 + random.nextInt(10);
+        int lakeRadius = type == DepositType.LARGE ? 4 : type == DepositType.MEDIUM ? 2 : 1;
+        int tendrilRadius = type == DepositType.LARGE ? 25 + random.nextInt(20)
+            : type == DepositType.MEDIUM ? 5 + random.nextInt(10) : 2 + random.nextInt(4);
         boolean[][] pattern = tendrilPattern(lakeRadius, tendrilRadius, random);
         int depth = random.nextDouble() < 0.5 ? 1 : 2;
         boolean placed = placeSurfacePattern(level, targetChunkX, targetChunkZ,
                 horizontalCenter, tendrilRadius, pattern, depth);
 
         int wellY = 20 + random.nextInt(10);
-        int reservoirRadius = type == DepositType.LARGE ? 8 + random.nextInt(9) : 4 + random.nextInt(4);
+        int reservoirRadius = type == DepositType.LARGE ? 8 + random.nextInt(9)
+            : type == DepositType.MEDIUM ? 4 + random.nextInt(4) : 2 + random.nextInt(2);
         BlockPos reservoir = new BlockPos(horizontalCenter.getX(), wellY, horizontalCenter.getZ());
         placed |= placeSphere(level, targetChunkX, targetChunkZ, reservoir, reservoirRadius);
 
         int spoutRadius = type == DepositType.LARGE ? 1 : 0;
-        int minSpout = type == DepositType.LARGE ? 10 : 6;
-        int maxSpout = type == DepositType.LARGE ? 20 : 12;
-        int spoutHeight = minSpout + random.nextInt(maxSpout - minSpout);
-        placed |= placeSpout(level, targetChunkX, targetChunkZ, reservoir, spoutRadius, spoutHeight);
+        if (BCEnergyConfig.ENABLE_OIL_SPOUTS.get()) {
+            int minSpout = type == DepositType.LARGE ? BCEnergyConfig.LARGE_SPOUT_MIN_HEIGHT.get()
+                : BCEnergyConfig.SMALL_SPOUT_MIN_HEIGHT.get();
+            int maxSpout = type == DepositType.LARGE ? BCEnergyConfig.LARGE_SPOUT_MAX_HEIGHT.get()
+                : BCEnergyConfig.SMALL_SPOUT_MAX_HEIGHT.get();
+            if (maxSpout < minSpout) maxSpout = minSpout;
+            int spoutHeight = minSpout + random.nextInt(maxSpout - minSpout + 1);
+            placed |= placeSpout(level, targetChunkX, targetChunkZ, reservoir, spoutRadius, spoutHeight);
+        }
 
         if (type == DepositType.LARGE) {
             int bottom = level.getMinY();
@@ -94,7 +107,12 @@ public final class OilDepositFeature extends Feature<NoneFeatureConfiguration> {
 
     public static boolean placeMediumForTest(WorldGenLevel level, BlockPos center, long seed) {
         return placeDeposit(level, center.getX() >> 4, center.getZ() >> 4, center,
-                new Random(seed), DepositType.MEDIUM);
+            new Random(seed), DepositType.MEDIUM);
+    }
+
+    public static boolean placeSmallForTest(WorldGenLevel level, BlockPos center, long seed) {
+        return placeDeposit(level, center.getX() >> 4, center.getZ() >> 4, center,
+            new Random(seed), DepositType.SMALL);
     }
 
     public static boolean placeLargeForTest(WorldGenLevel level, BlockPos center, long seed) {

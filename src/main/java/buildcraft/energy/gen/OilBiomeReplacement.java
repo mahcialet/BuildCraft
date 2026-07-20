@@ -1,6 +1,7 @@
 package buildcraft.energy.gen;
 
 import buildcraft.energy.BCEnergy;
+import buildcraft.energy.BCEnergyConfig;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
@@ -43,12 +44,13 @@ public final class OilBiomeReplacement {
         if (current == null || !original.is(BiomeTags.IS_OVERWORLD)) return original;
         double blockX = quartX * 4.0;
         double blockZ = quartZ * 4.0;
-        if (original.is(Tags.Biomes.IS_OCEAN)
+        if (BCEnergyConfig.ENABLE_OIL_OCEAN_BIOME.get() && original.is(Tags.Biomes.IS_OCEAN)
                 && LegacySimplexNoise.noise((blockX + current.xOffset) * 0.0005,
                         (blockZ + current.zOffset) * 0.0005) > 0.9) {
             return current.ocean;
         }
-        if (original.is(Tags.Biomes.IS_HOT) && original.is(Tags.Biomes.IS_DRY)
+        if (BCEnergyConfig.ENABLE_OIL_DESERT_BIOME.get()
+                && original.is(Tags.Biomes.IS_HOT) && original.is(Tags.Biomes.IS_DRY)
                 && original.is(Tags.Biomes.IS_SANDY)
                 && LegacySimplexNoise.noise((blockX + current.xOffset) * 0.001,
                         (blockZ + current.zOffset) * 0.001) > 0.7) {

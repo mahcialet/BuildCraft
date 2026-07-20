@@ -8,6 +8,7 @@ import buildcraft.core.BCCoreItems;
 import buildcraft.core.block.BlockEngine;
 import buildcraft.core.block.entity.EngineBlockEntity;
 import buildcraft.energy.BCEnergyBlockEntities;
+import buildcraft.energy.BCEnergyConfig;
 import buildcraft.lib.engine.EngineConnector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -79,6 +80,7 @@ public final class RfEngineBlockEntity extends BlockEntity implements EngineBloc
     }
 
     private void serverTick(ServerLevel level, BlockState state) {
+        if (!BCEnergyConfig.ENABLE_RF_ENGINE.get()) return;
         tickCycle(level.hasNeighborSignal(worldPosition), receiver(state.getValue(BlockEngine.FACING)));
         sync();
     }

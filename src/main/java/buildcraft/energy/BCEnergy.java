@@ -9,6 +9,8 @@ import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
@@ -19,7 +21,8 @@ import net.neoforged.neoforge.common.NeoForge;
 public final class BCEnergy {
     public static final String MOD_ID = "buildcraftenergy";
 
-    public BCEnergy(IEventBus modBus) {
+    public BCEnergy(IEventBus modBus, ModContainer modContainer) {
+        modContainer.registerConfig(ModConfig.Type.COMMON, BCEnergyConfig.SPEC);
         BCEnergyFluids.register(modBus);
         BCEnergyFeatures.register(modBus);
         BCEnergyBlocks.register(modBus);
@@ -73,7 +76,7 @@ public final class BCEnergy {
         if (event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) {
             event.accept(ItemBlockEngine.stirlingEngine());
             event.accept(ItemBlockEngine.combustionEngine());
-            event.accept(ItemBlockEngine.rfEngine());
+            if (BCEnergyConfig.ENABLE_RF_ENGINE.get()) event.accept(ItemBlockEngine.rfEngine());
             event.accept(BCEnergyFluids.OIL_BUCKET.get());
             event.accept(BCEnergyFluids.FUEL_LIGHT_BUCKET.get());
             for (var family : BCEnergyFluids.REFINERY_FLUIDS.values()) {
@@ -82,7 +85,7 @@ public final class BCEnergy {
                     event.accept(bucket);
                 }
             }
-        event.accept(BCEnergyItems.MJ_DYNAMO.get());
+            if (BCEnergyConfig.ENABLE_MJ_DYNAMO.get()) event.accept(BCEnergyItems.MJ_DYNAMO.get());
         event.accept(BCEnergyItems.GLOB_OF_OIL.get());
         }
         if (event.getTabKey().equals(CreativeModeTabs.FUNCTIONAL_BLOCKS)) {

@@ -888,6 +888,9 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void energyOilWorldgen(GameTestHelper helper) {
+        BlockPos small = helper.absolutePos(new BlockPos(2, 4, 2));
+        helper.assertTrue(buildcraft.energy.gen.OilDepositFeature.placeSmallForTest(
+                helper.getLevel(), small, 0xBCE10L), "Small oil deposit placed no blocks");
         BlockPos medium = helper.absolutePos(new BlockPos(8, 4, 8));
         helper.assertTrue(buildcraft.energy.gen.OilDepositFeature.placeMediumForTest(
                 helper.getLevel(), medium, 0xBCE11L), "Medium oil deposit placed no blocks");
@@ -1017,6 +1020,12 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
             BCEnergyFluids.OIL_BLOCK.get().defaultBlockState(), helper.getLevel(),
             helper.absolutePos(BlockPos.ZERO), net.minecraft.core.Direction.UP
         ), "oil block is not flammable");
+        buildcraft.energy.BCEnergyConfig.OIL_CAN_BURN.set(false);
+        helper.assertFalse(BCEnergyFluids.OIL_BLOCK.get().isFlammable(
+            BCEnergyFluids.OIL_BLOCK.get().defaultBlockState(), helper.getLevel(),
+            helper.absolutePos(BlockPos.ZERO), net.minecraft.core.Direction.UP
+        ), "oil ignored the disabled burning setting");
+        buildcraft.energy.BCEnergyConfig.OIL_CAN_BURN.set(true);
         helper.assertTrue(BCEnergyFluids.OIL_BUCKET.get().getContent() == BCEnergyFluids.OIL.get(),
             "oil bucket has the wrong fluid");
         helper.assertTrue(BCEnergyFluids.FUEL_LIGHT_BUCKET.get().getContent() == BCEnergyFluids.FUEL_LIGHT.get(),
@@ -1133,6 +1142,9 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void rfEngine(GameTestHelper helper) {
+        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.get(),
+                "RF Engine should retain its historical disabled default");
+        buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.set(true);
         BlockState state = BCCoreBlocks.ENGINE.get().defaultBlockState()
             .setValue(BlockEngine.ENGINE_TYPE, EnumEngineType.RF)
             .setValue(BlockEngine.FACING, net.minecraft.core.Direction.UP);
@@ -1313,6 +1325,9 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void mjDynamo(GameTestHelper helper) {
+        helper.assertFalse(buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.get(),
+                "MJ Dynamo should retain its historical disabled default");
+        buildcraft.energy.BCEnergyConfig.ENABLE_MJ_DYNAMO.set(true);
         BlockPos pos = helper.absolutePos(new BlockPos(0, 1, 0));
         BlockState state = buildcraft.energy.BCEnergyBlocks.MJ_DYNAMO.get().defaultBlockState()
             .setValue(buildcraft.energy.block.BlockDynamoMj.FACING, net.minecraft.core.Direction.UP);
@@ -4904,6 +4919,7 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void transportRfPipes(GameTestHelper helper) {
+        buildcraft.energy.BCEnergyConfig.ENABLE_RF_ENGINE.set(true);
         var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
         BlockPos woodPos = helper.absolutePos(new BlockPos(1, 2, 1));
         BlockPos goldPos = woodPos.east();

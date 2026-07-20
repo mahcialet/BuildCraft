@@ -69,18 +69,22 @@ public final class BCEnergyBlockEntities {
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, ENGINE_COMBUSTION.get(),
             (engine, side) -> engine.tanks());
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_RF.get(),
-            (engine, side) -> engine.connector(side));
+                (engine, side) -> BCEnergyConfig.ENABLE_RF_ENGINE.get() ? engine.connector(side) : null);
         event.registerBlockEntity(Capabilities.Energy.BLOCK, ENGINE_RF.get(),
-            (engine, side) -> engine.energy());
+                (engine, side) -> BCEnergyConfig.ENABLE_RF_ENGINE.get() ? engine.energy() : null);
         event.registerBlockEntity(MjAPI.CAP_RECEIVER, MJ_DYNAMO.get(),
-            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReceiver() : null);
+                (dynamo, side) -> BCEnergyConfig.ENABLE_MJ_DYNAMO.get() && side != dynamo.outputDirection()
+                        ? dynamo.mjReceiver() : null);
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, MJ_DYNAMO.get(),
-            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReceiver() : null);
+                (dynamo, side) -> BCEnergyConfig.ENABLE_MJ_DYNAMO.get() && side != dynamo.outputDirection()
+                        ? dynamo.mjReceiver() : null);
         event.registerBlockEntity(MjAPI.CAP_READABLE, MJ_DYNAMO.get(),
-            (dynamo, side) -> side != dynamo.outputDirection() ? dynamo.mjReadable() : null);
+                (dynamo, side) -> BCEnergyConfig.ENABLE_MJ_DYNAMO.get() && side != dynamo.outputDirection()
+                        ? dynamo.mjReadable() : null);
         event.registerBlockEntity(Capabilities.Energy.BLOCK, MJ_DYNAMO.get(),
-            (dynamo, side) -> side == dynamo.outputDirection() ? dynamo.energy() : null);
+                (dynamo, side) -> BCEnergyConfig.ENABLE_MJ_DYNAMO.get() && side == dynamo.outputDirection()
+                        ? dynamo.energy() : null);
         event.registerBlockEntity(Capabilities.Item.BLOCK, MJ_DYNAMO.get(),
-            (dynamo, side) -> dynamo.upgrades());
+                (dynamo, side) -> BCEnergyConfig.ENABLE_MJ_DYNAMO.get() ? dynamo.upgrades() : null);
     }
 }

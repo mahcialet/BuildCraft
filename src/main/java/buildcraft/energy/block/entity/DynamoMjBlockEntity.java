@@ -6,6 +6,7 @@ import buildcraft.api.mj.IMjReceiver;
 import buildcraft.api.mj.MjAPI;
 import buildcraft.core.BCCoreItems;
 import buildcraft.energy.BCEnergyBlockEntities;
+import buildcraft.energy.BCEnergyConfig;
 import buildcraft.energy.block.BlockDynamoMj;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -56,6 +57,7 @@ public final class DynamoMjBlockEntity extends BlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, DynamoMjBlockEntity dynamo) {
+        if (!BCEnergyConfig.ENABLE_MJ_DYNAMO.get()) return;
         if (level instanceof ServerLevel serverLevel) {
             dynamo.tickCycle(level.hasNeighborSignal(pos), dynamo.outputReceiver(serverLevel));
         }
