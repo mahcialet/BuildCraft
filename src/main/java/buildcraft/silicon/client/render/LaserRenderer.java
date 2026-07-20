@@ -11,6 +11,9 @@ import net.minecraft.gizmos.Gizmos;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jspecify.annotations.Nullable;
+import net.minecraft.client.Minecraft;
+import net.minecraft.world.entity.EquipmentSlot;
+import buildcraft.core.BCCoreItems;
 
 public final class LaserRenderer implements BlockEntityRenderer<LaserBlockEntity, LaserRenderState> {
     public LaserRenderer(BlockEntityRendererProvider.Context context) {}
@@ -19,6 +22,8 @@ public final class LaserRenderer implements BlockEntityRenderer<LaserBlockEntity
                                               Vec3 cameraPosition,
                                               ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
         BlockEntityRenderer.super.extractRenderState(laser, state, partialTicks, cameraPosition, breakProgress);
+        var player = Minecraft.getInstance().player;
+        state.visible = player != null && player.getItemBySlot(EquipmentSlot.HEAD).is(BCCoreItems.GOGGLES.get());
         if (laser.targetPos() == null) {
             state.start = null;
             state.end = null;
@@ -29,7 +34,7 @@ public final class LaserRenderer implements BlockEntityRenderer<LaserBlockEntity
     }
     @Override public void submit(LaserRenderState state, PoseStack poseStack, SubmitNodeCollector nodes,
                                  CameraRenderState camera) {
-        if (state.start != null && state.end != null) Gizmos.line(state.start, state.end, 0xFFFF2020, 3.0F);
+        if (state.visible && state.start != null && state.end != null) Gizmos.line(state.start, state.end, 0xFFFF2020, 3.0F);
     }
     @Override public boolean shouldRenderOffScreen() { return true; }
     @Override public int getViewDistance() { return 48; }

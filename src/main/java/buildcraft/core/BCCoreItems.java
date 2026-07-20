@@ -17,6 +17,7 @@ import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -63,6 +64,10 @@ public final class BCCoreItems {
     public static final DeferredItem<Item> GEAR_GOLD = ITEMS.registerSimpleItem("gear_gold");
     public static final DeferredItem<Item> GEAR_DIAMOND = ITEMS.registerSimpleItem("gear_diamond");
     public static final DeferredItem<Item> DIAMOND_SHARD = ITEMS.registerSimpleItem("diamond_shard");
+    public static final DeferredItem<Item> GOGGLES = ITEMS.registerItem("goggles",
+            properties -> new Item(properties.stacksTo(1).equippable(EquipmentSlot.HEAD)));
+    public static final DeferredItem<BlockItem> POWER_TESTER =
+            ITEMS.registerSimpleBlockItem(BCCoreBlocks.POWER_TESTER);
 
     private BCCoreItems() {
     }

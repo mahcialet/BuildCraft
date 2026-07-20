@@ -4,6 +4,7 @@ import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.world.phys.Vec3;
 
 public final class LaserRenderState extends BlockEntityRenderState {
+    public boolean visible;
     Vec3 start;
     Vec3 end;
 }

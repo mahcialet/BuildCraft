@@ -35,7 +35,9 @@ public final class BCCreativeTabs {
                     output.accept(buildcraft.core.item.ItemPaintbrush.colored(BCCoreItems.PAINTBRUSH.get(), color));
                 }
                 output.accept(BCCoreItems.LIST.get());
-                output.accept(BCCoreItems.VOLUME_BOX.get());
+                        output.accept(BCCoreItems.VOLUME_BOX.get());
+                        output.accept(BCCoreItems.GOGGLES.get());
+                        output.accept(BCCoreItems.POWER_TESTER.get());
                 for (EnumSpring type : EnumSpring.VALUES) output.accept(ItemBlockSpring.createStack(type));
                 output.accept(ItemBlockEngine.redstoneEngine());
                 output.accept(ItemBlockEngine.creativeEngine());

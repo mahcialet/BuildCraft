@@ -6,6 +6,7 @@ import buildcraft.core.block.BlockMarkerPath;
 import buildcraft.core.block.BlockMarkerVolume;
 import buildcraft.core.block.BlockSpring;
 import buildcraft.core.block.BlockEngine;
+import buildcraft.core.block.PowerTesterBlock;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -23,7 +24,9 @@ public final class BCCoreBlocks {
     public static final DeferredBlock<BlockSpring> SPRING =
         BLOCKS.registerBlock("spring", BlockSpring::new);
     public static final DeferredBlock<BlockEngine> ENGINE =
-        BLOCKS.registerBlock("engine", BlockEngine::new);
+            BLOCKS.registerBlock("engine", BlockEngine::new);
+    public static final DeferredBlock<PowerTesterBlock> POWER_TESTER =
+            BLOCKS.registerBlock("power_tester", PowerTesterBlock::new);
 
     private BCCoreBlocks() {
     }

@@ -5,6 +5,7 @@ import buildcraft.core.block.entity.PathMarkerBlockEntity;
 import buildcraft.core.block.entity.VolumeMarkerBlockEntity;
 import buildcraft.core.block.entity.RedstoneEngineBlockEntity;
 import buildcraft.core.block.entity.CreativeEngineBlockEntity;
+import buildcraft.core.block.entity.PowerTesterBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.core.registries.Registries;
@@ -34,6 +35,10 @@ public final class BCCoreBlockEntities {
         BLOCK_ENTITIES.register("engine_creative", () -> new BlockEntityType<>(
             CreativeEngineBlockEntity::new, BCCoreBlocks.ENGINE.get()
         ));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PowerTesterBlockEntity>> POWER_TESTER =
+        BLOCK_ENTITIES.register("power_tester", () -> new BlockEntityType<>(
+            PowerTesterBlockEntity::new, BCCoreBlocks.POWER_TESTER.get()
+        ));
 
     private BCCoreBlockEntities() {
     }
@@ -44,6 +49,8 @@ public final class BCCoreBlockEntities {
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerBlockEntity(MjAPI.CAP_RECEIVER, POWER_TESTER.get(), (tester, side) -> tester);
+        event.registerBlockEntity(MjAPI.CAP_CONNECTOR, POWER_TESTER.get(), (tester, side) -> tester);
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_REDSTONE.get(),
             (engine, side) -> engine.connector(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, ENGINE_CREATIVE.get(),

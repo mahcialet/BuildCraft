@@ -77,6 +77,12 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('processResources', ProcessResources) {
+    from('buildcraft_resources/assets/buildcraftcore/textures/items/goggles.png') {
+        into 'assets/buildcraftcore/textures/item'
+    }
+    from('buildcraft_resources/assets/buildcraftcore/textures/blocks/power_tester.png') {
+        into 'assets/buildcraftcore/textures/block'
+    }
     // Reuse the original artwork without duplicating binary assets while the
     // historical resource tree remains available as the migration source.
     from('buildcraft_resources/assets/buildcraftcore/textures/items') {

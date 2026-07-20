@@ -101,6 +101,7 @@ public final class BCCoreGameTests {
 
     private static void registerTests(RegisterGameTestsEvent event) {
         Holder<TestEnvironmentDefinition<?>> environment = event.registerEnvironment(id("core"));
+        Holder<TestEnvironmentDefinition<?>> diagnosticsEnvironment = event.registerEnvironment(id("core_diagnostics"));
         Holder<TestEnvironmentDefinition<?>> pickerEnvironment =
             event.registerEnvironment(id("robotics_picker"));
         Holder<TestEnvironmentDefinition<?>> fluidCarrierEnvironment =
@@ -170,6 +171,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "volume_box", BCCoreGameTests::volumeBox);
         registerTest(event, environment, "builders_filler_planner", BCCoreGameTests::buildersFillerPlanner);
         registerTest(event, environment, "fragile_fluid_shard", BCCoreGameTests::fragileFluidShard);
+        registerTest(event, diagnosticsEnvironment, "core_goggles_power_tester", BCCoreGameTests::coreGogglesPowerTester);
         registerTest(event, environment, "spring", BCCoreGameTests::spring);
         registerTest(event, environment, "mj_foundation", BCCoreGameTests::mjFoundation);
         registerTest(event, environment, "mj_energy_conversion", BCCoreGameTests::mjEnergyConversion);
@@ -732,6 +734,45 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 JsonOps.INSTANCE, (com.google.gson.JsonElement) encoded).getOrThrow();
         helper.assertValueEqual(decoded, data, "Filler Planner codec round-trip");
         helper.assertTrue(planners.remove(box.id()) && planners.get(box.id()).isEmpty(), "Planner did not detach");
+        helper.succeed();
+    }
+
+    private static void coreGogglesPowerTester(GameTestHelper helper) {
+        ItemStack goggles = new ItemStack(BCCoreItems.GOGGLES.get());
+        helper.assertValueEqual(1, goggles.getMaxStackSize(), "Goggles stack size");
+        helper.assertFalse(goggles.isDamageableItem(), "Goggles unexpectedly have durability");
+        var equippable = goggles.get(DataComponents.EQUIPPABLE);
+        helper.assertTrue(equippable != null, "Goggles are not equippable");
+        helper.assertValueEqual(net.minecraft.world.entity.EquipmentSlot.HEAD, equippable.slot(), "Goggles equipment slot");
+        helper.assertTrue(goggles.getOrDefault(DataComponents.ATTRIBUTE_MODIFIERS,
+                net.minecraft.world.item.component.ItemAttributeModifiers.EMPTY).modifiers().isEmpty(),
+                "Goggles unexpectedly grant armour attributes");
+
+        BlockPos relative = new BlockPos(2, 8, 2);
+        helper.setBlock(relative, BCCoreBlocks.POWER_TESTER.get());
+        BlockPos pos = helper.absolutePos(relative);
+        var tester = (buildcraft.core.block.entity.PowerTesterBlockEntity) helper.getLevel().getBlockEntity(pos);
+        var north = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, pos, Direction.NORTH);
+        var down = helper.getLevel().getCapability(MjAPI.CAP_RECEIVER, pos, Direction.DOWN);
+        helper.assertTrue(north == tester && down == tester, "Power Tester did not expose receiver on every side");
+        long offered = buildcraft.core.block.entity.PowerTesterBlockEntity.MAX_RECEIVE + 7 * MjAPI.MJ;
+        helper.assertValueEqual(7 * MjAPI.MJ, tester.receivePower(offered, true), "Power Tester simulated excess");
+        helper.assertValueEqual(0L, tester.totalReceived(), "Power Tester simulation mutated totals");
+        helper.assertValueEqual(7 * MjAPI.MJ, tester.receivePower(offered, false), "Power Tester committed excess");
+        helper.assertValueEqual(buildcraft.core.block.entity.PowerTesterBlockEntity.MAX_RECEIVE,
+                tester.pendingReceived(), "Power Tester pending tick measurement");
+        buildcraft.core.block.entity.PowerTesterBlockEntity.tick(helper.getLevel(), pos, tester.getBlockState(), tester);
+        helper.assertValueEqual(buildcraft.core.block.entity.PowerTesterBlockEntity.MAX_RECEIVE,
+                tester.tickReceived(), "Power Tester current tick measurement");
+        buildcraft.core.block.entity.PowerTesterBlockEntity.tick(helper.getLevel(), pos, tester.getBlockState(), tester);
+        helper.assertValueEqual(buildcraft.core.block.entity.PowerTesterBlockEntity.MAX_RECEIVE,
+                tester.lastReceived(), "Power Tester last tick measurement");
+        var saved = tester.saveWithoutMetadata(helper.getLevel().registryAccess());
+        helper.assertValueEqual(buildcraft.core.block.entity.PowerTesterBlockEntity.MAX_RECEIVE,
+                saved.getLongOr("total", -1), "Power Tester persisted total");
+        var drops = Block.getDrops(tester.getBlockState(), helper.getLevel(), pos, tester);
+        helper.assertTrue(drops.stream().anyMatch(stack -> stack.is(BCCoreItems.POWER_TESTER.get())),
+                "Power Tester loot missing block item");
         helper.succeed();
     }
 
