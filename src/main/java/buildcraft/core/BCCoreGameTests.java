@@ -115,6 +115,8 @@ public final class BCCoreGameTests {
             event.registerEnvironment(id("robotics_planter"));
         Holder<TestEnvironmentDefinition<?>> farmerEnvironment =
             event.registerEnvironment(id("robotics_farmer"));
+        Holder<TestEnvironmentDefinition<?>> leafCutterEnvironment =
+            event.registerEnvironment(id("robotics_leaf_cutter"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -126,6 +128,8 @@ public final class BCCoreGameTests {
             BCCoreGameTests::roboticsPlanterRobot);
         registerTest(event, farmerEnvironment, "robotics_farmer_robot",
             BCCoreGameTests::roboticsFarmerRobot);
+        registerTest(event, leafCutterEnvironment, "robotics_leaf_cutter_robot",
+            BCCoreGameTests::roboticsLeafCutterRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7473,6 +7477,99 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Farmer scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Farmer work consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsLeafCutterRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 84, 1);
+        BlockPos sourceRelative = new BlockPos(2, 84, 1);
+        BlockPos receiverRelative = new BlockPos(3, 84, 1);
+        BlockPos targetRelative = new BlockPos(4, 84, 1);
+        BlockPos excludedRelative = new BlockPos(4, 84, 2);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        var persistentLeaves = Blocks.OAK_LEAVES.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LeavesBlock.PERSISTENT, true);
+        helper.setBlock(targetRelative, persistentLeaves);
+        helper.setBlock(excludedRelative, persistentLeaves);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        net.minecraft.world.Container sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        net.minecraft.world.Container receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenShears = new ItemStack(Items.SHEARS);
+        nearlyBrokenShears.setDamageValue(nearlyBrokenShears.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenShears);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.LEAF_CUTTER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Leaf Cutter failed to dock at its home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1_500 && (!helper.getBlockState(targetRelative).isAir()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.leafCutterPhase() != buildcraft.robotics.LeafCutterPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(targetRelative).isAir(),
+                "Leaf Cutter did not cut zoned leaves: phase=" + robot.leafCutterPhase()
+                        + ", task=" + robot.taskState() + ", tool=" + robot.leafCutterTool());
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.OAK_LEAVES),
+                "Leaf Cutter cut leaves outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Leaf Cutter did not extract one Shears");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.SHEARS)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Leaf Cutter did not damage and unload its worn Shears");
+        helper.assertTrue(robot.leafCutterTool().isEmpty(), "Leaf Cutter retained unloaded Shears");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Leaf Cutter did not return home");
+        helper.assertValueEqual(buildcraft.robotics.LeafCutterPhase.NONE, robot.leafCutterPhase(),
+                "Leaf Cutter scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Leaf Cutter work consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                net.minecraft.world.entity.item.ItemEntity.class,
+                new net.minecraft.world.phys.AABB(target).inflate(2),
+                item -> item.getItem().is(Items.OAK_LEAVES)).isEmpty(),
+                "Leaf Cutter did not preserve Shears leaf drops");
         helper.succeed();
     }
 

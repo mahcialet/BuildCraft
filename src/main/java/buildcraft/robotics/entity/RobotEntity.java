@@ -20,6 +20,7 @@ import buildcraft.robotics.MinerPhase;
 import buildcraft.robotics.PlanterPhase;
 import buildcraft.robotics.RobotCropHandlerRegistry;
 import buildcraft.robotics.FarmerPhase;
+import buildcraft.robotics.LeafCutterPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -99,6 +100,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos farmerGroundTarget;
     private FarmerPhase farmerPhase = FarmerPhase.NONE;
     private int farmerUseDelay;
+    private ItemStack leafCutterTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address leafCutterStationTarget;
+    private BlockPos leafCutterBlockTarget;
+    private LeafCutterPhase leafCutterPhase = LeafCutterPhase.NONE;
+    private float leafCutterBreakProgress;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -155,6 +161,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack planterSeed() { return planterSeed.copy(); }
     public FarmerPhase farmerPhase() { return farmerPhase; }
     public ItemStack farmerTool() { return farmerTool.copy(); }
+    public LeafCutterPhase leafCutterPhase() { return leafCutterPhase; }
+    public ItemStack leafCutterTool() { return leafCutterTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -220,6 +228,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.FARMER
                     && farmerPhase == FarmerPhase.NONE && tickCount % 20 == 0) {
                 beginFarmer(serverLevel);
+            } else if (board() == RobotBoardType.LEAF_CUTTER
+                    && leafCutterPhase == LeafCutterPhase.NONE && tickCount % 20 == 0) {
+                beginLeafCutter(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -247,6 +258,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (minerPhase != MinerPhase.NONE) tickMiner(serverLevel);
         if (planterPhase != PlanterPhase.NONE) tickPlanter(serverLevel);
         if (farmerPhase != FarmerPhase.NONE) tickFarmer(serverLevel);
+        if (leafCutterPhase != LeafCutterPhase.NONE) tickLeafCutter(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -1563,6 +1575,203 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         farmerUseDelay = 0;
     }
 
+    private void beginLeafCutter(ServerLevel level) {
+        if (leafCutterTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findLeafCutterToolStation(level, true);
+            if (source.isEmpty()) return;
+            leafCutterStationTarget = source.get();
+            leafCutterPhase = LeafCutterPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (leafCutterTool.isDamageableItem()
+                && leafCutterTool.getDamageValue() >= leafCutterTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findLeafCutterToolStation(level, false);
+            if (receiver.isEmpty()) return;
+            leafCutterStationTarget = receiver.get();
+            leafCutterPhase = LeafCutterPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        if (selectLeafBlock(level)) {
+            leafCutterPhase = LeafCutterPhase.TO_BLOCK;
+            leaveStation();
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findLeafCutterToolStation(ServerLevel level, boolean provider) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
+                        return false;
+                    }
+                    if (!provider) {
+                        if (!config.matches(leafCutterTool)) return false;
+                        try (Transaction transaction = Transaction.openRoot()) {
+                            return handler.insert(ItemResource.of(leafCutterTool), 1, transaction) == 1;
+                        }
+                    }
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (stack.is(net.minecraft.world.item.Items.SHEARS)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadLeafCutterTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!stack.is(net.minecraft.world.item.Items.SHEARS) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    leafCutterTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadLeafCutterTool(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (leafCutterTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives() || !config.matches(leafCutterTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(leafCutterTool), 1, transaction) == 1) {
+                leafCutterTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private boolean selectLeafBlock(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime()
+                ^ getUUID().getMostSignificantBits() ^ 0x4C454146L);
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                if (!level.getBlockState(candidate).is(net.minecraft.tags.BlockTags.LEAVES)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        leafCutterBlockTarget = best;
+        return best != null;
+    }
+
+    private void tickLeafCutter(ServerLevel level) {
+        if (leafCutterPhase == LeafCutterPhase.TO_TOOL) {
+            if (leafCutterStationTarget == null) { leafCutterPhase = LeafCutterPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(leafCutterStationTarget))) {
+                loadLeafCutterTool(level, leafCutterStationTarget);
+                leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+            }
+        } else if (leafCutterPhase == LeafCutterPhase.TO_UNLOAD_TOOL) {
+            if (leafCutterStationTarget == null) { leafCutterPhase = LeafCutterPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(leafCutterStationTarget))) {
+                unloadLeafCutterTool(level, leafCutterStationTarget);
+                leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+            }
+        } else if (leafCutterPhase == LeafCutterPhase.TO_BLOCK) {
+            if (leafCutterBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, leafCutterBlockTarget, getUUID())
+                    || !level.getBlockState(leafCutterBlockTarget).is(net.minecraft.tags.BlockTags.LEAVES)) {
+                releaseLeafCutterBlock(level);
+                leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(leafCutterBlockTarget))) {
+                int breakResult = progressLeafCutterBlock(level);
+                if (breakResult == 0) return;
+                releaseLeafCutterBlock(level);
+                if (breakResult > 0 && !leafCutterTool.isEmpty() && selectLeafBlock(level)) return;
+                leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+            }
+        } else if (leafCutterPhase == LeafCutterPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                leafCutterPhase = LeafCutterPhase.NONE;
+                leafCutterStationTarget = null;
+            }
+        }
+    }
+
+    private int progressLeafCutterBlock(ServerLevel level) {
+        final long energyPerTick = 66_667;
+        if (leafCutterBlockTarget == null || leafCutterTool.isEmpty() || energy() < energyPerTick) return -1;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(leafCutterBlockTarget);
+        float hardness = state.getDestroySpeed(level, leafCutterBlockTarget);
+        if (!state.is(net.minecraft.tags.BlockTags.LEAVES) || hardness < 0) return -1;
+        leafCutterBreakProgress += hardness == 0 ? 1.1F
+                : leafCutterTool.getDestroySpeed(state) / hardness / 30.0F;
+        setEnergy(energy() - energyPerTick);
+        level.destroyBlockProgress(getId(), leafCutterBlockTarget,
+                Math.min(9, Math.max(0, (int) (leafCutterBreakProgress * 10))));
+        if (leafCutterBreakProgress <= 1.0F) return 0;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack usedTool = leafCutterTool.copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, usedTool);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer, leafCutterBlockTarget, state);
+        if (event.isCanceled()) return -1;
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, leafCutterBlockTarget, level.getBlockEntity(leafCutterBlockTarget), fakePlayer, usedTool);
+        level.removeBlock(leafCutterBlockTarget, false);
+        for (ItemStack drop : drops) net.minecraft.world.level.block.Block.popResource(
+                level, leafCutterBlockTarget, drop);
+        leafCutterTool.hurtAndBreak(1, level, null, item -> {});
+        leafCutterBreakProgress = 0;
+        return 1;
+    }
+
+    private void releaseLeafCutterBlock(ServerLevel level) {
+        if (leafCutterBlockTarget != null) {
+            BlockWorkRegistry.release(level, leafCutterBlockTarget, getUUID());
+            level.destroyBlockProgress(getId(), leafCutterBlockTarget, -1);
+            leafCutterBlockTarget = null;
+        }
+        leafCutterBreakProgress = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -1727,6 +1936,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseMinerBlock(serverLevel);
         releasePlanterGround(serverLevel);
         releaseFarmerGround(serverLevel);
+        releaseLeafCutterBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -1736,6 +1946,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!minerTool.isEmpty()) spawnAtLocation(serverLevel, minerTool.copy());
         if (!planterSeed.isEmpty()) spawnAtLocation(serverLevel, planterSeed.copy());
         if (!farmerTool.isEmpty()) spawnAtLocation(serverLevel, farmerTool.copy());
+        if (!leafCutterTool.isEmpty()) spawnAtLocation(serverLevel, leafCutterTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -1756,6 +1967,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseMinerBlock(level);
             releasePlanterGround(level);
             releaseFarmerGround(level);
+            releaseLeafCutterBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -1764,6 +1976,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!minerTool.isEmpty()) spawnAtLocation(level, minerTool.copy());
             if (!planterSeed.isEmpty()) spawnAtLocation(level, planterSeed.copy());
             if (!farmerTool.isEmpty()) spawnAtLocation(level, farmerTool.copy());
+            if (!leafCutterTool.isEmpty()) spawnAtLocation(level, leafCutterTool.copy());
             discard();
         }
         return true;
@@ -1842,6 +2055,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (farmerGroundTarget != null) output.putLong("FarmerGround", farmerGroundTarget.asLong());
         output.putInt("FarmerUseDelay", farmerUseDelay);
+        if (!leafCutterTool.isEmpty()) output.store("LeafCutterTool", ItemStack.CODEC, leafCutterTool);
+        output.putInt("LeafCutterPhase", leafCutterPhase.ordinal());
+        if (leafCutterStationTarget != null) {
+            output.putLong("LeafCutterStationPos", leafCutterStationTarget.pipePos().asLong());
+            output.putInt("LeafCutterStationSide", leafCutterStationTarget.side().get3DDataValue());
+        }
+        if (leafCutterBlockTarget != null) output.putLong("LeafCutterBlock", leafCutterBlockTarget.asLong());
+        output.putFloat("LeafCutterBreakProgress", leafCutterBreakProgress);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -2009,6 +2230,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if ((farmerPhase == FarmerPhase.TO_GROUND || farmerPhase == FarmerPhase.USING_TOOL)
                 && farmerGroundTarget == null) farmerPhase = FarmerPhase.RETURN_HOME;
+        leafCutterTool = input.read("LeafCutterTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int leafCutterOrdinal = input.getIntOr("LeafCutterPhase", LeafCutterPhase.NONE.ordinal());
+        LeafCutterPhase[] leafCutterPhases = LeafCutterPhase.values();
+        leafCutterPhase = leafCutterOrdinal >= 0 && leafCutterOrdinal < leafCutterPhases.length
+                ? leafCutterPhases[leafCutterOrdinal] : LeafCutterPhase.NONE;
+        if (input.getLong("LeafCutterStationPos").isPresent()) {
+            leafCutterStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("LeafCutterStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "LeafCutterStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("LeafCutterBlock").isPresent()) {
+            leafCutterBlockTarget = BlockPos.of(input.getLongOr("LeafCutterBlock", 0));
+        }
+        leafCutterBreakProgress = Math.clamp(input.getFloatOr("LeafCutterBreakProgress", 0), 0, 1.1F);
+        if ((leafCutterPhase == LeafCutterPhase.TO_TOOL
+                || leafCutterPhase == LeafCutterPhase.TO_UNLOAD_TOOL)
+                && leafCutterStationTarget == null) leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+        if (leafCutterPhase == LeafCutterPhase.TO_BLOCK && leafCutterBlockTarget == null) {
+            leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+        }
         ContainerHelper.loadAllItems(input, inventory);
     }
 
