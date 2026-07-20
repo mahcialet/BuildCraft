@@ -10,6 +10,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import buildcraft.robotics.zone.ZoneMapLocation;
+import buildcraft.robotics.zone.ZonePlan;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -68,6 +70,52 @@ public final class RoboticsGateActions {
                 || active != null && active.matchesFluid(GateAction.STATION_ACCEPT_FLUIDS, fluid);
     }
 
+    public static ZonePlan workZone(ServerLevel level, RobotStationRegistry.Address address) {
+        return zone(level, address, GateAction.ROBOT_WORK_AREA);
+    }
+
+    public static ZonePlan loadUnloadZone(ServerLevel level, RobotStationRegistry.Address address) {
+        return zone(level, address, GateAction.ROBOT_LOAD_UNLOAD_AREA);
+    }
+
+    public static boolean matchesWorkItem(ServerLevel level, RobotStationRegistry.Address address,
+            ItemStack stack) {
+        Active active = active(level, address);
+        return active == null || active.matchesOptionalItem(GateAction.ROBOT_FILTER, stack);
+    }
+
+    public static boolean matchesTool(ServerLevel level, RobotStationRegistry.Address address,
+            ItemStack stack) {
+        Active active = active(level, address);
+        return active == null || active.matchesOptionalItem(GateAction.ROBOT_FILTER_TOOL, stack);
+    }
+
+    public static boolean matchesWorkFluid(ServerLevel level, RobotStationRegistry.Address address,
+            FluidResource fluid) {
+        Active active = active(level, address);
+        return active == null || active.matchesOptionalFluid(GateAction.ROBOT_FILTER, fluid);
+    }
+
+    public static boolean permitsRobot(ServerLevel level, RobotStationRegistry.Address address,
+            RobotBoardType board) {
+        Active active = active(level, address);
+        if (active == null) return true;
+        if (active.has(GateAction.STATION_FORBID_ROBOT)
+                && active.matchesRobot(GateAction.STATION_FORBID_ROBOT, board)) return false;
+        return !active.has(GateAction.STATION_FORCE_ROBOT)
+                || active.matchesRobot(GateAction.STATION_FORCE_ROBOT, board);
+    }
+
+    private static ZonePlan zone(ServerLevel level, RobotStationRegistry.Address address, GateAction action) {
+        Active active = active(level, address);
+        if (active == null) return null;
+        for (ItemStack parameter : active.parameters.getOrDefault(action, List.of())) {
+            ZonePlan zone = ZoneMapLocation.get(parameter);
+            if (zone != null) return zone;
+        }
+        return null;
+    }
+
     private static Active active(ServerLevel level, RobotStationRegistry.Address address) {
         Map<RobotStationRegistry.Address, Active> actions = LEVELS.get(level);
         Active active = actions == null ? null : actions.get(address);
@@ -97,6 +145,26 @@ public final class RoboticsGateActions {
                     || filters.stream().anyMatch(filter -> ItemStack.isSameItemSameComponents(filter, stack)));
         }
 
+        private boolean has(GateAction action) {
+            return parameters.containsKey(action);
+        }
+
+        private boolean matchesOptionalItem(GateAction action, ItemStack stack) {
+            List<ItemStack> filters = parameters.get(action);
+            return filters == null || unrestricted.contains(action)
+                    || filters.stream().anyMatch(filter -> ItemStack.isSameItemSameComponents(filter, stack));
+        }
+
+        private boolean matchesRobot(GateAction action, RobotBoardType board) {
+            return parameters.getOrDefault(action, List.of()).stream().anyMatch(parameter -> {
+                RobotBoardType type = parameter.getOrDefault(BCRoboticsDataComponents.BOARD_TYPE.get(),
+                        RobotBoardType.EMPTY);
+                RobotItemData data = parameter.get(BCRoboticsDataComponents.ROBOT.get());
+                if (type == RobotBoardType.EMPTY && data != null) type = data.board();
+                return type == board;
+            });
+        }
+
         private boolean matchesFluid(GateAction action, FluidResource fluid) {
             List<ItemStack> filters = parameters.get(action);
             if (filters == null) return false;
@@ -109,6 +177,10 @@ public final class RoboticsGateActions {
                 }
             }
             return false;
+        }
+
+        private boolean matchesOptionalFluid(GateAction action, FluidResource fluid) {
+            return !has(action) || unrestricted.contains(action) || matchesFluid(action, fluid);
         }
     }
 }

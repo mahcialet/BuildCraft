@@ -6760,6 +6760,17 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(buildcraft.robotics.RoboticsGateActions.providesItem(
                 helper.getLevel(), address, disabled, new ItemStack(Items.DIAMOND)),
                 "Unfiltered Provide Items rule did not override a parallel filtered rule");
+        robot.setTaskState(buildcraft.robotics.RobotTaskState.LEAVING);
+        ItemStack returnGate = holder.attachment(Direction.UP).copy();
+        returnGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.ROBOT_GOTO_STATION))));
+        holder.setAttachment(Direction.UP, returnGate);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(
+                helper.getLevel(), pos, helper.getLevel().getBlockState(pos), holder);
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.RETURNING, robot.taskState(),
+                "Go To Station action did not recall linked Robot");
 
         BlockPos fluidRelative = new BlockPos(5, 2, 2);
         BlockPos fluidPos = helper.absolutePos(fluidRelative);
@@ -6799,6 +6810,67 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertFalse(buildcraft.robotics.RoboticsGateActions.providesItem(
                 helper.getLevel(), fluidAddress, disabled, new ItemStack(Items.WATER_BUCKET)),
                 "Provide Fluids action incorrectly enabled item output");
+
+        BlockPos robotActionRelative = new BlockPos(7, 2, 2);
+        BlockPos robotActionPos = helper.absolutePos(robotActionRelative);
+        helper.setBlock(robotActionRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        var robotActionHolder = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(robotActionPos);
+        helper.assertTrue(robotActionHolder != null && robotActionHolder.installAttachment(Direction.NORTH,
+                new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get())),
+                "Robot action test rejected Robot Station");
+        var actionZone = new buildcraft.robotics.zone.ZonePlan();
+        actionZone.set(robotActionPos.getX() + 3, robotActionPos.getZ() + 4, true);
+        ItemStack map = new ItemStack(buildcraft.core.BCCoreItems.MAP_LOCATION.get());
+        buildcraft.robotics.zone.ZoneMapLocation.set(map, actionZone, "Gate zone");
+        ItemStack forcedRobot = buildcraft.robotics.item.RobotItem.create(
+                buildcraft.robotics.RobotBoardType.CARRIER, 0);
+        ItemStack robotActionGate = buildcraft.silicon.BCSiliconItems.gate(
+                buildcraft.silicon.gate.GateMaterial.GOLD,
+                buildcraft.silicon.gate.GateLogic.AND,
+                buildcraft.silicon.gate.GateModifier.NO_MODIFIER);
+        robotActionGate.set(buildcraft.silicon.BCSiliconDataComponents.GATE_PROGRAM.get(),
+                new buildcraft.silicon.gate.GateProgram(java.util.List.of(
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.ROBOT_WORK_AREA,
+                                java.util.Optional.empty(), java.util.List.of(map)),
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.ROBOT_FILTER,
+                                java.util.Optional.empty(), java.util.List.of(new ItemStack(Items.COBBLESTONE))),
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.ROBOT_FILTER_TOOL,
+                                java.util.Optional.empty(), java.util.List.of(new ItemStack(Items.IRON_PICKAXE))),
+                        new buildcraft.silicon.gate.GateRule(buildcraft.silicon.gate.GateTrigger.TRUE,
+                                buildcraft.silicon.gate.GateAction.STATION_FORCE_ROBOT,
+                                java.util.Optional.empty(), java.util.List.of(forcedRobot)))));
+        helper.assertTrue(robotActionHolder.installAttachment(Direction.UP, robotActionGate),
+                "Robot action test rejected Gate");
+        buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), robotActionPos, Direction.NORTH);
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), robotActionPos,
+                helper.getLevel().getBlockState(robotActionPos), robotActionHolder);
+        var robotActionAddress = new buildcraft.robotics.RobotStationRegistry.Address(
+                robotActionPos, Direction.NORTH);
+        helper.assertValueEqual(actionZone, buildcraft.robotics.RoboticsGateActions.workZone(
+                helper.getLevel(), robotActionAddress), "Work Area action lost its Zone Map");
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.matchesWorkItem(
+                helper.getLevel(), robotActionAddress, new ItemStack(Items.COBBLESTONE)),
+                "Robot Filter rejected configured item");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.matchesWorkItem(
+                helper.getLevel(), robotActionAddress, new ItemStack(Items.DIRT)),
+                "Robot Filter accepted unconfigured item");
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.matchesTool(
+                helper.getLevel(), robotActionAddress, new ItemStack(Items.IRON_PICKAXE)),
+                "Tool Filter rejected configured tool");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.matchesTool(
+                helper.getLevel(), robotActionAddress, new ItemStack(Items.DIAMOND_PICKAXE)),
+                "Tool Filter accepted unconfigured tool");
+        helper.assertTrue(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(),
+                robotActionAddress, buildcraft.robotics.RobotBoardType.CARRIER),
+                "Force Robot rejected configured board");
+        helper.assertFalse(buildcraft.robotics.RoboticsGateActions.permitsRobot(helper.getLevel(),
+                robotActionAddress, buildcraft.robotics.RobotBoardType.PICKER),
+                "Force Robot accepted unconfigured board");
         helper.succeed();
     }
 

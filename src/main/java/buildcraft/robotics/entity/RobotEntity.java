@@ -388,8 +388,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findDeliverySource(ServerLevel level, ItemStack requested) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> sourceContains(level, address, requested))
                 .min(java.util.Comparator.comparingDouble(address ->
@@ -398,7 +397,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private boolean sourceContains(ServerLevel level, RobotStationRegistry.Address address, ItemStack requested) {
         RobotStationConfig config = stationConfig(level, address);
-        if (!RoboticsGateActions.providesItem(level, address, config, requested)) return false;
+        if (!matchesWorkFilter(level, requested)
+                || !RoboticsGateActions.providesItem(level, address, config, requested)) return false;
         ResourceHandler<ItemResource> handler = sourceHandler(level, address);
         if (handler == null) return false;
         ItemResource resource = ItemResource.of(requested);
@@ -431,11 +431,33 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private buildcraft.robotics.zone.ZonePlan workZone(ServerLevel level) {
-        return stationAddress == null ? null : stationConfig(level, stationAddress).workZone();
+        if (stationAddress == null) return null;
+        buildcraft.robotics.zone.ZonePlan actionZone = RoboticsGateActions.workZone(level, stationAddress);
+        return actionZone != null ? actionZone : stationConfig(level, stationAddress).workZone();
     }
 
     private buildcraft.robotics.zone.ZonePlan loadUnloadZone(ServerLevel level) {
-        return stationAddress == null ? null : stationConfig(level, stationAddress).effectiveLoadUnloadZone();
+        if (stationAddress == null) return null;
+        buildcraft.robotics.zone.ZonePlan actionZone = RoboticsGateActions.loadUnloadZone(level, stationAddress);
+        return actionZone != null ? actionZone : stationConfig(level, stationAddress).effectiveLoadUnloadZone();
+    }
+
+    private java.util.stream.Stream<RobotStationRegistry.Address> permittedStations(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> RoboticsGateActions.permitsRobot(level, address, board()));
+    }
+
+    private boolean matchesWorkFilter(ServerLevel level, ItemStack stack) {
+        return stationAddress == null || RoboticsGateActions.matchesWorkItem(level, stationAddress, stack);
+    }
+
+    private boolean matchesToolFilter(ServerLevel level, ItemStack stack) {
+        return stationAddress == null || RoboticsGateActions.matchesTool(level, stationAddress, stack);
+    }
+
+    private boolean matchesWorkFilter(ServerLevel level, FluidResource fluid) {
+        return stationAddress == null || RoboticsGateActions.matchesWorkFluid(level, stationAddress, fluid);
     }
 
     private static boolean inside(buildcraft.robotics.zone.ZonePlan zone, BlockPos position) {
@@ -452,8 +474,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findCarrierLoadStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -462,7 +483,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemResource resource = handler.getResource(slot);
-                        if (!resource.isEmpty() && handler.getAmountAsLong(slot) > 0
+                if (!resource.isEmpty() && handler.getAmountAsLong(slot) > 0
+                        && matchesWorkFilter(level, resource.toStack())
                         && RoboticsGateActions.providesItem(
                                 level, address, config, resource.toStack())) return true;
                     }
@@ -474,8 +496,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private Optional<RobotStationRegistry.Address> findCarrierUnloadStation(
             ServerLevel level, RobotStationRegistry.Address excluded) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> canUnloadAt(level, address))
@@ -541,7 +562,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (handler == null) return;
         for (int sourceSlot = 0; sourceSlot < handler.size(); sourceSlot++) {
             ItemResource resource = handler.getResource(sourceSlot);
-            if (resource.isEmpty() || !RoboticsGateActions.providesItem(
+            if (resource.isEmpty() || !matchesWorkFilter(level, resource.toStack())
+                    || !RoboticsGateActions.providesItem(
                     level, source, config, resource.toStack())) continue;
             ItemStack template = resource.toStack();
             int capacity = inventoryCapacity(template);
@@ -593,7 +615,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         Optional<net.minecraft.world.entity.item.ItemEntity> target = DroppedItemRegistry.reserveClosest(
                 level, position(), 250, getUUID(), item ->
                         inside(workZone(level), item.blockPosition())
-                                && homeConfig.matches(item.getItem()) && inventoryCapacity(item.getItem()) > 0);
+                            && homeConfig.matches(item.getItem()) && matchesWorkFilter(level, item.getItem())
+                            && inventoryCapacity(item.getItem()) > 0);
         if (target.isEmpty()) return;
         pickerTarget = target.get().getUUID();
         pickerPhase = PickerPhase.TO_ITEM;
@@ -680,8 +703,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findFluidLoadStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -690,7 +712,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         FluidResource fluid = handler.getResource(slot);
-                        if (!fluid.isEmpty() && handler.getAmountAsLong(slot) > 0
+                if (!fluid.isEmpty() && handler.getAmountAsLong(slot) > 0 && matchesWorkFilter(level, fluid)
                         && RoboticsGateActions.providesFluid(level, address, config, fluid)) return true;
                     }
                     return false;
@@ -703,8 +725,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             ServerLevel level, RobotStationRegistry.Address excluded) {
         if (fluidTank.getAmountAsLong(0) <= 0) return Optional.empty();
         FluidResource carried = fluidTank.getResource(0);
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress) && !address.equals(excluded))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -762,7 +783,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (handler == null) return;
         for (int slot = 0; slot < handler.size() && fluidTank.getAmountAsLong(0) < FLUID_CAPACITY; slot++) {
             FluidResource fluid = handler.getResource(slot);
-            if (fluid.isEmpty() || !RoboticsGateActions.providesFluid(
+            if (fluid.isEmpty() || !matchesWorkFilter(level, fluid)
+                    || !RoboticsGateActions.providesFluid(
                     level, source, config, fluid)) continue;
             int capacity = FLUID_CAPACITY - fluidTank.getAmountAsInt(0);
             try (Transaction transaction = Transaction.openRoot()) {
@@ -824,8 +846,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findLumberjackToolStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -835,7 +856,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.AXES)
-                        && handler.getAmountAsLong(slot) > 0
+                        && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -845,8 +866,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findLumberjackToolReceiver(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -869,7 +889,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.AXES)
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.AXES) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -1182,8 +1202,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findMinerToolStation(ServerLevel level, boolean provider) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -1199,7 +1218,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.PICKAXES)
-                        && handler.getAmountAsLong(slot) > 0
+                        && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -1215,7 +1234,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.PICKAXES)
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.PICKAXES) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -1389,8 +1408,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findPlanterSeedStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -1400,7 +1418,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (RobotCropHandlerRegistry.isSeed(stack)
-                        && handler.getAmountAsLong(slot) > 0
+                        && handler.getAmountAsLong(slot) > 0 && matchesWorkFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -1416,7 +1434,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!RobotCropHandlerRegistry.isSeed(stack)
+            if (!RobotCropHandlerRegistry.isSeed(stack) || !matchesWorkFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -1540,8 +1558,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findFarmerToolStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -1551,7 +1568,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (!stack.isEmpty() && stack.is(net.minecraft.tags.ItemTags.HOES)
-                        && handler.getAmountAsLong(slot) > 0
+                        && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -1567,7 +1584,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.HOES)
+            if (stack.isEmpty() || !stack.is(net.minecraft.tags.ItemTags.HOES) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -1717,8 +1734,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findLeafCutterToolStation(ServerLevel level, boolean provider) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -1734,7 +1750,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
                         if (stack.is(net.minecraft.world.item.Items.SHEARS)
-                        && handler.getAmountAsLong(slot) > 0
+                        && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -1750,7 +1766,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.world.item.Items.SHEARS)
+            if (!stack.is(net.minecraft.world.item.Items.SHEARS) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -1915,8 +1931,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findShovelmanToolStation(ServerLevel level, boolean provider) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -1931,8 +1946,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     }
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (stack.is(net.minecraft.tags.ItemTags.SHOVELS)
-                    && handler.getAmountAsLong(slot) > 0
+                if (stack.is(net.minecraft.tags.ItemTags.SHOVELS)
+                    && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                     && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -1947,7 +1962,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SHOVELS)
+            if (!stack.is(net.minecraft.tags.ItemTags.SHOVELS) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, address, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -2127,8 +2142,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findButcherToolStation(ServerLevel level, boolean provider) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -2143,8 +2157,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     }
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
-                    && handler.getAmountAsLong(slot) > 0
+                if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                    && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                     && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -2159,7 +2173,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS)
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -2447,8 +2461,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findKnightToolStation(ServerLevel level, boolean provider) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -2463,8 +2476,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     }
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
-                    && handler.getAmountAsLong(slot) > 0
+                if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                    && handler.getAmountAsLong(slot) > 0 && matchesToolFilter(level, stack)
                     && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -2479,7 +2492,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS)
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !matchesToolFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -2586,8 +2599,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findBomberTntStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -2596,8 +2608,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
-                        && handler.getAmountAsLong(slot) > 0
+                if (stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
+                        && handler.getAmountAsLong(slot) > 0 && matchesWorkFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -2612,7 +2624,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem())
+            if (!stack.is(net.minecraft.world.level.block.Blocks.TNT.asItem()) || !matchesWorkFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             int accepted = bomberInventoryCapacity(stack);
             if (accepted <= 0) return;
@@ -2753,8 +2765,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     }
 
     private Optional<RobotStationRegistry.Address> findStripesItemStation(ServerLevel level) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -2763,7 +2774,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                if (!stack.isEmpty() && handler.getAmountAsLong(slot) > 0
+                if (!stack.isEmpty() && handler.getAmountAsLong(slot) > 0 && matchesWorkFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -2778,7 +2789,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (stack.isEmpty() || !RoboticsGateActions.providesItem(
+            if (stack.isEmpty() || !matchesWorkFilter(level, stack)
+                    || !RoboticsGateActions.providesItem(
                     level, source, config, stack)) continue;
             try (Transaction transaction = Transaction.openRoot()) {
                 if (handler.extract(slot, resource, 1, transaction) == 1) {
@@ -3060,8 +3072,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private Optional<RobotStationRegistry.Address> findBuilderMaterialStation(ServerLevel level,
             buildcraft.builders.snapshot.SnapshotData snapshot,
             net.minecraft.world.level.block.state.BlockState desired) {
-        return RobotStationRegistry.loadedStations(level).stream()
-                .map(RobotStationRegistry.Station::address)
+        return permittedStations(level)
                 .filter(address -> !address.equals(stationAddress))
                 .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
                 .filter(address -> {
@@ -3070,8 +3081,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                     if (handler == null) return false;
                     for (int slot = 0; slot < handler.size(); slot++) {
                         ItemStack stack = handler.getResource(slot).toStack();
-                        if (builderMaterialMatches(snapshot, desired, stack)
-                        && handler.getAmountAsLong(slot) > 0
+                if (builderMaterialMatches(snapshot, desired, stack)
+                        && handler.getAmountAsLong(slot) > 0 && matchesWorkFilter(level, stack)
                         && RoboticsGateActions.providesItem(level, address, config, stack)) return true;
                     }
                     return false;
@@ -3097,7 +3108,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         for (int slot = 0; slot < handler.size(); slot++) {
             ItemResource resource = handler.getResource(slot);
             ItemStack stack = resource.toStack();
-            if (!builderMaterialMatches(snapshot, desired, stack)
+            if (!builderMaterialMatches(snapshot, desired, stack) || !matchesWorkFilter(level, stack)
                     || !RoboticsGateActions.providesItem(level, source, config, stack)) continue;
             int targetSlot = firstEmptyRobotSlot();
             if (targetSlot < 0) return;
