@@ -9541,6 +9541,11 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 "network update interval did not fire");
         helper.assertTrue(BCCoreConfig.networkUpdateDue(101, 100, 10, true),
                 "forced network update was delayed");
+        helper.assertFalse(buildcraft.transport.BCTransportConfig.POWER_USE_OLD_MJ_TEXTURE.getDefault(),
+                "power pipes should retain the modern MJ texture default");
+        helper.assertValueEqual(buildcraft.transport.BCTransportConfig.KINESIS_LOSS_MODE.getDefault(),
+                buildcraft.transport.BCTransportConfig.PowerLossMode.LOSSLESS,
+                "Kinesis pipes should retain the historical lossless default");
         helper.assertValueEqual(buildcraft.builders.block.entity.QuarryBlockEntity.configuredMineDelayTicks(), 0L,
                 "Quarry should retain its unlimited mining-rate default");
         buildcraft.builders.BCBuildersConfig.QUARRY_MAX_BLOCK_MINE_RATE.set(0.5);
