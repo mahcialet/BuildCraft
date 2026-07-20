@@ -14,6 +14,7 @@ import org.jspecify.annotations.Nullable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.EquipmentSlot;
 import buildcraft.core.BCCoreItems;
+import buildcraft.silicon.BCSiliconConfig;
 
 public final class LaserRenderer implements BlockEntityRenderer<LaserBlockEntity, LaserRenderState> {
     public LaserRenderer(BlockEntityRendererProvider.Context context) {}
@@ -23,7 +24,8 @@ public final class LaserRenderer implements BlockEntityRenderer<LaserBlockEntity
                                               ModelFeatureRenderer.@Nullable CrumblingOverlay breakProgress) {
         BlockEntityRenderer.super.extractRenderState(laser, state, partialTicks, cameraPosition, breakProgress);
         var player = Minecraft.getInstance().player;
-        state.visible = player != null && player.getItemBySlot(EquipmentSlot.HEAD).is(BCCoreItems.GOGGLES.get());
+        state.visible = BCSiliconConfig.RENDER_LASER_BEAMS.get()
+            || player != null && player.getItemBySlot(EquipmentSlot.HEAD).is(BCCoreItems.GOGGLES.get());
         if (laser.targetPos() == null) {
             state.start = null;
             state.end = null;
