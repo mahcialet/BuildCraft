@@ -17,6 +17,8 @@ import buildcraft.robotics.LumberjackPhase;
 import buildcraft.robotics.BlockWorkRegistry;
 import buildcraft.robotics.HarvesterPhase;
 import buildcraft.robotics.MinerPhase;
+import buildcraft.robotics.PlanterPhase;
+import buildcraft.robotics.RobotCropHandlerRegistry;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -85,6 +87,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos minerBlockTarget;
     private MinerPhase minerPhase = MinerPhase.NONE;
     private float minerBreakProgress;
+    private ItemStack planterSeed = ItemStack.EMPTY;
+    private RobotStationRegistry.Address planterSeedSource;
+    private BlockPos planterGroundTarget;
+    private PlanterPhase planterPhase = PlanterPhase.NONE;
+    private int planterDelay;
+    private int planterSearchAttempts;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -137,6 +145,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public HarvesterPhase harvesterPhase() { return harvesterPhase; }
     public MinerPhase minerPhase() { return minerPhase; }
     public ItemStack minerTool() { return minerTool.copy(); }
+    public PlanterPhase planterPhase() { return planterPhase; }
+    public ItemStack planterSeed() { return planterSeed.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -196,6 +206,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.MINER
                     && minerPhase == MinerPhase.NONE && tickCount % 20 == 0) {
                 beginMiner(serverLevel);
+            } else if (board() == RobotBoardType.PLANTER
+                    && planterPhase == PlanterPhase.NONE && tickCount % 20 == 0) {
+                beginPlanter(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -221,6 +234,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (lumberjackPhase != LumberjackPhase.NONE) tickLumberjack(serverLevel);
         if (harvesterPhase != HarvesterPhase.NONE) tickHarvester(serverLevel);
         if (minerPhase != MinerPhase.NONE) tickMiner(serverLevel);
+        if (planterPhase != PlanterPhase.NONE) tickPlanter(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -1222,6 +1236,156 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         minerBreakProgress = 0;
     }
 
+    private void beginPlanter(ServerLevel level) {
+        if (planterSeed.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findPlanterSeedStation(level);
+            if (source.isEmpty()) return;
+            planterSeedSource = source.get();
+            planterPhase = PlanterPhase.TO_SEED;
+            leaveStation();
+        } else {
+            planterSearchAttempts = 0;
+            planterPhase = PlanterPhase.SEARCHING;
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findPlanterSeedStation(ServerLevel level) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (RobotCropHandlerRegistry.isSeed(stack)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address ->
+                        sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadPlanterSeed(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!RobotCropHandlerRegistry.isSeed(stack) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    planterSeed = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void tickPlanter(ServerLevel level) {
+        if (planterPhase == PlanterPhase.TO_SEED) {
+            if (planterSeedSource == null) { planterPhase = PlanterPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(planterSeedSource))) {
+                loadPlanterSeed(level, planterSeedSource);
+                planterPhase = PlanterPhase.RETURN_HOME;
+            }
+        } else if (planterPhase == PlanterPhase.SEARCHING) {
+            if (planterSeed.isEmpty() || ++planterSearchAttempts > 4_096) {
+                planterPhase = PlanterPhase.NONE;
+                return;
+            }
+            if (energy() <= 0) { planterPhase = PlanterPhase.NONE; return; }
+            setEnergy(energy() - 2);
+            BlockPos candidate = randomPlantingGround(level);
+            if (candidate != null && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                planterGroundTarget = candidate;
+                planterPhase = PlanterPhase.TO_GROUND;
+                leaveStation();
+            }
+        } else if (planterPhase == PlanterPhase.TO_GROUND) {
+            if (planterGroundTarget == null
+                    || !BlockWorkRegistry.reclaim(level, planterGroundTarget, getUUID())
+                    || !RobotCropHandlerRegistry.canPlant(level, planterSeed, planterGroundTarget)) {
+                releasePlanterGround(level);
+                planterPhase = PlanterPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(planterGroundTarget.above()))) {
+                planterDelay = 0;
+                planterPhase = PlanterPhase.PLANTING;
+            }
+        } else if (planterPhase == PlanterPhase.PLANTING) {
+            if (planterGroundTarget == null
+                    || !RobotCropHandlerRegistry.canPlant(level, planterSeed, planterGroundTarget)) {
+                releasePlanterGround(level);
+                planterPhase = PlanterPhase.RETURN_HOME;
+                return;
+            }
+            if (energy() <= 0) {
+                releasePlanterGround(level);
+                planterPhase = PlanterPhase.RETURN_HOME;
+                return;
+            }
+            setEnergy(energy() - 1_000);
+            if (++planterDelay <= 40) return;
+            RobotCropHandlerRegistry.plant(level, planterSeed, planterGroundTarget);
+            if (!planterSeed.isEmpty()) {
+                net.minecraft.world.entity.item.ItemEntity remainder =
+                        new net.minecraft.world.entity.item.ItemEntity(level, getX(), getY(), getZ(), planterSeed.copy());
+                remainder.setPickUpDelay(10);
+                level.addFreshEntity(remainder);
+            }
+            planterSeed = ItemStack.EMPTY;
+            releasePlanterGround(level);
+            planterPhase = PlanterPhase.RETURN_HOME;
+        } else if (planterPhase == PlanterPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                planterPhase = PlanterPhase.NONE;
+                planterSeedSource = null;
+            }
+        }
+    }
+
+    private BlockPos randomPlantingGround(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime()
+                ^ getUUID().getMostSignificantBits() ^ planterSearchAttempts);
+        int x;
+        int z;
+        if (zone != null) {
+            BlockPos column = zone.random(random, blockPosition().getY());
+            if (column == null) return null;
+            x = column.getX();
+            z = column.getZ();
+        } else {
+            double radius = random.nextDouble() * 64;
+            double angle = random.nextDouble() * Math.PI * 2;
+            x = (int) Math.floor(getX() + Math.cos(angle) * radius);
+            z = (int) Math.floor(getZ() + Math.sin(angle) * radius);
+        }
+        if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) return null;
+        int surface = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, x, z) - 1;
+        BlockPos ground = new BlockPos(x, surface, z);
+        return RobotCropHandlerRegistry.canPlant(level, planterSeed, ground) ? ground : null;
+    }
+
+    private void releasePlanterGround(ServerLevel level) {
+        if (planterGroundTarget != null) {
+            BlockWorkRegistry.release(level, planterGroundTarget, getUUID());
+            planterGroundTarget = null;
+        }
+        planterDelay = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -1384,6 +1548,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseLumberjackBlock(serverLevel);
         releaseHarvesterBlock(serverLevel);
         releaseMinerBlock(serverLevel);
+        releasePlanterGround(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -1391,6 +1556,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (!lumberjackTool.isEmpty()) spawnAtLocation(serverLevel, lumberjackTool.copy());
         if (!minerTool.isEmpty()) spawnAtLocation(serverLevel, minerTool.copy());
+        if (!planterSeed.isEmpty()) spawnAtLocation(serverLevel, planterSeed.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -1409,12 +1575,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseLumberjackBlock(level);
             releaseHarvesterBlock(level);
             releaseMinerBlock(level);
+            releasePlanterGround(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
             }
             if (!lumberjackTool.isEmpty()) spawnAtLocation(level, lumberjackTool.copy());
             if (!minerTool.isEmpty()) spawnAtLocation(level, minerTool.copy());
+            if (!planterSeed.isEmpty()) spawnAtLocation(level, planterSeed.copy());
             discard();
         }
         return true;
@@ -1476,6 +1644,15 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (minerBlockTarget != null) output.putLong("MinerBlock", minerBlockTarget.asLong());
         output.putFloat("MinerBreakProgress", minerBreakProgress);
+        if (!planterSeed.isEmpty()) output.store("PlanterSeed", ItemStack.CODEC, planterSeed);
+        output.putInt("PlanterPhase", planterPhase.ordinal());
+        if (planterSeedSource != null) {
+            output.putLong("PlanterSourcePos", planterSeedSource.pipePos().asLong());
+            output.putInt("PlanterSourceSide", planterSeedSource.side().get3DDataValue());
+        }
+        if (planterGroundTarget != null) output.putLong("PlanterGround", planterGroundTarget.asLong());
+        output.putInt("PlanterDelay", planterDelay);
+        output.putInt("PlanterSearchAttempts", planterSearchAttempts);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -1602,6 +1779,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (minerPhase == MinerPhase.TO_BLOCK && minerBlockTarget == null) {
             minerPhase = MinerPhase.RETURN_HOME;
         }
+        planterSeed = input.read("PlanterSeed", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int planterOrdinal = input.getIntOr("PlanterPhase", PlanterPhase.NONE.ordinal());
+        PlanterPhase[] planterPhases = PlanterPhase.values();
+        planterPhase = planterOrdinal >= 0 && planterOrdinal < planterPhases.length
+                ? planterPhases[planterOrdinal] : PlanterPhase.NONE;
+        if (input.getLong("PlanterSourcePos").isPresent()) {
+            planterSeedSource = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("PlanterSourcePos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "PlanterSourceSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("PlanterGround").isPresent()) {
+            planterGroundTarget = BlockPos.of(input.getLongOr("PlanterGround", 0));
+        }
+        planterDelay = Math.clamp(input.getIntOr("PlanterDelay", 0), 0, 41);
+        planterSearchAttempts = Math.clamp(input.getIntOr("PlanterSearchAttempts", 0), 0, 4_096);
+        if (planterPhase == PlanterPhase.TO_SEED && planterSeedSource == null) {
+            planterPhase = PlanterPhase.RETURN_HOME;
+        }
+        if ((planterPhase == PlanterPhase.TO_GROUND || planterPhase == PlanterPhase.PLANTING)
+                && planterGroundTarget == null) planterPhase = PlanterPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 
