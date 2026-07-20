@@ -116,7 +116,9 @@ public final class BCCoreGameTests {
         Holder<TestEnvironmentDefinition<?>> farmerEnvironment =
             event.registerEnvironment(id("robotics_farmer"));
         Holder<TestEnvironmentDefinition<?>> leafCutterEnvironment =
-            event.registerEnvironment(id("robotics_leaf_cutter"));
+                event.registerEnvironment(id("robotics_leaf_cutter"));
+        Holder<TestEnvironmentDefinition<?>> shovelmanEnvironment =
+                event.registerEnvironment(id("robotics_shovelman"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -129,7 +131,9 @@ public final class BCCoreGameTests {
         registerTest(event, farmerEnvironment, "robotics_farmer_robot",
             BCCoreGameTests::roboticsFarmerRobot);
         registerTest(event, leafCutterEnvironment, "robotics_leaf_cutter_robot",
-            BCCoreGameTests::roboticsLeafCutterRobot);
+                BCCoreGameTests::roboticsLeafCutterRobot);
+        registerTest(event, shovelmanEnvironment, "robotics_shovelman_robot",
+                BCCoreGameTests::roboticsShovelmanRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7570,6 +7574,98 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 new net.minecraft.world.phys.AABB(target).inflate(2),
                 item -> item.getItem().is(Items.OAK_LEAVES)).isEmpty(),
                 "Leaf Cutter did not preserve Shears leaf drops");
+        helper.succeed();
+    }
+
+    private static void roboticsShovelmanRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 96, 1);
+        BlockPos sourceRelative = new BlockPos(2, 96, 1);
+        BlockPos receiverRelative = new BlockPos(3, 96, 1);
+        BlockPos targetRelative = new BlockPos(4, 96, 1);
+        BlockPos excludedRelative = new BlockPos(4, 96, 2);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        helper.setBlock(targetRelative, Blocks.DIRT);
+        helper.setBlock(excludedRelative, Blocks.DIRT);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        var receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenShovel = new ItemStack(Items.IRON_SHOVEL);
+        nearlyBrokenShovel.setDamageValue(nearlyBrokenShovel.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenShovel);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.SHOVELMAN);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Shovelman failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1600 && (!helper.getBlockState(targetRelative).isAir()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.shovelmanPhase() != buildcraft.robotics.ShovelmanPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(
+                        helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(targetRelative).isAir(),
+                "Shovelman did not dig zoned dirt: phase=" + robot.shovelmanPhase()
+                        + ", state=" + robot.taskState() + ", tool=" + robot.shovelmanTool());
+        helper.assertTrue(helper.getBlockState(excludedRelative).is(Blocks.DIRT),
+                "Shovelman dug dirt outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Shovelman did not extract one shovel");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.IRON_SHOVEL)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Shovelman did not damage and unload its worn shovel");
+        helper.assertTrue(robot.shovelmanTool().isEmpty(), "Shovelman retained unloaded shovel");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Shovelman did not return home");
+        helper.assertValueEqual(buildcraft.robotics.ShovelmanPhase.NONE, robot.shovelmanPhase(),
+                "Shovelman scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Shovelman work consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                        net.minecraft.world.entity.item.ItemEntity.class,
+                        new net.minecraft.world.phys.AABB(target).inflate(2),
+                        item -> item.getItem().is(Items.DIRT)).isEmpty(),
+                "Shovelman did not preserve shovel drops");
         helper.succeed();
     }
 

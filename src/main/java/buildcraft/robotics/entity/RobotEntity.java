@@ -21,6 +21,7 @@ import buildcraft.robotics.PlanterPhase;
 import buildcraft.robotics.RobotCropHandlerRegistry;
 import buildcraft.robotics.FarmerPhase;
 import buildcraft.robotics.LeafCutterPhase;
+import buildcraft.robotics.ShovelmanPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -105,6 +106,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos leafCutterBlockTarget;
     private LeafCutterPhase leafCutterPhase = LeafCutterPhase.NONE;
     private float leafCutterBreakProgress;
+    private ItemStack shovelmanTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address shovelmanStationTarget;
+    private BlockPos shovelmanBlockTarget;
+    private ShovelmanPhase shovelmanPhase = ShovelmanPhase.NONE;
+    private float shovelmanBreakProgress;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -163,6 +169,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack farmerTool() { return farmerTool.copy(); }
     public LeafCutterPhase leafCutterPhase() { return leafCutterPhase; }
     public ItemStack leafCutterTool() { return leafCutterTool.copy(); }
+    public ShovelmanPhase shovelmanPhase() { return shovelmanPhase; }
+    public ItemStack shovelmanTool() { return shovelmanTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -231,6 +239,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.LEAF_CUTTER
                     && leafCutterPhase == LeafCutterPhase.NONE && tickCount % 20 == 0) {
                 beginLeafCutter(serverLevel);
+            } else if (board() == RobotBoardType.SHOVELMAN
+                    && shovelmanPhase == ShovelmanPhase.NONE && tickCount % 20 == 0) {
+                beginShovelman(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -259,6 +270,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (planterPhase != PlanterPhase.NONE) tickPlanter(serverLevel);
         if (farmerPhase != FarmerPhase.NONE) tickFarmer(serverLevel);
         if (leafCutterPhase != LeafCutterPhase.NONE) tickLeafCutter(serverLevel);
+        if (shovelmanPhase != ShovelmanPhase.NONE) tickShovelman(serverLevel);
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -1772,6 +1784,210 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         leafCutterBreakProgress = 0;
     }
 
+    private void beginShovelman(ServerLevel level) {
+        if (shovelmanTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findShovelmanToolStation(level, true);
+            if (source.isEmpty()) return;
+            shovelmanStationTarget = source.get();
+            shovelmanPhase = ShovelmanPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (shovelmanTool.isDamageableItem()
+                && shovelmanTool.getDamageValue() >= shovelmanTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findShovelmanToolStation(level, false);
+            if (receiver.isEmpty()) return;
+            shovelmanStationTarget = receiver.get();
+            shovelmanPhase = ShovelmanPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        if (selectShovelmanBlock(level)) {
+            shovelmanPhase = ShovelmanPhase.TO_BLOCK;
+            leaveStation();
+        }
+    }
+
+    private Optional<RobotStationRegistry.Address> findShovelmanToolStation(ServerLevel level, boolean provider) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) return false;
+                    if (!provider) {
+                        if (!config.matches(shovelmanTool)) return false;
+                        try (Transaction transaction = Transaction.openRoot()) {
+                            return handler.insert(ItemResource.of(shovelmanTool), 1, transaction) == 1;
+                        }
+                    }
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (stack.is(net.minecraft.tags.ItemTags.SHOVELS)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> position().distanceToSqr(sourcePosition(address))));
+    }
+
+    private void loadShovelmanTool(ServerLevel level, RobotStationRegistry.Address address) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+        RobotStationConfig config = stationConfig(level, address);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!stack.is(net.minecraft.tags.ItemTags.SHOVELS) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    shovelmanTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadShovelmanTool(ServerLevel level, RobotStationRegistry.Address address) {
+        if (shovelmanTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+        RobotStationConfig config = stationConfig(level, address);
+        if (handler == null || !config.mode().receives() || !config.matches(shovelmanTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(shovelmanTool), 1, transaction) == 1) {
+                shovelmanTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private boolean isShovelmanBlock(net.minecraft.world.level.block.state.BlockState state) {
+        return state.is(net.minecraft.tags.BlockTags.DIRT)
+                || state.is(net.minecraft.tags.BlockTags.SAND)
+                || state.is(net.minecraft.world.level.block.Blocks.CLAY)
+                || state.is(net.minecraft.world.level.block.Blocks.GRAVEL)
+                || state.is(net.minecraft.world.level.block.Blocks.FARMLAND)
+                || state.is(net.minecraft.world.level.block.Blocks.GRASS_BLOCK)
+                || state.is(net.minecraft.world.level.block.Blocks.SNOW);
+    }
+
+    private boolean selectShovelmanBlock(ServerLevel level) {
+        buildcraft.robotics.zone.ZonePlan zone = workZone(level);
+        java.util.Random random = new java.util.Random(level.getGameTime() ^ getUUID().getLeastSignificantBits());
+        int minY = Math.max(level.getMinY(), blockPosition().getY() - 96);
+        int maxY = Math.min(level.getMaxY() - 1, blockPosition().getY() + 96);
+        BlockPos best = null;
+        double bestDistance = Double.MAX_VALUE;
+        for (int attempt = 0; attempt < 128; attempt++) {
+            int x;
+            int z;
+            if (zone != null) {
+                BlockPos column = zone.random(random, blockPosition().getY());
+                if (column == null) return false;
+                x = column.getX();
+                z = column.getZ();
+            } else {
+                x = blockPosition().getX() + random.nextInt(129) - 64;
+                z = blockPosition().getZ() + random.nextInt(129) - 64;
+            }
+            if (level.getChunkSource().getChunkNow(x >> 4, z >> 4) == null) continue;
+            for (int y = minY; y <= maxY; y++) {
+                BlockPos candidate = new BlockPos(x, y, z);
+                net.minecraft.world.level.block.state.BlockState state = level.getBlockState(candidate);
+                if (!isShovelmanBlock(state) || !shovelmanTool.isCorrectToolForDrops(state)) continue;
+                double distance = candidate.distToCenterSqr(position());
+                if (distance <= 96 * 96 && distance < bestDistance
+                        && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                    if (best != null) BlockWorkRegistry.release(level, best, getUUID());
+                    best = candidate;
+                    bestDistance = distance;
+                }
+            }
+        }
+        shovelmanBlockTarget = best;
+        return best != null;
+    }
+
+    private void tickShovelman(ServerLevel level) {
+        if (shovelmanPhase == ShovelmanPhase.TO_TOOL) {
+            if (shovelmanStationTarget == null) { shovelmanPhase = ShovelmanPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(shovelmanStationTarget))) {
+                loadShovelmanTool(level, shovelmanStationTarget);
+                shovelmanPhase = ShovelmanPhase.RETURN_HOME;
+            }
+        } else if (shovelmanPhase == ShovelmanPhase.TO_UNLOAD_TOOL) {
+            if (shovelmanStationTarget == null) { shovelmanPhase = ShovelmanPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(shovelmanStationTarget))) {
+                unloadShovelmanTool(level, shovelmanStationTarget);
+                shovelmanPhase = ShovelmanPhase.RETURN_HOME;
+            }
+        } else if (shovelmanPhase == ShovelmanPhase.TO_BLOCK) {
+            if (shovelmanBlockTarget == null
+                    || !BlockWorkRegistry.reclaim(level, shovelmanBlockTarget, getUUID())
+                    || !isShovelmanBlock(level.getBlockState(shovelmanBlockTarget))) {
+                releaseShovelmanBlock(level);
+                shovelmanPhase = ShovelmanPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(shovelmanBlockTarget))) {
+                int result = progressShovelmanBlock(level);
+                if (result != 0) {
+                    releaseShovelmanBlock(level);
+                    shovelmanPhase = ShovelmanPhase.RETURN_HOME;
+                }
+            }
+        } else if (shovelmanPhase == ShovelmanPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                shovelmanStationTarget = null;
+                shovelmanPhase = ShovelmanPhase.NONE;
+            }
+        }
+    }
+
+    private int progressShovelmanBlock(ServerLevel level) {
+        if (shovelmanBlockTarget == null || shovelmanTool.isEmpty()) return -1;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(shovelmanBlockTarget);
+        float hardness = state.getDestroySpeed(level, shovelmanBlockTarget);
+        if (!isShovelmanBlock(state) || hardness < 0 || !shovelmanTool.isCorrectToolForDrops(state)) return -1;
+        long energyPerTick = 66_667;
+        if (energy() < energyPerTick) return 0;
+        float speed = shovelmanTool.getDestroySpeed(state);
+        shovelmanBreakProgress += Math.max(0.001F, speed / hardness / 30.0F);
+        setEnergy(energy() - energyPerTick);
+        level.destroyBlockProgress(getId(), shovelmanBlockTarget,
+                Math.min(9, Math.max(0, (int) (shovelmanBreakProgress * 10))));
+        if (shovelmanBreakProgress <= 1.0F) return 0;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack usedTool = shovelmanTool.copy();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, usedTool);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer, shovelmanBlockTarget, state);
+        if (event.isCanceled()) return -1;
+        java.util.List<ItemStack> drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, shovelmanBlockTarget, level.getBlockEntity(shovelmanBlockTarget), fakePlayer, usedTool);
+        level.removeBlock(shovelmanBlockTarget, false);
+        for (ItemStack drop : drops) net.minecraft.world.level.block.Block.popResource(level, shovelmanBlockTarget, drop);
+        shovelmanTool.hurtAndBreak(1, level, null, item -> {});
+        shovelmanBreakProgress = 0;
+        return 1;
+    }
+
+    private void releaseShovelmanBlock(ServerLevel level) {
+        if (shovelmanBlockTarget != null) {
+            BlockWorkRegistry.release(level, shovelmanBlockTarget, getUUID());
+            level.destroyBlockProgress(getId(), shovelmanBlockTarget, -1);
+            shovelmanBlockTarget = null;
+        }
+        shovelmanBreakProgress = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -1937,6 +2153,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releasePlanterGround(serverLevel);
         releaseFarmerGround(serverLevel);
         releaseLeafCutterBlock(serverLevel);
+        releaseShovelmanBlock(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -1947,6 +2164,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!planterSeed.isEmpty()) spawnAtLocation(serverLevel, planterSeed.copy());
         if (!farmerTool.isEmpty()) spawnAtLocation(serverLevel, farmerTool.copy());
         if (!leafCutterTool.isEmpty()) spawnAtLocation(serverLevel, leafCutterTool.copy());
+        if (!shovelmanTool.isEmpty()) spawnAtLocation(serverLevel, shovelmanTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -1968,6 +2186,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releasePlanterGround(level);
             releaseFarmerGround(level);
             releaseLeafCutterBlock(level);
+            releaseShovelmanBlock(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -1977,6 +2196,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!planterSeed.isEmpty()) spawnAtLocation(level, planterSeed.copy());
             if (!farmerTool.isEmpty()) spawnAtLocation(level, farmerTool.copy());
             if (!leafCutterTool.isEmpty()) spawnAtLocation(level, leafCutterTool.copy());
+            if (!shovelmanTool.isEmpty()) spawnAtLocation(level, shovelmanTool.copy());
             discard();
         }
         return true;
@@ -2063,6 +2283,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (leafCutterBlockTarget != null) output.putLong("LeafCutterBlock", leafCutterBlockTarget.asLong());
         output.putFloat("LeafCutterBreakProgress", leafCutterBreakProgress);
+        if (!shovelmanTool.isEmpty()) output.store("ShovelmanTool", ItemStack.CODEC, shovelmanTool);
+        output.putInt("ShovelmanPhase", shovelmanPhase.ordinal());
+        if (shovelmanStationTarget != null) {
+            output.putLong("ShovelmanStationPos", shovelmanStationTarget.pipePos().asLong());
+            output.putInt("ShovelmanStationSide", shovelmanStationTarget.side().get3DDataValue());
+        }
+        if (shovelmanBlockTarget != null) output.putLong("ShovelmanBlock", shovelmanBlockTarget.asLong());
+        output.putFloat("ShovelmanBreakProgress", shovelmanBreakProgress);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -2250,6 +2478,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 && leafCutterStationTarget == null) leafCutterPhase = LeafCutterPhase.RETURN_HOME;
         if (leafCutterPhase == LeafCutterPhase.TO_BLOCK && leafCutterBlockTarget == null) {
             leafCutterPhase = LeafCutterPhase.RETURN_HOME;
+        }
+        shovelmanTool = input.read("ShovelmanTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int shovelmanOrdinal = input.getIntOr("ShovelmanPhase", ShovelmanPhase.NONE.ordinal());
+        ShovelmanPhase[] shovelmanPhases = ShovelmanPhase.values();
+        shovelmanPhase = shovelmanOrdinal >= 0 && shovelmanOrdinal < shovelmanPhases.length
+                ? shovelmanPhases[shovelmanOrdinal] : ShovelmanPhase.NONE;
+        if (input.getLong("ShovelmanStationPos").isPresent()) {
+            shovelmanStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("ShovelmanStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "ShovelmanStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("ShovelmanBlock").isPresent()) {
+            shovelmanBlockTarget = BlockPos.of(input.getLongOr("ShovelmanBlock", 0));
+        }
+        shovelmanBreakProgress = Math.clamp(input.getFloatOr("ShovelmanBreakProgress", 0), 0, 1.1F);
+        if ((shovelmanPhase == ShovelmanPhase.TO_TOOL
+                || shovelmanPhase == ShovelmanPhase.TO_UNLOAD_TOOL)
+                && shovelmanStationTarget == null) shovelmanPhase = ShovelmanPhase.RETURN_HOME;
+        if (shovelmanPhase == ShovelmanPhase.TO_BLOCK && shovelmanBlockTarget == null) {
+            shovelmanPhase = ShovelmanPhase.RETURN_HOME;
         }
         ContainerHelper.loadAllItems(input, inventory);
     }
