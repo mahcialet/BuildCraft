@@ -12,7 +12,7 @@ public enum GateTrigger implements StringRepresentable {
     INVENTORY_BELOW_25, INVENTORY_BELOW_50, INVENTORY_BELOW_75,
     FLUID_BELOW_25, FLUID_BELOW_50, FLUID_BELOW_75,
     POWER_LOW, POWER_HIGH, MACHINE_ACTIVE, MACHINE_INACTIVE,
-    ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED,
+    ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED, ENGINE_OVERHEAT,
     PIPE_SIGNAL_RED_ACTIVE, PIPE_SIGNAL_RED_INACTIVE,
     PIPE_SIGNAL_BLUE_ACTIVE, PIPE_SIGNAL_BLUE_INACTIVE,
     PIPE_SIGNAL_GREEN_ACTIVE, PIPE_SIGNAL_GREEN_INACTIVE,
@@ -27,6 +27,7 @@ public enum GateTrigger implements StringRepresentable {
             case ENGINE_GREEN -> stage == buildcraft.api.enums.EnumPowerStage.GREEN;
             case ENGINE_YELLOW -> stage == buildcraft.api.enums.EnumPowerStage.YELLOW;
             case ENGINE_RED -> stage == buildcraft.api.enums.EnumPowerStage.RED;
+            case ENGINE_OVERHEAT -> stage == buildcraft.api.enums.EnumPowerStage.OVERHEAT;
             default -> false;
         };
     }

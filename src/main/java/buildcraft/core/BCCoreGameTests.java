@@ -5776,15 +5776,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         double range = buildcraft.energy.block.entity.CombustionEngineBlockEntity.MAX_HEAT - min;
         var stages = new buildcraft.api.enums.EnumPowerStage[] {
                 buildcraft.api.enums.EnumPowerStage.BLUE, buildcraft.api.enums.EnumPowerStage.GREEN,
-                buildcraft.api.enums.EnumPowerStage.YELLOW, buildcraft.api.enums.EnumPowerStage.RED
+                buildcraft.api.enums.EnumPowerStage.YELLOW, buildcraft.api.enums.EnumPowerStage.RED,
+                buildcraft.api.enums.EnumPowerStage.OVERHEAT
         };
         var triggers = new buildcraft.silicon.gate.GateTrigger[] {
                 buildcraft.silicon.gate.GateTrigger.ENGINE_BLUE,
                 buildcraft.silicon.gate.GateTrigger.ENGINE_GREEN,
                 buildcraft.silicon.gate.GateTrigger.ENGINE_YELLOW,
-                buildcraft.silicon.gate.GateTrigger.ENGINE_RED
+                buildcraft.silicon.gate.GateTrigger.ENGINE_RED,
+                buildcraft.silicon.gate.GateTrigger.ENGINE_OVERHEAT
         };
-        double[] boundaryHeat = { min, min + range * .25, min + range * .50, min + range * .75 };
+        double[] boundaryHeat = { min, min + range * .25, min + range * .50, min + range * .75,
+                min + range * .85 };
         for (int index = 0; index < stages.length; index++) {
             helper.assertValueEqual(stages[index],
                     buildcraft.energy.block.entity.CombustionEngineBlockEntity.stageForHeat(boundaryHeat[index]),

@@ -117,7 +117,7 @@ public final class GateItem extends PipePlugItem implements PipeAttachmentMenu {
             case POWER_HIGH -> pipe.adjacentPower(gateSide).high();
             case MACHINE_ACTIVE -> pipe.adjacentMachine(gateSide).active();
             case MACHINE_INACTIVE -> pipe.adjacentMachine(gateSide).inactive();
-            case ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED ->
+            case ENGINE_BLUE, ENGINE_GREEN, ENGINE_YELLOW, ENGINE_RED, ENGINE_OVERHEAT ->
                     rule.trigger().matchesEngineStage(pipe.adjacentEngineStage(gateSide));
             case PIPE_SIGNAL_RED_ACTIVE -> pipe.isWirePowered(PipeWireColor.RED);
             case PIPE_SIGNAL_RED_INACTIVE -> !pipe.isWirePowered(PipeWireColor.RED);
