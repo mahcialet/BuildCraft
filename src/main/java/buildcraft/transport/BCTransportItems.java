@@ -54,6 +54,15 @@ public final class BCTransportItems {
     public static final DeferredItem<PipeItem> PIPE_GOLD_POWER = pipe(PipeType.GOLD_POWER);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_POWER = pipe(PipeType.DIAMOND_POWER);
     public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_POWER = pipe(PipeType.DIAMOND_WOOD_POWER);
+    public static final DeferredItem<PipeItem> PIPE_COBBLE_RF = pipe(PipeType.COBBLESTONE_RF);
+    public static final DeferredItem<PipeItem> PIPE_STONE_RF = pipe(PipeType.STONE_RF);
+    public static final DeferredItem<PipeItem> PIPE_QUARTZ_RF = pipe(PipeType.QUARTZ_RF);
+    public static final DeferredItem<PipeItem> PIPE_WOOD_RF = pipe(PipeType.WOOD_RF);
+    public static final DeferredItem<PipeItem> PIPE_SANDSTONE_RF = pipe(PipeType.SANDSTONE_RF);
+    public static final DeferredItem<PipeItem> PIPE_IRON_RF = pipe(PipeType.IRON_RF);
+    public static final DeferredItem<PipeItem> PIPE_GOLD_RF = pipe(PipeType.GOLD_RF);
+    public static final DeferredItem<PipeItem> PIPE_DIAMOND_RF = pipe(PipeType.DIAMOND_RF);
+    public static final DeferredItem<PipeItem> PIPE_DIAMOND_WOOD_RF = pipe(PipeType.DIAMOND_WOOD_RF);
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_RED = wire(PipeWireColor.RED);
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_BLUE = wire(PipeWireColor.BLUE);
     public static final DeferredItem<PipeWireItem> PIPE_WIRE_GREEN = wire(PipeWireColor.GREEN);

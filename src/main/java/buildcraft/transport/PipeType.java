@@ -39,7 +39,16 @@ public enum PipeType implements StringRepresentable {
     IRON_POWER("iron_power", "pipe_iron_power", "Iron Power Pipe"),
     GOLD_POWER("gold_power", "pipe_gold_power", "Golden Power Pipe"),
     DIAMOND_POWER("diamond_power", "pipe_diamond_power", "Diamond Power Pipe"),
-    DIAMOND_WOOD_POWER("diamond_wood_power", "pipe_diamond_wood_power", "Diamond Wooden Power Pipe");
+    DIAMOND_WOOD_POWER("diamond_wood_power", "pipe_diamond_wood_power", "Diamond Wooden Power Pipe"),
+    COBBLESTONE_RF("cobblestone_rf", "pipe_cobble_rf", "Cobblestone RF Pipe"),
+    STONE_RF("stone_rf", "pipe_stone_rf", "Stone RF Pipe"),
+    QUARTZ_RF("quartz_rf", "pipe_quartz_rf", "Quartz RF Pipe"),
+    WOOD_RF("wood_rf", "pipe_wood_rf", "Wooden RF Pipe"),
+    SANDSTONE_RF("sandstone_rf", "pipe_sandstone_rf", "Sandstone RF Pipe"),
+    IRON_RF("iron_rf", "pipe_iron_rf", "Iron RF Pipe"),
+    GOLD_RF("gold_rf", "pipe_gold_rf", "Golden RF Pipe"),
+    DIAMOND_RF("diamond_rf", "pipe_diamond_rf", "Diamond RF Pipe"),
+    DIAMOND_WOOD_RF("diamond_wood_rf", "pipe_diamond_wood_rf", "Diamond Wooden RF Pipe");
 
     public static final PipeType[] VALUES = values();
     private final String serializedName;
@@ -57,6 +66,11 @@ public enum PipeType implements StringRepresentable {
     public String englishName() { return englishName; }
 
     public boolean connectsTo(PipeType other) {
+        if (carriesRf() != other.carriesRf()) return false;
+        if (carriesRf()) {
+            if (isWoodenRfInput() && other.isWoodenRfInput()) return false;
+            return this == other || isGeneralRfConnector() || other.isGeneralRfConnector();
+        }
         if (carriesPower() != other.carriesPower()) return false;
         if (carriesPower()) {
             if (isWoodenPowerInput() && other.isWoodenPowerInput()) return false;
@@ -87,7 +101,31 @@ public enum PipeType implements StringRepresentable {
         return this == WOOD_ITEM || this == DIAMOND_WOOD_ITEM || this == EMZULI_ITEM;
     }
 
-    public boolean carriesItems() { return this != STRUCTURE && !carriesFluids() && !carriesPower(); }
+    public boolean carriesItems() {
+        return this != STRUCTURE && !carriesFluids() && !carriesPower() && !carriesRf();
+    }
+    public boolean carriesRf() {
+        return this == COBBLESTONE_RF || this == STONE_RF || this == QUARTZ_RF || this == WOOD_RF
+            || this == SANDSTONE_RF || this == IRON_RF || this == GOLD_RF || this == DIAMOND_RF
+            || this == DIAMOND_WOOD_RF;
+    }
+    private boolean isGeneralRfConnector() {
+        return this == WOOD_RF || this == SANDSTONE_RF || this == IRON_RF || this == GOLD_RF
+            || this == DIAMOND_RF || this == DIAMOND_WOOD_RF;
+    }
+    public boolean isWoodenRfInput() { return this == WOOD_RF || this == DIAMOND_WOOD_RF; }
+    public int rfTransferRate() {
+        return switch (this) {
+            case COBBLESTONE_RF -> 40;
+            case STONE_RF -> 80;
+            case WOOD_RF, SANDSTONE_RF -> 160;
+            case QUARTZ_RF, IRON_RF -> 320;
+            case GOLD_RF -> 1_280;
+            case DIAMOND_RF, DIAMOND_WOOD_RF -> 2_560;
+            default -> 0;
+        };
+    }
+    public boolean connectsRfHandlers() { return carriesRf() && this != SANDSTONE_RF; }
     public boolean carriesPower() {
         return this == COBBLESTONE_POWER || this == STONE_POWER || this == QUARTZ_POWER || this == WOOD_POWER
             || this == SANDSTONE_POWER || this == IRON_POWER || this == GOLD_POWER
@@ -98,7 +136,9 @@ public enum PipeType implements StringRepresentable {
             || this == DIAMOND_POWER || this == DIAMOND_WOOD_POWER;
     }
     public boolean isWoodenPowerInput() { return this == WOOD_POWER || this == DIAMOND_WOOD_POWER; }
-    public boolean isPowerLimiter() { return this == IRON_POWER || this == DIAMOND_POWER; }
+    public boolean isPowerLimiter() {
+        return this == IRON_POWER || this == DIAMOND_POWER || this == IRON_RF || this == DIAMOND_RF;
+    }
     public long powerTransferPerTick() {
         return switch (this) {
             case COBBLESTONE_POWER -> 4_000_000L;

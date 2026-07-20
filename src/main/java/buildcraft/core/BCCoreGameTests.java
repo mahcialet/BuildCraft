@@ -187,6 +187,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
         registerTest(event, environment, "transport_filtered_buffer", BCCoreGameTests::transportFilteredBuffer);
         registerTest(event, environment, "transport_pipe_plugs", BCCoreGameTests::transportPipePlugs);
+        registerTest(event, environment, "transport_rf_pipes", BCCoreGameTests::transportRfPipes);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
@@ -4526,6 +4527,95 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_FLUID.get()),
                 "diamond wooden fluid pipe returned wrong drop");
         helper.succeed();
+    }
+
+    private static void transportRfPipes(GameTestHelper helper) {
+        var block = buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get();
+        BlockPos woodPos = helper.absolutePos(new BlockPos(1, 2, 1));
+        BlockPos goldPos = woodPos.east();
+        BlockPos targetPos = goldPos.east();
+        helper.getLevel().setBlock(woodPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.WOOD_RF), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(goldPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.GOLD_RF), Block.UPDATE_ALL);
+        helper.getLevel().setBlock(targetPos,
+                buildcraft.core.BCCoreBlocks.ENGINE.get().defaultBlockState().setValue(
+                        buildcraft.core.block.BlockEngine.ENGINE_TYPE,
+                        buildcraft.api.enums.EnumEngineType.RF), Block.UPDATE_ALL);
+        var wood = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(woodPos);
+        var gold = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(goldPos);
+        var target = (buildcraft.energy.block.entity.RfEngineBlockEntity)
+                helper.getLevel().getBlockEntity(targetPos);
+        var input = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+                woodPos, Direction.WEST);
+        helper.assertTrue(input != null, "Wooden RF Pipe did not expose Energy input");
+        helper.assertTrue(helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Energy.BLOCK,
+                goldPos, Direction.UP) == null, "Golden RF Pipe incorrectly exposed Energy input");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(160, input.insert(500, transaction),
+                    "Wooden RF Pipe ignored its 160 FE/t input limit");
+            transaction.commit();
+        }
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), woodPos,
+                helper.getLevel().getBlockState(woodPos), wood);
+        helper.assertValueEqual(160, gold.rfStored(), "RF energy did not cross first pipe edge");
+        buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), goldPos,
+                helper.getLevel().getBlockState(goldPos), gold);
+        helper.assertValueEqual(0, target.energy().getAmountAsInt(),
+                "RF energy crossed two pipe edges in one server tick");
+
+        helper.assertValueEqual(40, buildcraft.transport.PipeType.COBBLESTONE_RF.rfTransferRate(),
+                "Cobblestone RF rate");
+        helper.assertValueEqual(80, buildcraft.transport.PipeType.STONE_RF.rfTransferRate(), "Stone RF rate");
+        helper.assertValueEqual(320, buildcraft.transport.PipeType.QUARTZ_RF.rfTransferRate(), "Quartz RF rate");
+        helper.assertValueEqual(2_560, buildcraft.transport.PipeType.DIAMOND_RF.rfTransferRate(),
+                "Diamond RF rate");
+        helper.assertFalse(buildcraft.transport.PipeType.COBBLESTONE_RF.connectsTo(
+                buildcraft.transport.PipeType.STONE_RF), "Cobblestone and Stone RF pipes connected");
+        helper.assertTrue(buildcraft.transport.PipeType.GOLD_RF.connectsTo(
+                buildcraft.transport.PipeType.STONE_RF), "Golden RF Pipe did not bridge RF materials");
+        helper.assertFalse(buildcraft.transport.PipeType.WOOD_RF.connectsTo(
+                buildcraft.transport.PipeType.DIAMOND_WOOD_RF), "two Wooden RF inputs connected");
+
+        BlockPos ironPos = helper.absolutePos(new BlockPos(6, 2, 1));
+        helper.getLevel().setBlock(ironPos, block.defaultBlockState().setValue(
+                buildcraft.transport.block.PipeHolderBlock.TYPE,
+                buildcraft.transport.PipeType.IRON_RF), Block.UPDATE_ALL);
+        var iron = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(ironPos);
+        iron.activatePowerLimit(2);
+        helper.assertValueEqual(80, iron.effectiveRfTransferRate(), "Iron RF limiter shift");
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(goldPos, gold.getBlockState(),
+                gold.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.transport.block.entity.PipeHolderBlockEntity
+                        && ((buildcraft.transport.block.entity.PipeHolderBlockEntity) loaded).rfStored() == 160,
+                "RF Pipe failed codec reload");
+        var recipeInput = net.minecraft.world.item.crafting.CraftingInput.of(2, 1, java.util.List.of(
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_WOOD_POWER.get()),
+                new ItemStack(Items.REDSTONE)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, recipeInput, helper.getLevel())
+                .orElseThrow().value().assemble(recipeInput);
+        helper.assertTrue(crafted.is(buildcraft.transport.BCTransportItems.PIPE_WOOD_RF.get()),
+                "Wooden RF Pipe recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(goldPos), helper.getLevel(), goldPos, gold);
+        helper.assertTrue(drops.size() == 1
+                        && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_GOLD_RF.get()),
+                "Golden RF Pipe loot output");
+        helper.runAfterDelay(1, () -> {
+            buildcraft.transport.block.entity.PipeHolderBlockEntity.tick(helper.getLevel(), goldPos,
+                    helper.getLevel().getBlockState(goldPos), gold);
+            helper.assertValueEqual(160, target.energy().getAmountAsInt(),
+                    "RF pipe network did not deliver into adjacent Energy receiver");
+            helper.assertValueEqual(0, gold.rfStored(), "Golden RF Pipe retained delivered Energy");
+            helper.succeed();
+        });
     }
 
     private static void transportPipePlugs(GameTestHelper helper) {

@@ -24,5 +24,14 @@
   "block.buildcrafttransport.filtered_buffer": "Filtered Buffer",
   "item.buildcrafttransport.waterproof": "Pipe Sealant",
   "item.buildcrafttransport.plug_blocker": "Pipe Plug",
-  "item.buildcrafttransport.plug_power_adaptor": "Power Adaptor"
+  "item.buildcrafttransport.plug_power_adaptor": "Power Adaptor",
+  "item.buildcrafttransport.pipe_cobble_rf": "Cobblestone RF Pipe",
+  "item.buildcrafttransport.pipe_stone_rf": "Stone RF Pipe",
+  "item.buildcrafttransport.pipe_quartz_rf": "Quartz RF Pipe",
+  "item.buildcrafttransport.pipe_wood_rf": "Wooden RF Pipe",
+  "item.buildcrafttransport.pipe_sandstone_rf": "Sandstone RF Pipe",
+  "item.buildcrafttransport.pipe_iron_rf": "Iron RF Pipe",
+  "item.buildcrafttransport.pipe_gold_rf": "Golden RF Pipe",
+  "item.buildcrafttransport.pipe_diamond_rf": "Diamond RF Pipe",
+  "item.buildcrafttransport.pipe_diamond_wood_rf": "Diamond Wooden RF Pipe"
 }

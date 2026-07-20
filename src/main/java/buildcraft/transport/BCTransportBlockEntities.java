@@ -34,7 +34,11 @@ public final class BCTransportBlockEntities {
         event.registerBlockEntity(Capabilities.Item.BLOCK, FILTERED_BUFFER.get(),
             (buffer, side) -> buffer.inventory());
         event.registerBlockEntity(Capabilities.Energy.BLOCK, PIPE_HOLDER.get(),
-            (holder, side) -> holder.attachmentEnergyHandler(side));
+            (holder, side) -> {
+                var attachment = holder.attachmentEnergyHandler(side);
+                if (attachment != null) return attachment;
+                return side != null && holder.pipeType().isWoodenRfInput() ? holder.rfSide(side) : null;
+            });
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side == null ? null : holder.fluidBuffer(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) -> holder.mjConnector());

@@ -43,6 +43,8 @@ import net.neoforged.neoforge.transfer.item.ItemStacksResourceHandler;
 import net.neoforged.neoforge.transfer.ResourceHandler;
 import net.neoforged.neoforge.transfer.fluid.FluidResource;
 import net.neoforged.neoforge.transfer.fluid.FluidStacksResourceHandler;
+import net.neoforged.neoforge.transfer.energy.EnergyHandler;
+import net.neoforged.neoforge.transfer.energy.SimpleEnergyHandler;
 import net.neoforged.neoforge.transfer.transaction.Transaction;
 import net.neoforged.neoforge.transfer.transaction.TransactionContext;
 import org.jspecify.annotations.Nullable;
@@ -65,6 +67,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
     private int pulsarStage;
     private final FluidBuffer fluidBuffer = new FluidBuffer();
     private final SideFluidHandler[] fluidSides = new SideFluidHandler[Direction.values().length];
+    private final SimpleEnergyHandler rfEnergy = new SimpleEnergyHandler(15_360, 15_360, 15_360);
+    private final SideRfHandler[] rfSides = new SideRfHandler[Direction.values().length];
+    private @Nullable Direction rfReceivedFrom;
+    private long rfReceivedTick = Long.MIN_VALUE;
     private @Nullable Direction fluidReceivedFrom;
     private int fluidInputCooldown;
     private final List<Transit> travelling = new ArrayList<>();
@@ -101,6 +107,7 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         for (Direction direction : Direction.values()) inputs[direction.ordinal()] = new InputHandler();
         for (Direction ignored : Direction.values()) attachments.add(ItemStack.EMPTY);
         for (Direction direction : Direction.values()) fluidSides[direction.ordinal()] = new SideFluidHandler(direction);
+        for (Direction direction : Direction.values()) rfSides[direction.ordinal()] = new SideRfHandler(direction);
         for (int index = 0; index < 9; index++) diamondFilters.add(ItemStack.EMPTY);
         for (int index = 0; index < 4; index++) {
             emzuliFilters.add(ItemStack.EMPTY);
@@ -151,6 +158,10 @@ public final class PipeHolderBlockEntity extends BlockEntity {
 
     private void serverTick(ServerLevel level) {
         evaluateAttachments();
+        if (pipeType().carriesRf()) {
+            transferRf(level);
+            return;
+        }
         if (pipeType().carriesPower()) {
             transferPower(level);
             return;
@@ -201,6 +212,62 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         travelling.addAll(next);
         sync();
     }
+
+    private void transferRf(ServerLevel level) {
+        if (rfEnergy.getAmountAsInt() <= 0 || rfReceivedTick == level.getGameTime()) return;
+        int rate = Math.min(rfEnergy.getAmountAsInt(), effectiveRfTransferRate());
+        if (rate <= 0) return;
+        for (int offset = 0; offset < Direction.values().length; offset++) {
+            Direction direction = Direction.values()[Math.floorMod(routeCursor + offset, Direction.values().length)];
+            if (direction == rfReceivedFrom
+                    || !getBlockState().getValue(PipeHolderBlock.property(direction))) continue;
+            BlockPos targetPos = worldPosition.relative(direction);
+            BlockEntity targetEntity = level.getBlockEntity(targetPos);
+            int inserted = 0;
+            if (targetEntity instanceof PipeHolderBlockEntity pipe && pipeType().connectsTo(pipe.pipeType())
+                    && pipe.pipeType().carriesRf()) {
+                int offered = Math.min(rate, pipe.effectiveRfTransferRate());
+                try (Transaction transaction = Transaction.openRoot()) {
+                    inserted = pipe.insertRf(offered, transaction);
+                    if (inserted > 0) transaction.commit();
+                }
+                if (inserted > 0) {
+                    pipe.rfReceivedFrom = direction.getOpposite();
+                    pipe.rfReceivedTick = level.getGameTime();
+                    pipe.sync();
+                }
+            } else if (pipeType().connectsRfHandlers()) {
+                EnergyHandler target = level.getCapability(Capabilities.Energy.BLOCK,
+                        targetPos, direction.getOpposite());
+                if (target != null) {
+                    try (Transaction transaction = Transaction.openRoot()) {
+                        inserted = target.insert(rate, transaction);
+                        if (inserted > 0) transaction.commit();
+                    }
+                }
+            }
+            if (inserted <= 0) continue;
+            rfEnergy.set(rfEnergy.getAmountAsInt() - inserted);
+            if (rfEnergy.getAmountAsInt() == 0) rfReceivedFrom = null;
+            routeCursor = Math.floorMod(direction.ordinal() + 1, Direction.values().length);
+            sync();
+            return;
+        }
+    }
+
+    public int effectiveRfTransferRate() {
+        int rate = pipeType().rfTransferRate();
+        return pipeType().isPowerLimiter() && powerLimitShift > 0 ? rate >> powerLimitShift : rate;
+    }
+
+    private int insertRf(int amount, TransactionContext transaction) {
+        int capacity = Math.multiplyExact(effectiveRfTransferRate(), Direction.values().length);
+        int available = Math.max(0, capacity - rfEnergy.getAmountAsInt());
+        return rfEnergy.insert(Math.min(amount, available), transaction);
+    }
+
+    public int rfStored() { return rfEnergy.getAmountAsInt(); }
+    public EnergyHandler rfSide(Direction side) { return rfSides[side.ordinal()]; }
 
     private void evaluateAttachments() {
         boolean previous = gateRedstoneOutput;
@@ -1493,6 +1560,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             inputs[direction.ordinal()].deserialize(input.childOrEmpty("input_" + direction.getSerializedName()));
         }
         fluidBuffer.deserialize(input.childOrEmpty("fluid_buffer"));
+        rfEnergy.deserialize(input.childOrEmpty("rf_energy"));
+        rfReceivedFrom = input.read("rf_received_from", Direction.CODEC).orElse(null);
     }
 
     @Override
@@ -1528,6 +1597,8 @@ public final class PipeHolderBlockEntity extends BlockEntity {
             inputs[direction.ordinal()].serialize(output.child("input_" + direction.getSerializedName()));
         }
         fluidBuffer.serialize(output.child("fluid_buffer"));
+        rfEnergy.serialize(output.child("rf_energy"));
+        if (rfReceivedFrom != null) output.store("rf_received_from", Direction.CODEC, rfReceivedFrom);
     }
 
     @Override
@@ -1604,6 +1675,30 @@ public final class PipeHolderBlockEntity extends BlockEntity {
         public int extract(int index, FluidResource resource, int amount, TransactionContext transaction) {
             return fluidBuffer.extract(index, resource, amount, transaction);
         }
+    }
+
+    private final class SideRfHandler implements EnergyHandler {
+        private final Direction side;
+
+        private SideRfHandler(Direction side) { this.side = side; }
+        @Override public long getAmountAsLong() { return rfEnergy.getAmountAsLong(); }
+        @Override public long getCapacityAsLong() {
+            return (long) effectiveRfTransferRate() * Direction.values().length;
+        }
+
+        @Override
+        public int insert(int amount, TransactionContext transaction) {
+            if (!pipeType().isWoodenRfInput() || amount <= 0) return 0;
+            int inserted = insertRf(Math.min(amount, effectiveRfTransferRate()), transaction);
+            if (inserted > 0) {
+                rfReceivedFrom = null;
+                rfReceivedTick = Long.MIN_VALUE;
+                setChanged();
+            }
+            return inserted;
+        }
+
+        @Override public int extract(int amount, TransactionContext transaction) { return 0; }
     }
 
     private final class WoodReceiver implements IMjRedstoneReceiver {

@@ -41,7 +41,25 @@
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_iron_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"iron_power"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_power"}}]},
             {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_power"}}]},
-            {"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_power"}}]}
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_power","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_power"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_cobble_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"cobblestone_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_stone_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"stone_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_quartz_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"quartz_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_wood_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"wood_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_sandstone_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"sandstone_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_iron_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"iron_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_gold_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"gold_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_rf"}}]},
+
+{"type":"minecraft:item","name":"buildcrafttransport:pipe_diamond_wood_rf","conditions":[{"condition":"minecraft:block_state_property","block":"buildcrafttransport:pipe_holder","properties":{"type":"diamond_wood_rf"}}]}
       ]
     }]
   }],
