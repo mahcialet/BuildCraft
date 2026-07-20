@@ -56,9 +56,9 @@ public final class TankRenderer implements BlockEntityRenderer<TankBlockEntity, 
                         2.01F, y1, 2.01F, 13.99F, y2, 13.99F));
     }
 
-    private static void cuboid(VertexConsumer vertices, PoseStack.Pose pose, TextureAtlasSprite sprite,
-                               int light, int color, float x1, float y1, float z1,
-                               float x2, float y2, float z2) {
+    static void cuboid(VertexConsumer vertices, PoseStack.Pose pose, TextureAtlasSprite sprite,
+                       int light, int color, float x1, float y1, float z1,
+                       float x2, float y2, float z2) {
         quad(vertices, pose, sprite, light, color, x1, y1, z1, x2, y1, z2, Direction.DOWN);
         quad(vertices, pose, sprite, light, color, x1, y2, z1, x2, y2, z2, Direction.UP);
         quad(vertices, pose, sprite, light, color, x1, y1, z1, x2, y2, z1, Direction.NORTH);
