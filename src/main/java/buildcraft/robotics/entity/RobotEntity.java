@@ -22,6 +22,8 @@ import buildcraft.robotics.RobotCropHandlerRegistry;
 import buildcraft.robotics.FarmerPhase;
 import buildcraft.robotics.LeafCutterPhase;
 import buildcraft.robotics.ShovelmanPhase;
+import buildcraft.robotics.ButcherPhase;
+import buildcraft.robotics.AnimalWorkRegistry;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -111,6 +113,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private BlockPos shovelmanBlockTarget;
     private ShovelmanPhase shovelmanPhase = ShovelmanPhase.NONE;
     private float shovelmanBreakProgress;
+    private ItemStack butcherTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address butcherStationTarget;
+    private UUID butcherAnimalTarget;
+    private ButcherPhase butcherPhase = ButcherPhase.NONE;
+    private int butcherAttackDelay;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -171,6 +178,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack leafCutterTool() { return leafCutterTool.copy(); }
     public ShovelmanPhase shovelmanPhase() { return shovelmanPhase; }
     public ItemStack shovelmanTool() { return shovelmanTool.copy(); }
+    public ButcherPhase butcherPhase() { return butcherPhase; }
+    public ItemStack butcherTool() { return butcherTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -242,6 +251,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.SHOVELMAN
                     && shovelmanPhase == ShovelmanPhase.NONE && tickCount % 20 == 0) {
                 beginShovelman(serverLevel);
+            } else if (board() == RobotBoardType.BUTCHER
+                    && butcherPhase == ButcherPhase.NONE && tickCount % 20 == 0) {
+                beginButcher(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -256,8 +268,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             move(net.minecraft.world.entity.MoverType.SELF, getDeltaMovement());
             if (position().distanceToSqr(station.dockingPosition()) >= 2.25) {
                 setDeltaMovement(Vec3.ZERO);
-                setTaskState(deliveryPhase == DeliveryPhase.NONE
-                        ? RobotTaskState.IDLE : RobotTaskState.WORKING);
+                setTaskState(hasActiveWorkflow() ? RobotTaskState.WORKING : RobotTaskState.IDLE);
             }
         }
         if (deliveryPhase != DeliveryPhase.NONE) tickDelivery(serverLevel);
@@ -271,6 +282,22 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (farmerPhase != FarmerPhase.NONE) tickFarmer(serverLevel);
         if (leafCutterPhase != LeafCutterPhase.NONE) tickLeafCutter(serverLevel);
         if (shovelmanPhase != ShovelmanPhase.NONE) tickShovelman(serverLevel);
+        if (butcherPhase != ButcherPhase.NONE) tickButcher(serverLevel);
+    }
+
+    private boolean hasActiveWorkflow() {
+        return deliveryPhase != DeliveryPhase.NONE
+                || carrierPhase != CarrierPhase.NONE
+                || pickerPhase != PickerPhase.NONE
+                || fluidCarrierPhase != FluidCarrierPhase.NONE
+                || lumberjackPhase != LumberjackPhase.NONE
+                || harvesterPhase != HarvesterPhase.NONE
+                || minerPhase != MinerPhase.NONE
+                || planterPhase != PlanterPhase.NONE
+                || farmerPhase != FarmerPhase.NONE
+                || leafCutterPhase != LeafCutterPhase.NONE
+                || shovelmanPhase != ShovelmanPhase.NONE
+                || butcherPhase != ButcherPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -1988,6 +2015,177 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         shovelmanBreakProgress = 0;
     }
 
+    private void beginButcher(ServerLevel level) {
+        if (butcherTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findButcherToolStation(level, true);
+            if (source.isEmpty()) return;
+            butcherStationTarget = source.get();
+            butcherPhase = ButcherPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (butcherTool.isDamageableItem()
+                && butcherTool.getDamageValue() >= butcherTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findButcherToolStation(level, false);
+            if (receiver.isEmpty()) return;
+            butcherStationTarget = receiver.get();
+            butcherPhase = ButcherPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        Optional<net.minecraft.world.entity.animal.Animal> target = AnimalWorkRegistry.reserveClosest(
+                level, position(), 250, getUUID(),
+                animal -> inside(workZone(level), animal.blockPosition()));
+        if (target.isEmpty()) return;
+        butcherAnimalTarget = target.get().getUUID();
+        butcherAttackDelay = 10;
+        butcherPhase = ButcherPhase.TO_TARGET;
+        leaveStation();
+    }
+
+    private Optional<RobotStationRegistry.Address> findButcherToolStation(ServerLevel level, boolean provider) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
+                        return false;
+                    }
+                    if (!provider) {
+                        if (!config.matches(butcherTool)) return false;
+                        try (Transaction transaction = Transaction.openRoot()) {
+                            return handler.insert(ItemResource.of(butcherTool), 1, transaction) == 1;
+                        }
+                    }
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadButcherTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    butcherTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadButcherTool(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (butcherTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives() || !config.matches(butcherTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(butcherTool), 1, transaction) == 1) {
+                butcherTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private void tickButcher(ServerLevel level) {
+        if (butcherPhase == ButcherPhase.TO_TOOL) {
+            if (butcherStationTarget == null) { butcherPhase = ButcherPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(butcherStationTarget))) {
+                loadButcherTool(level, butcherStationTarget);
+                butcherPhase = ButcherPhase.RETURN_HOME;
+            }
+        } else if (butcherPhase == ButcherPhase.TO_UNLOAD_TOOL) {
+            if (butcherStationTarget == null) { butcherPhase = ButcherPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(butcherStationTarget))) {
+                unloadButcherTool(level, butcherStationTarget);
+                butcherPhase = ButcherPhase.RETURN_HOME;
+            }
+        } else if (butcherPhase == ButcherPhase.TO_TARGET || butcherPhase == ButcherPhase.ATTACKING) {
+            if (butcherAnimalTarget == null
+                    || !AnimalWorkRegistry.reclaim(level, butcherAnimalTarget, getUUID())) {
+                releaseButcherTarget(level);
+                butcherPhase = ButcherPhase.RETURN_HOME;
+                return;
+            }
+            var animal = AnimalWorkRegistry.animal(level, butcherAnimalTarget).orElse(null);
+            if (animal == null || !inside(workZone(level), animal.blockPosition())) {
+                releaseButcherTarget(level);
+                butcherPhase = ButcherPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (distanceToSqr(animal) > 4.0) {
+                butcherPhase = ButcherPhase.TO_TARGET;
+                flyToward(animal.position());
+                return;
+            }
+            setDeltaMovement(Vec3.ZERO);
+            butcherPhase = ButcherPhase.ATTACKING;
+            if (energy() < 133_334) return;
+            setEnergy(energy() - 133_334);
+            if (++butcherAttackDelay > 20) {
+                butcherAttackDelay = 0;
+                var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+                fakePlayer.setPos(position());
+                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, butcherTool.copy());
+                var attackEvent = new net.neoforged.neoforge.event.entity.player.AttackEntityEvent(fakePlayer, animal);
+                if (!net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(attackEvent).isCanceled()) {
+                    final double[] damage = {2.0};
+                    butcherTool.forEachModifier(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+                            (attribute, modifier) -> {
+                                if (!attribute.equals(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) {
+                                    return;
+                                }
+                                switch (modifier.operation()) {
+                                    case ADD_VALUE -> damage[0] += modifier.amount();
+                                    case ADD_MULTIPLIED_BASE -> damage[0] += 2.0 * modifier.amount();
+                                    case ADD_MULTIPLIED_TOTAL -> damage[0] *= 1.0 + modifier.amount();
+                                }
+                            });
+                    if (animal.hurtServer(level, fakePlayer.damageSources().playerAttack(fakePlayer),
+                            (float) Math.max(0, damage[0]))) {
+                        butcherTool.hurtAndBreak(1, level, fakePlayer, item -> {});
+                    }
+                }
+                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                if (!animal.isAlive()) {
+                    releaseButcherTarget(level);
+                    butcherPhase = ButcherPhase.RETURN_HOME;
+                }
+            }
+        } else if (butcherPhase == ButcherPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                butcherStationTarget = null;
+                butcherPhase = ButcherPhase.NONE;
+            }
+        }
+    }
+
+    private void releaseButcherTarget(ServerLevel level) {
+        if (butcherAnimalTarget != null) {
+            AnimalWorkRegistry.release(level, butcherAnimalTarget, getUUID());
+            butcherAnimalTarget = null;
+        }
+        butcherAttackDelay = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -2154,6 +2352,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseFarmerGround(serverLevel);
         releaseLeafCutterBlock(serverLevel);
         releaseShovelmanBlock(serverLevel);
+        releaseButcherTarget(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -2165,6 +2364,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!farmerTool.isEmpty()) spawnAtLocation(serverLevel, farmerTool.copy());
         if (!leafCutterTool.isEmpty()) spawnAtLocation(serverLevel, leafCutterTool.copy());
         if (!shovelmanTool.isEmpty()) spawnAtLocation(serverLevel, shovelmanTool.copy());
+        if (!butcherTool.isEmpty()) spawnAtLocation(serverLevel, butcherTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -2187,6 +2387,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseFarmerGround(level);
             releaseLeafCutterBlock(level);
             releaseShovelmanBlock(level);
+            releaseButcherTarget(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -2197,6 +2398,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!farmerTool.isEmpty()) spawnAtLocation(level, farmerTool.copy());
             if (!leafCutterTool.isEmpty()) spawnAtLocation(level, leafCutterTool.copy());
             if (!shovelmanTool.isEmpty()) spawnAtLocation(level, shovelmanTool.copy());
+            if (!butcherTool.isEmpty()) spawnAtLocation(level, butcherTool.copy());
             discard();
         }
         return true;
@@ -2291,6 +2493,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (shovelmanBlockTarget != null) output.putLong("ShovelmanBlock", shovelmanBlockTarget.asLong());
         output.putFloat("ShovelmanBreakProgress", shovelmanBreakProgress);
+        if (!butcherTool.isEmpty()) output.store("ButcherTool", ItemStack.CODEC, butcherTool);
+        output.putInt("ButcherPhase", butcherPhase.ordinal());
+        if (butcherStationTarget != null) {
+            output.putLong("ButcherStationPos", butcherStationTarget.pipePos().asLong());
+            output.putInt("ButcherStationSide", butcherStationTarget.side().get3DDataValue());
+        }
+        if (butcherAnimalTarget != null) output.store("ButcherAnimal", net.minecraft.core.UUIDUtil.CODEC, butcherAnimalTarget);
+        output.putInt("ButcherAttackDelay", butcherAttackDelay);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -2500,6 +2710,23 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (shovelmanPhase == ShovelmanPhase.TO_BLOCK && shovelmanBlockTarget == null) {
             shovelmanPhase = ShovelmanPhase.RETURN_HOME;
         }
+        butcherTool = input.read("ButcherTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int butcherOrdinal = input.getIntOr("ButcherPhase", ButcherPhase.NONE.ordinal());
+        ButcherPhase[] butcherPhases = ButcherPhase.values();
+        butcherPhase = butcherOrdinal >= 0 && butcherOrdinal < butcherPhases.length
+                ? butcherPhases[butcherOrdinal] : ButcherPhase.NONE;
+        if (input.getLong("ButcherStationPos").isPresent()) {
+            butcherStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("ButcherStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "ButcherStationSide", Direction.UP.get3DDataValue())));
+        }
+        butcherAnimalTarget = input.read("ButcherAnimal", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+        butcherAttackDelay = Math.clamp(input.getIntOr("ButcherAttackDelay", 0), 0, 20);
+        if ((butcherPhase == ButcherPhase.TO_TOOL || butcherPhase == ButcherPhase.TO_UNLOAD_TOOL)
+                && butcherStationTarget == null) butcherPhase = ButcherPhase.RETURN_HOME;
+        if ((butcherPhase == ButcherPhase.TO_TARGET || butcherPhase == ButcherPhase.ATTACKING)
+                && butcherAnimalTarget == null) butcherPhase = ButcherPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

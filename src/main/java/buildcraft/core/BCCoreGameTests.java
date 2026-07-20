@@ -119,6 +119,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_leaf_cutter"));
         Holder<TestEnvironmentDefinition<?>> shovelmanEnvironment =
                 event.registerEnvironment(id("robotics_shovelman"));
+        Holder<TestEnvironmentDefinition<?>> butcherEnvironment =
+                event.registerEnvironment(id("robotics_butcher"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -134,6 +136,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsLeafCutterRobot);
         registerTest(event, shovelmanEnvironment, "robotics_shovelman_robot",
                 BCCoreGameTests::roboticsShovelmanRobot);
+        registerTest(event, butcherEnvironment, "robotics_butcher_robot",
+                BCCoreGameTests::roboticsButcherRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7666,6 +7670,109 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                         new net.minecraft.world.phys.AABB(target).inflate(2),
                         item -> item.getItem().is(Items.DIRT)).isEmpty(),
                 "Shovelman did not preserve shovel drops");
+        helper.succeed();
+    }
+
+    private static void roboticsButcherRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 108, 1);
+        BlockPos sourceRelative = new BlockPos(2, 108, 1);
+        BlockPos receiverRelative = new BlockPos(3, 108, 1);
+        BlockPos targetRelative = new BlockPos(5, 108, 1);
+        BlockPos excludedRelative = new BlockPos(5, 108, 3);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        BlockPos excluded = helper.absolutePos(excludedRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        var receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenSword = new ItemStack(Items.IRON_SWORD);
+        nearlyBrokenSword.setDamageValue(nearlyBrokenSword.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenSword);
+        var targetSheep = net.minecraft.world.entity.EntityType.SHEEP.create(
+                helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        var excludedSheep = net.minecraft.world.entity.EntityType.SHEEP.create(
+                helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        helper.assertTrue(targetSheep != null && excludedSheep != null, "Could not create Butcher test animals");
+        targetSheep.setNoAi(true);
+        excludedSheep.setNoAi(true);
+        targetSheep.setHealth(1.0F);
+        targetSheep.setPos(net.minecraft.world.phys.Vec3.atCenterOf(target));
+        excludedSheep.setPos(net.minecraft.world.phys.Vec3.atCenterOf(excluded));
+        helper.getLevel().addFreshEntity(targetSheep);
+        helper.getLevel().addFreshEntity(excludedSheep);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.BUTCHER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Butcher failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1600 && (targetSheep.isAlive()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.butcherPhase() != buildcraft.robotics.ButcherPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(
+                        helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(!targetSheep.isAlive(),
+                "Butcher did not kill zoned animal: phase=" + robot.butcherPhase()
+                        + ", state=" + robot.taskState() + ", tool=" + robot.butcherTool());
+        helper.assertTrue(excludedSheep.isAlive(), "Butcher attacked animal outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Butcher did not extract one sword");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.IRON_SWORD)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Butcher did not damage and unload its worn sword");
+        helper.assertTrue(robot.butcherTool().isEmpty(), "Butcher retained unloaded sword");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Butcher did not return home");
+        helper.assertValueEqual(buildcraft.robotics.ButcherPhase.NONE, robot.butcherPhase(),
+                "Butcher scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Butcher work consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                        net.minecraft.world.entity.item.ItemEntity.class,
+                        new net.minecraft.world.phys.AABB(target).inflate(3),
+                        item -> item.getItem().is(Items.WHITE_WOOL)
+                                || item.getItem().is(Items.MUTTON)).isEmpty(),
+                "Butcher did not preserve animal drops");
         helper.succeed();
     }
 
