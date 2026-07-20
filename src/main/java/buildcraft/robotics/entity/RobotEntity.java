@@ -24,6 +24,7 @@ import buildcraft.robotics.LeafCutterPhase;
 import buildcraft.robotics.ShovelmanPhase;
 import buildcraft.robotics.ButcherPhase;
 import buildcraft.robotics.AnimalWorkRegistry;
+import buildcraft.robotics.PumpPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -118,6 +119,14 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private UUID butcherAnimalTarget;
     private ButcherPhase butcherPhase = ButcherPhase.NONE;
     private int butcherAttackDelay;
+    private RobotStationRegistry.Address pumpStationTarget;
+    private BlockPos pumpBlockTarget;
+    private PumpPhase pumpPhase = PumpPhase.NONE;
+    private int pumpWaited;
+    private int pumpSearchRadius;
+    private int pumpSearchX;
+    private int pumpSearchY;
+    private int pumpSearchZ;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -180,6 +189,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack shovelmanTool() { return shovelmanTool.copy(); }
     public ButcherPhase butcherPhase() { return butcherPhase; }
     public ItemStack butcherTool() { return butcherTool.copy(); }
+    public PumpPhase pumpPhase() { return pumpPhase; }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -254,6 +264,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.BUTCHER
                     && butcherPhase == ButcherPhase.NONE && tickCount % 20 == 0) {
                 beginButcher(serverLevel);
+            } else if (board() == RobotBoardType.PUMP
+                    && pumpPhase == PumpPhase.NONE && tickCount % 20 == 0) {
+                beginPump(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -283,6 +296,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (leafCutterPhase != LeafCutterPhase.NONE) tickLeafCutter(serverLevel);
         if (shovelmanPhase != ShovelmanPhase.NONE) tickShovelman(serverLevel);
         if (butcherPhase != ButcherPhase.NONE) tickButcher(serverLevel);
+        if (pumpPhase != PumpPhase.NONE) tickPump(serverLevel);
     }
 
     private boolean hasActiveWorkflow() {
@@ -297,7 +311,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 || farmerPhase != FarmerPhase.NONE
                 || leafCutterPhase != LeafCutterPhase.NONE
                 || shovelmanPhase != ShovelmanPhase.NONE
-                || butcherPhase != ButcherPhase.NONE;
+                || butcherPhase != ButcherPhase.NONE
+                || pumpPhase != PumpPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -2186,6 +2201,147 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         butcherAttackDelay = 0;
     }
 
+    private void beginPump(ServerLevel level) {
+        if (fluidTank.getAmountAsLong(0) > 0) {
+            Optional<RobotStationRegistry.Address> receiver = findFluidUnloadStation(level, null);
+            if (receiver.isEmpty()) return;
+            pumpStationTarget = receiver.get();
+            pumpPhase = PumpPhase.TO_UNLOAD;
+            leaveStation();
+            return;
+        }
+        pumpSearchRadius = 0;
+        pumpSearchX = 0;
+        pumpSearchY = 0;
+        pumpSearchZ = 0;
+        pumpPhase = PumpPhase.SEARCHING;
+    }
+
+    private void tickPump(ServerLevel level) {
+        if (pumpPhase == PumpPhase.SEARCHING) {
+            searchPumpSource(level);
+        } else if (pumpPhase == PumpPhase.TO_SOURCE) {
+            if (pumpBlockTarget == null || !BlockWorkRegistry.reclaim(level, pumpBlockTarget, getUUID())
+                    || !isPumpSource(level, pumpBlockTarget)) {
+                releasePumpSource(level);
+                pumpPhase = PumpPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(pumpBlockTarget))) {
+                pumpWaited = 0;
+                pumpPhase = PumpPhase.PUMPING;
+            }
+        } else if (pumpPhase == PumpPhase.PUMPING) {
+            if (pumpBlockTarget == null || !BlockWorkRegistry.reclaim(level, pumpBlockTarget, getUUID())
+                    || !isPumpSource(level, pumpBlockTarget)) {
+                releasePumpSource(level);
+                pumpPhase = PumpPhase.RETURN_HOME;
+                return;
+            }
+            if (energy() < 5) return;
+            setEnergy(energy() - 5);
+            if (++pumpWaited > 40) {
+                pumpSource(level);
+                releasePumpSource(level);
+                pumpPhase = PumpPhase.RETURN_HOME;
+            }
+        } else if (pumpPhase == PumpPhase.TO_UNLOAD) {
+            if (pumpStationTarget == null || fluidTank.getAmountAsLong(0) <= 0) {
+                pumpPhase = PumpPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(pumpStationTarget))) {
+                unloadFluidCarrier(level, pumpStationTarget);
+                pumpPhase = PumpPhase.RETURN_HOME;
+            }
+        } else if (pumpPhase == PumpPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                pumpStationTarget = null;
+                pumpPhase = PumpPhase.NONE;
+            }
+        }
+    }
+
+    private void searchPumpSource(ServerLevel level) {
+        if (energy() < 2) return;
+        setEnergy(energy() - 2);
+        BlockPos origin = stationAddress == null ? blockPosition() : stationAddress.pipePos();
+        for (int checked = 0; checked < 4096 && pumpSearchRadius <= 96; checked++) {
+            int radius = pumpSearchRadius;
+            BlockPos candidate = origin.offset(pumpSearchX, pumpSearchY, pumpSearchZ);
+            advancePumpSearch();
+            if (Math.max(Math.max(Math.abs(candidate.getX() - origin.getX()),
+                    Math.abs(candidate.getY() - origin.getY())),
+                    Math.abs(candidate.getZ() - origin.getZ())) != radius) continue;
+            if (candidate.distSqr(origin) > 96 * 96 || !inside(workZone(level), candidate)) continue;
+            if (level.getChunkSource().getChunkNow(candidate.getX() >> 4, candidate.getZ() >> 4) == null) continue;
+            if (isPumpSource(level, candidate) && BlockWorkRegistry.reserve(level, candidate, getUUID())) {
+                pumpBlockTarget = candidate.immutable();
+                pumpPhase = PumpPhase.TO_SOURCE;
+                leaveStation();
+                return;
+            }
+        }
+        if (pumpSearchRadius > 96) pumpPhase = PumpPhase.NONE;
+    }
+
+    private void advancePumpSearch() {
+        int radius = pumpSearchRadius;
+        if (radius == 0) {
+            pumpSearchRadius = 1;
+            pumpSearchX = -1;
+            pumpSearchY = -1;
+            pumpSearchZ = -1;
+            return;
+        }
+        if (++pumpSearchZ <= radius) return;
+        pumpSearchZ = -radius;
+        if (++pumpSearchY <= radius) return;
+        pumpSearchY = -radius;
+        if (++pumpSearchX <= radius) return;
+        pumpSearchRadius++;
+        pumpSearchX = -pumpSearchRadius;
+        pumpSearchY = -pumpSearchRadius;
+        pumpSearchZ = -pumpSearchRadius;
+    }
+
+    private boolean isPumpSource(ServerLevel level, BlockPos pos) {
+        net.minecraft.world.level.material.FluidState state = level.getFluidState(pos);
+        if (state.isEmpty() || !state.isSource()) return false;
+        FluidResource resource = FluidResource.of(state.getType());
+        return stationAddress == null || stationConfig(level, stationAddress).matches(resource);
+    }
+
+    private boolean pumpSource(ServerLevel level) {
+        if (pumpBlockTarget == null || fluidTank.getAmountAsLong(0) > 0) return false;
+        net.minecraft.world.level.block.state.BlockState state = level.getBlockState(pumpBlockTarget);
+        net.minecraft.world.level.material.FluidState fluidState = state.getFluidState();
+        if (fluidState.isEmpty() || !fluidState.isSource()
+                || !(state.getBlock() instanceof net.minecraft.world.level.block.BucketPickup pickup)) return false;
+        FluidResource resource = FluidResource.of(fluidState.getType());
+        if (stationAddress != null && !stationConfig(level, stationAddress).matches(resource)) return false;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (fluidTank.insert(resource, 1_000, transaction) != 1_000) return false;
+            var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+            fakePlayer.setPos(position());
+            ItemStack pickedUp = pickup.pickupBlock(fakePlayer, level, pumpBlockTarget, state);
+            if (pickedUp.isEmpty()) return false;
+            transaction.commit();
+            return true;
+        }
+    }
+
+    private void releasePumpSource(ServerLevel level) {
+        if (pumpBlockTarget != null) {
+            BlockWorkRegistry.release(level, pumpBlockTarget, getUUID());
+            pumpBlockTarget = null;
+        }
+        pumpWaited = 0;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -2353,6 +2509,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseLeafCutterBlock(serverLevel);
         releaseShovelmanBlock(serverLevel);
         releaseButcherTarget(serverLevel);
+        releasePumpSource(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -2388,6 +2545,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseLeafCutterBlock(level);
             releaseShovelmanBlock(level);
             releaseButcherTarget(level);
+            releasePumpSource(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -2501,6 +2659,17 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if (butcherAnimalTarget != null) output.store("ButcherAnimal", net.minecraft.core.UUIDUtil.CODEC, butcherAnimalTarget);
         output.putInt("ButcherAttackDelay", butcherAttackDelay);
+        output.putInt("PumpPhase", pumpPhase.ordinal());
+        if (pumpStationTarget != null) {
+            output.putLong("PumpStationPos", pumpStationTarget.pipePos().asLong());
+            output.putInt("PumpStationSide", pumpStationTarget.side().get3DDataValue());
+        }
+        if (pumpBlockTarget != null) output.putLong("PumpBlock", pumpBlockTarget.asLong());
+        output.putInt("PumpWaited", pumpWaited);
+        output.putInt("PumpSearchRadius", pumpSearchRadius);
+        output.putInt("PumpSearchX", pumpSearchX);
+        output.putInt("PumpSearchY", pumpSearchY);
+        output.putInt("PumpSearchZ", pumpSearchZ);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -2727,6 +2896,27 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 && butcherStationTarget == null) butcherPhase = ButcherPhase.RETURN_HOME;
         if ((butcherPhase == ButcherPhase.TO_TARGET || butcherPhase == ButcherPhase.ATTACKING)
                 && butcherAnimalTarget == null) butcherPhase = ButcherPhase.RETURN_HOME;
+        int pumpOrdinal = input.getIntOr("PumpPhase", PumpPhase.NONE.ordinal());
+        PumpPhase[] pumpPhases = PumpPhase.values();
+        pumpPhase = pumpOrdinal >= 0 && pumpOrdinal < pumpPhases.length
+                ? pumpPhases[pumpOrdinal] : PumpPhase.NONE;
+        if (input.getLong("PumpStationPos").isPresent()) {
+            pumpStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("PumpStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "PumpStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("PumpBlock").isPresent()) {
+            pumpBlockTarget = BlockPos.of(input.getLongOr("PumpBlock", 0));
+        }
+        pumpWaited = Math.clamp(input.getIntOr("PumpWaited", 0), 0, 41);
+        pumpSearchRadius = Math.clamp(input.getIntOr("PumpSearchRadius", 0), 0, 97);
+        pumpSearchX = input.getIntOr("PumpSearchX", 0);
+        pumpSearchY = input.getIntOr("PumpSearchY", 0);
+        pumpSearchZ = input.getIntOr("PumpSearchZ", 0);
+        if (pumpPhase == PumpPhase.TO_UNLOAD && pumpStationTarget == null) pumpPhase = PumpPhase.RETURN_HOME;
+        if ((pumpPhase == PumpPhase.TO_SOURCE || pumpPhase == PumpPhase.PUMPING)
+                && pumpBlockTarget == null) pumpPhase = PumpPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

@@ -121,6 +121,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_shovelman"));
         Holder<TestEnvironmentDefinition<?>> butcherEnvironment =
                 event.registerEnvironment(id("robotics_butcher"));
+        Holder<TestEnvironmentDefinition<?>> pumpEnvironment =
+                event.registerEnvironment(id("robotics_pump"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -138,6 +140,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsShovelmanRobot);
         registerTest(event, butcherEnvironment, "robotics_butcher_robot",
                 BCCoreGameTests::roboticsButcherRobot);
+        registerTest(event, pumpEnvironment, "robotics_pump_robot",
+                BCCoreGameTests::roboticsPumpRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7773,6 +7777,82 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                         item -> item.getItem().is(Items.WHITE_WOOL)
                                 || item.getItem().is(Items.MUTTON)).isEmpty(),
                 "Butcher did not preserve animal drops");
+        helper.succeed();
+    }
+
+    private static void roboticsPumpRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 120, 1);
+        BlockPos receiverRelative = new BlockPos(2, 120, 1);
+        BlockPos lavaRelative = new BlockPos(3, 120, 1);
+        BlockPos sourceRelative = new BlockPos(5, 120, 1);
+        BlockPos excludedRelative = new BlockPos(5, 120, 3);
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(receiverRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(receiverRelative.above(), buildcraft.factory.BCFactoryBlocks.TANK.get());
+        helper.setBlock(lavaRelative, Blocks.LAVA);
+        helper.setBlock(sourceRelative, Blocks.WATER);
+        helper.setBlock(excludedRelative, Blocks.WATER);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        BlockPos lava = helper.absolutePos(lavaRelative);
+        BlockPos source = helper.absolutePos(sourceRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(lava.getX(), lava.getZ(), true);
+        workZone.set(source.getX(), source.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        var water = net.neoforged.neoforge.transfer.fluid.FluidResource.of(
+                net.minecraft.world.level.material.Fluids.WATER);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(water), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of(), java.util.List.of(water)));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        var receiverTank = ((buildcraft.factory.block.entity.TankBlockEntity) helper.getLevel()
+                .getBlockEntity(helper.absolutePos(receiverRelative.above()))).localStorage();
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.PUMP);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Pump failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1800 && (receiverTank.getAmountAsInt(0) != 1_000
+                || robot.pumpPhase() != buildcraft.robotics.PumpPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(helper.getLevel().getFluidState(helper.absolutePos(sourceRelative)).isEmpty(),
+                "Pump did not drain zoned Water source: phase=" + robot.pumpPhase()
+                        + ", state=" + robot.taskState());
+        helper.assertTrue(helper.getLevel().getFluidState(helper.absolutePos(lavaRelative)).isSource(),
+                "Pump ignored linked-station Water filter");
+        helper.assertTrue(helper.getLevel().getFluidState(helper.absolutePos(excludedRelative)).isSource(),
+                "Pump drained source outside its work zone");
+        helper.assertTrue(receiverTank.getResource(0).equals(water)
+                        && receiverTank.getAmountAsInt(0) == 1_000,
+                "Pump did not unload exactly one source bucket");
+        helper.assertValueEqual(0, robot.fluidTank().getAmountAsInt(0),
+                "Pump retained unloaded fluid");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Pump did not return home");
+        helper.assertValueEqual(buildcraft.robotics.PumpPhase.NONE, robot.pumpPhase(),
+                "Pump scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Pump work consumed no battery energy");
         helper.succeed();
     }
 
