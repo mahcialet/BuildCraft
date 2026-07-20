@@ -129,6 +129,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_bomber"));
         Holder<TestEnvironmentDefinition<?>> stripesEnvironment =
                 event.registerEnvironment(id("robotics_stripes"));
+        Holder<TestEnvironmentDefinition<?>> builderRobotEnvironment =
+                event.registerEnvironment(id("robotics_builder_robot"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -154,6 +156,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsBomberRobot);
         registerTest(event, stripesEnvironment, "robotics_stripes_robot",
                 BCCoreGameTests::roboticsStripesRobot);
+        registerTest(event, builderRobotEnvironment, "robotics_builder_robot",
+                BCCoreGameTests::roboticsBuilderRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -8129,6 +8133,93 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Stripes scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Stripes work consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsBuilderRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 180, 1);
+        BlockPos sourceRelative = new BlockPos(2, 180, 1);
+        BlockPos markerRelative = new BlockPos(5, 180, 1);
+        BlockPos placeRelative = markerRelative.east();
+        BlockPos clearRelative = placeRelative.east();
+        helper.setBlock(homeRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(markerRelative.below(), Blocks.STONE);
+        helper.setBlock(markerRelative, buildcraft.builders.BCBuildersBlocks.CONSTRUCTION_MARKER.get());
+        helper.setBlock(placeRelative.below(), Blocks.STONE);
+        helper.setBlock(clearRelative, Blocks.DIRT);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var marker = (buildcraft.builders.block.entity.ConstructionMarkerBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(markerRelative));
+        BlockPos markerPos = helper.absolutePos(markerRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(markerPos.getX(), markerPos.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of(new ItemStack(Items.COBBLESTONE))));
+        source.installAttachment(Direction.UP, sourceStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        sourceChest.setItem(0, new ItemStack(Items.COBBLESTONE));
+        var snapshot = new buildcraft.builders.snapshot.SnapshotData(
+                buildcraft.builders.snapshot.SnapshotKind.BLUEPRINT,
+                new BlockPos(2, 1, 1), Direction.WEST, new BlockPos(1, 0, 0),
+                java.util.List.of(Blocks.COBBLESTONE.defaultBlockState(), Blocks.AIR.defaultBlockState()),
+                java.util.List.of(0, 1), "Robot Builder", true, true, false, false);
+        ItemStack blueprint = new ItemStack(buildcraft.builders.BCBuildersItems.BLUEPRINT.get());
+        blueprint.set(buildcraft.builders.BCBuildersDataComponents.SNAPSHOT.get(), snapshot);
+        helper.assertTrue(marker.setBlueprint(blueprint), "Builder robot marker rejected Blueprint");
+        buildcraft.builders.ConstructionMarkerRegistry.add(helper.getLevel(), marker);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.BUILDER);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Builder failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 2000 && (!helper.getBlockState(placeRelative).is(Blocks.COBBLESTONE)
+                || !helper.getBlockState(clearRelative).isAir()
+                || robot.builderPhase() != buildcraft.robotics.BuilderPhase.NONE); tick++) {
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), home.getBlockPos(), Direction.UP);
+            buildcraft.robotics.RobotStationRegistry.touch(
+                    helper.getLevel(), source.getBlockPos(), Direction.UP);
+            robot.tick();
+        }
+        helper.assertTrue(helper.getBlockState(placeRelative).is(Blocks.COBBLESTONE),
+                "Builder did not place Blueprint material: phase=" + robot.builderPhase()
+                        + ", state=" + robot.taskState() + ", target=" + robot.builderBlockTarget());
+        helper.assertTrue(helper.getBlockState(clearRelative).isAir(),
+                "Builder did not excavate Blueprint air slot");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(),
+                "Builder did not transactionally fetch exact material");
+        helper.assertTrue(robot.isEmpty(), "Builder retained consumed material");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Builder did not return home after completing marker");
+        helper.assertValueEqual(buildcraft.robotics.BuilderPhase.NONE, robot.builderPhase(),
+                "Builder scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Builder construction consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                        net.minecraft.world.entity.item.ItemEntity.class,
+                        new net.minecraft.world.phys.AABB(helper.absolutePos(clearRelative)).inflate(3),
+                        item -> item.getItem().is(Items.DIRT)).isEmpty(),
+                "Builder did not preserve excavation drops");
         helper.succeed();
     }
 

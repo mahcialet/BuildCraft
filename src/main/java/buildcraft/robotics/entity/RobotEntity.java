@@ -28,6 +28,7 @@ import buildcraft.robotics.PumpPhase;
 import buildcraft.robotics.KnightPhase;
 import buildcraft.robotics.BomberPhase;
 import buildcraft.robotics.StripesPhase;
+import buildcraft.robotics.BuilderPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -145,6 +146,13 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private StripesPhase stripesPhase = StripesPhase.NONE;
     private int stripesUseCycles;
     private int stripesSearchAttempts;
+    private RobotStationRegistry.Address builderStationTarget;
+    private BlockPos builderMarkerTarget;
+    private BlockPos builderBlockTarget;
+    private BuilderPhase builderPhase = BuilderPhase.NONE;
+    private int builderSlotIndex = -1;
+    private int builderScanCursor;
+    private int builderLaunchingDelay;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -215,6 +223,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ItemStack stripesItem() { return stripesItem.copy(); }
     public Optional<BlockPos> stripesBlockTarget() { return Optional.ofNullable(stripesBlockTarget); }
     public int stripesSearchAttempts() { return stripesSearchAttempts; }
+    public BuilderPhase builderPhase() { return builderPhase; }
+    public Optional<BlockPos> builderBlockTarget() { return Optional.ofNullable(builderBlockTarget); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -301,6 +311,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.STRIPES
                     && stripesPhase == StripesPhase.NONE && tickCount % 20 == 0) {
                 beginStripes(serverLevel);
+            } else if (board() == RobotBoardType.BUILDER
+                    && builderPhase == BuilderPhase.NONE && tickCount % 20 == 0) {
+                beginBuilder();
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -334,6 +347,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (knightPhase != KnightPhase.NONE) tickKnight(serverLevel);
         if (bomberPhase != BomberPhase.NONE) tickBomber(serverLevel);
         if (stripesPhase != StripesPhase.NONE) tickStripes(serverLevel);
+        if (builderPhase != BuilderPhase.NONE) tickBuilder(serverLevel);
     }
 
     private boolean hasActiveWorkflow() {
@@ -352,7 +366,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 || pumpPhase != PumpPhase.NONE
                 || knightPhase != KnightPhase.NONE
                 || bomberPhase != BomberPhase.NONE
-                || stripesPhase != StripesPhase.NONE;
+                || stripesPhase != StripesPhase.NONE
+                || builderPhase != BuilderPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -2898,6 +2913,274 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         stripesUseCycles = 0;
     }
 
+    private void beginBuilder() {
+        builderPhase = BuilderPhase.SEARCHING;
+    }
+
+    private void tickBuilder(ServerLevel level) {
+        if (builderLaunchingDelay > 0) {
+            builderLaunchingDelay--;
+            return;
+        }
+        if (builderPhase == BuilderPhase.SEARCHING) {
+            searchBuilderWork(level);
+        } else if (builderPhase == BuilderPhase.TO_MATERIAL) {
+            if (builderStationTarget == null) { builderPhase = BuilderPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(builderStationTarget))) {
+                loadBuilderMaterial(level, builderStationTarget);
+                builderPhase = hasBuilderMaterial(level) ? BuilderPhase.TO_BLOCK : BuilderPhase.RETURN_HOME;
+            }
+        } else if (builderPhase == BuilderPhase.TO_BLOCK) {
+            if (!validateBuilderTarget(level)) {
+                releaseBuilderTarget(level);
+                builderPhase = BuilderPhase.SEARCHING;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(Vec3.atCenterOf(builderBlockTarget))) builderPhase = BuilderPhase.BUILDING;
+        } else if (builderPhase == BuilderPhase.BUILDING) {
+            if (!validateBuilderTarget(level)) {
+                releaseBuilderTarget(level);
+                builderPhase = BuilderPhase.SEARCHING;
+                return;
+            }
+            long cost = builderOperationCost();
+            if (energy() <= cost + 1_000_000) return;
+            if (buildBuilderSlot(level)) {
+                setEnergy(energy() - cost);
+                builderScanCursor = builderSlotIndex + 1;
+                builderLaunchingDelay = 2;
+            }
+            releaseBuilderTarget(level);
+            builderPhase = BuilderPhase.SEARCHING;
+        } else if (builderPhase == BuilderPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                builderStationTarget = null;
+                builderMarkerTarget = null;
+                builderPhase = BuilderPhase.NONE;
+            }
+        }
+    }
+
+    private void searchBuilderWork(ServerLevel level) {
+        var marker = builderMarker(level);
+        if (marker == null) {
+            marker = buildcraft.builders.ConstructionMarkerRegistry.loaded(level).stream()
+                    .filter(candidate -> candidate.snapshot() != null && candidate.snapshot().valid())
+                    .filter(candidate -> inside(workZone(level), candidate.getBlockPos()))
+                    .filter(candidate -> candidate.getBlockPos().distToCenterSqr(position()) < 3 * 64 * 64)
+                    .filter(candidate -> markerNeedsBuild(level, candidate))
+                    .min(java.util.Comparator.comparingDouble(
+                            candidate -> candidate.getBlockPos().distToCenterSqr(position())))
+                    .orElse(null);
+            if (marker == null) { builderPhase = BuilderPhase.RETURN_HOME; return; }
+            builderMarkerTarget = marker.getBlockPos();
+            builderScanCursor = 0;
+        }
+        buildcraft.builders.snapshot.SnapshotData snapshot = marker.snapshot();
+        int volume = snapshot.blocks().size();
+        for (int checked = 0; checked < volume; checked++) {
+            int index = (builderScanCursor + checked) % volume;
+            BlockPos local = builderLocal(snapshot, index);
+            BlockPos target = marker.snapshotMin().offset(local);
+            net.minecraft.world.level.block.state.BlockState desired = snapshot.stateAt(local);
+            net.minecraft.world.level.block.state.BlockState actual = level.getBlockState(target);
+            if (actual.equals(desired)) continue;
+            if (desired.isAir() && (!snapshot.excavate() || actual.isAir())) continue;
+            if (!desired.isAir() && !actual.isAir() && !snapshot.excavate()) continue;
+            if (!BlockWorkRegistry.reserve(level, target, getUUID())) continue;
+            builderSlotIndex = index;
+            builderBlockTarget = target;
+            if (!desired.isAir() && !hasBuilderMaterial(level)) {
+                Optional<RobotStationRegistry.Address> source = findBuilderMaterialStation(level, snapshot, desired);
+                if (source.isEmpty()) {
+                    releaseBuilderTarget(level);
+                    builderScanCursor = index + 1;
+                    continue;
+                }
+                builderStationTarget = source.get();
+                builderPhase = BuilderPhase.TO_MATERIAL;
+                if (taskState() == RobotTaskState.DOCKED) leaveStation();
+            } else {
+                builderPhase = BuilderPhase.TO_BLOCK;
+                if (taskState() == RobotTaskState.DOCKED) leaveStation();
+            }
+            return;
+        }
+        builderPhase = BuilderPhase.RETURN_HOME;
+    }
+
+    private buildcraft.builders.block.entity.ConstructionMarkerBlockEntity builderMarker(ServerLevel level) {
+        if (builderMarkerTarget == null) return null;
+        if (!(level.getBlockEntity(builderMarkerTarget)
+                instanceof buildcraft.builders.block.entity.ConstructionMarkerBlockEntity marker)) return null;
+        return marker.snapshot() != null && marker.snapshot().valid() ? marker : null;
+    }
+
+    private boolean markerNeedsBuild(ServerLevel level,
+            buildcraft.builders.block.entity.ConstructionMarkerBlockEntity marker) {
+        buildcraft.builders.snapshot.SnapshotData snapshot = marker.snapshot();
+        for (int index = 0; index < snapshot.blocks().size(); index++) {
+            BlockPos local = builderLocal(snapshot, index);
+            var desired = snapshot.stateAt(local);
+            var actual = level.getBlockState(marker.snapshotMin().offset(local));
+            if (actual.equals(desired)) continue;
+            if (desired.isAir() && !snapshot.excavate()) continue;
+            if (!desired.isAir() && !actual.isAir() && !snapshot.excavate()) continue;
+            return true;
+        }
+        return false;
+    }
+
+    private BlockPos builderLocal(buildcraft.builders.snapshot.SnapshotData snapshot, int index) {
+        int x = index % snapshot.size().getX();
+        int y = (index / snapshot.size().getX()) % snapshot.size().getY();
+        int z = index / (snapshot.size().getX() * snapshot.size().getY());
+        return new BlockPos(x, y, z);
+    }
+
+    private Optional<RobotStationRegistry.Address> findBuilderMaterialStation(ServerLevel level,
+            buildcraft.builders.snapshot.SnapshotData snapshot,
+            net.minecraft.world.level.block.state.BlockState desired) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    if (!config.mode().provides()) return false;
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null) return false;
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (builderMaterialMatches(snapshot, desired, stack)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private boolean builderMaterialMatches(buildcraft.builders.snapshot.SnapshotData snapshot,
+            net.minecraft.world.level.block.state.BlockState desired, ItemStack stack) {
+        return stack.getItem() instanceof net.minecraft.world.item.BlockItem
+                && (snapshot.kind() == buildcraft.builders.snapshot.SnapshotKind.TEMPLATE
+                        || stack.is(desired.getBlock().asItem()));
+    }
+
+    private void loadBuilderMaterial(ServerLevel level, RobotStationRegistry.Address source) {
+        var marker = builderMarker(level);
+        if (marker == null || builderSlotIndex < 0) return;
+        var snapshot = marker.snapshot();
+        var desired = snapshot.stateAt(builderLocal(snapshot, builderSlotIndex));
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!builderMaterialMatches(snapshot, desired, stack) || !config.matches(stack)) continue;
+            int targetSlot = firstEmptyRobotSlot();
+            if (targetSlot < 0) return;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    inventory.set(targetSlot, resource.toStack(1));
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private int firstEmptyRobotSlot() {
+        for (int slot = 0; slot < inventory.size(); slot++) if (inventory.get(slot).isEmpty()) return slot;
+        return -1;
+    }
+
+    private boolean hasBuilderMaterial(ServerLevel level) {
+        var marker = builderMarker(level);
+        if (marker == null || builderSlotIndex < 0) return false;
+        var snapshot = marker.snapshot();
+        var desired = snapshot.stateAt(builderLocal(snapshot, builderSlotIndex));
+        if (desired.isAir()) return true;
+        return inventory.stream().anyMatch(stack -> builderMaterialMatches(snapshot, desired, stack));
+    }
+
+    private boolean validateBuilderTarget(ServerLevel level) {
+        var marker = builderMarker(level);
+        if (marker == null || builderBlockTarget == null || builderSlotIndex < 0
+                || !BlockWorkRegistry.reclaim(level, builderBlockTarget, getUUID())) return false;
+        var snapshot = marker.snapshot();
+        if (builderSlotIndex >= snapshot.blocks().size()) return false;
+        return marker.snapshotMin().offset(builderLocal(snapshot, builderSlotIndex)).equals(builderBlockTarget);
+    }
+
+    private long builderOperationCost() {
+        if (builderBlockTarget == null || builderMarkerTarget == null) return Long.MAX_VALUE;
+        return (long) ((Math.sqrt(builderBlockTarget.distSqr(builderMarkerTarget)) + 10) * 1_000_000L);
+    }
+
+    private boolean buildBuilderSlot(ServerLevel level) {
+        var marker = builderMarker(level);
+        if (marker == null) return false;
+        var snapshot = marker.snapshot();
+        var desired = snapshot.stateAt(builderLocal(snapshot, builderSlotIndex));
+        var actual = level.getBlockState(builderBlockTarget);
+        if (!actual.isAir() && !actual.equals(desired)) {
+            if (!snapshot.excavate() || !clearBuilderBlock(level, actual)) return false;
+        }
+        if (desired.isAir()) return level.getBlockState(builderBlockTarget).isAir();
+        int materialSlot = -1;
+        for (int slot = 0; slot < inventory.size(); slot++) {
+            if (builderMaterialMatches(snapshot, desired, inventory.get(slot))) { materialSlot = slot; break; }
+        }
+        if (materialSlot < 0) return false;
+        ItemStack held = inventory.get(materialSlot).copyWithCount(1);
+        if (!(held.getItem() instanceof net.minecraft.world.item.BlockItem blockItem)) return false;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        fakePlayer.setPos(position());
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, held);
+        var hit = new net.minecraft.world.phys.BlockHitResult(
+                Vec3.atCenterOf(builderBlockTarget), Direction.UP, builderBlockTarget, false);
+        boolean placed = blockItem.place(new net.minecraft.world.item.context.BlockPlaceContext(
+                new net.minecraft.world.item.context.UseOnContext(
+                        level, fakePlayer, InteractionHand.MAIN_HAND, held, hit))).consumesAction();
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        if (!placed) return false;
+        level.setBlock(builderBlockTarget, desired, net.minecraft.world.level.block.Block.UPDATE_ALL);
+        inventory.get(materialSlot).shrink(1);
+        if (inventory.get(materialSlot).isEmpty()) inventory.set(materialSlot, ItemStack.EMPTY);
+        return true;
+    }
+
+    private boolean clearBuilderBlock(ServerLevel level,
+            net.minecraft.world.level.block.state.BlockState state) {
+        if (state.getDestroySpeed(level, builderBlockTarget) < 0) return false;
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        ItemStack tool = new ItemStack(net.minecraft.world.item.Items.DIAMOND_PICKAXE);
+        fakePlayer.setPos(position());
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, tool);
+        var event = net.neoforged.neoforge.common.CommonHooks.fireBlockBreak(
+                level, net.minecraft.world.level.GameType.SURVIVAL, fakePlayer, builderBlockTarget, state);
+        if (event.isCanceled()) return false;
+        var drops = net.minecraft.world.level.block.Block.getDrops(
+                state, level, builderBlockTarget, level.getBlockEntity(builderBlockTarget), fakePlayer, tool);
+        level.removeBlock(builderBlockTarget, false);
+        for (ItemStack drop : drops) spawnAtLocation(level, drop);
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        return true;
+    }
+
+    private void releaseBuilderTarget(ServerLevel level) {
+        if (builderBlockTarget != null) {
+            BlockWorkRegistry.release(level, builderBlockTarget, getUUID());
+            builderBlockTarget = null;
+        }
+        builderSlotIndex = -1;
+    }
+
     private void tickDelivery(ServerLevel level) {
         if (deliveryReservation == null || deliverySource == null) {
             abortDelivery(level);
@@ -3068,6 +3351,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releasePumpSource(serverLevel);
         releaseKnightTarget(serverLevel);
         releaseStripesBlock(serverLevel);
+        releaseBuilderTarget(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -3108,6 +3392,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releasePumpSource(level);
             releaseKnightTarget(level);
             releaseStripesBlock(level);
+            releaseBuilderTarget(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -3259,6 +3544,16 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (stripesBlockTarget != null) output.putLong("StripesBlock", stripesBlockTarget.asLong());
         output.putInt("StripesUseCycles", stripesUseCycles);
         output.putInt("StripesSearchAttempts", stripesSearchAttempts);
+        output.putInt("BuilderPhase", builderPhase.ordinal());
+        if (builderStationTarget != null) {
+            output.putLong("BuilderStationPos", builderStationTarget.pipePos().asLong());
+            output.putInt("BuilderStationSide", builderStationTarget.side().get3DDataValue());
+        }
+        if (builderMarkerTarget != null) output.putLong("BuilderMarker", builderMarkerTarget.asLong());
+        if (builderBlockTarget != null) output.putLong("BuilderBlock", builderBlockTarget.asLong());
+        output.putInt("BuilderSlot", builderSlotIndex);
+        output.putInt("BuilderScanCursor", builderScanCursor);
+        output.putInt("BuilderLaunchingDelay", builderLaunchingDelay);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -3564,6 +3859,30 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         }
         if ((stripesPhase == StripesPhase.TO_BLOCK || stripesPhase == StripesPhase.USING)
                 && stripesBlockTarget == null) stripesPhase = StripesPhase.SEARCHING;
+        int builderOrdinal = input.getIntOr("BuilderPhase", BuilderPhase.NONE.ordinal());
+        BuilderPhase[] builderPhases = BuilderPhase.values();
+        builderPhase = builderOrdinal >= 0 && builderOrdinal < builderPhases.length
+                ? builderPhases[builderOrdinal] : BuilderPhase.NONE;
+        if (input.getLong("BuilderStationPos").isPresent()) {
+            builderStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("BuilderStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "BuilderStationSide", Direction.UP.get3DDataValue())));
+        }
+        if (input.getLong("BuilderMarker").isPresent()) {
+            builderMarkerTarget = BlockPos.of(input.getLongOr("BuilderMarker", 0));
+        }
+        if (input.getLong("BuilderBlock").isPresent()) {
+            builderBlockTarget = BlockPos.of(input.getLongOr("BuilderBlock", 0));
+        }
+        builderSlotIndex = input.getIntOr("BuilderSlot", -1);
+        builderScanCursor = Math.max(0, input.getIntOr("BuilderScanCursor", 0));
+        builderLaunchingDelay = Math.clamp(input.getIntOr("BuilderLaunchingDelay", 0), 0, 2);
+        if (builderPhase == BuilderPhase.TO_MATERIAL && builderStationTarget == null) {
+            builderPhase = BuilderPhase.RETURN_HOME;
+        }
+        if ((builderPhase == BuilderPhase.TO_BLOCK || builderPhase == BuilderPhase.BUILDING)
+                && (builderBlockTarget == null || builderSlotIndex < 0)) builderPhase = BuilderPhase.SEARCHING;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

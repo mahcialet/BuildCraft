@@ -44,6 +44,22 @@ public final class ConstructionMarkerBlockEntity extends BlockEntity {
         SnapshotData snapshot = snapshot();
         return snapshot == null ? worldPosition : snapshotMin().offset(snapshot.size()).offset(-1, -1, -1);
     }
+
+    @Override
+    public void onLoad() {
+        super.onLoad();
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            buildcraft.builders.ConstructionMarkerRegistry.add(serverLevel, this);
+        }
+    }
+
+    @Override
+    public void setRemoved() {
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            buildcraft.builders.ConstructionMarkerRegistry.remove(serverLevel, this);
+        }
+        super.setRemoved();
+    }
     private void sync() {
         setChanged();
         Level level = getLevel();
