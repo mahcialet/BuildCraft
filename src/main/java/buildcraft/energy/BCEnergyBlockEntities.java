@@ -7,6 +7,7 @@ import buildcraft.energy.block.entity.CombustionEngineBlockEntity;
 import buildcraft.energy.block.entity.RfEngineBlockEntity;
 import buildcraft.energy.block.entity.DynamoMjBlockEntity;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.capabilities.Capabilities;
@@ -41,8 +42,15 @@ public final class BCEnergyBlockEntities {
     }
 
     public static void register(IEventBus modBus) {
+        BLOCK_ENTITIES.addAlias(id("engine.stone"), id("engine_stirling"));
+        BLOCK_ENTITIES.addAlias(id("engine.iron"), id("engine_combustion"));
+        BLOCK_ENTITIES.addAlias(id("engine.rf"), id("engine_rf"));
         BLOCK_ENTITIES.register(modBus);
         modBus.addListener(BCEnergyBlockEntities::registerCapabilities);
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(BCEnergy.MOD_ID, path);
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {

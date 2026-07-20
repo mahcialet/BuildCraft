@@ -9437,6 +9437,18 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
             ) == buildcraft.builders.BCBuildersBlockEntities.BLUEPRINT_LIBRARY.get(),
             "Legacy library block entity identifier did not resolve"
         );
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("buildcraftcore", "engine.wood")
+            ) == buildcraft.core.BCCoreBlockEntities.ENGINE_REDSTONE.get(),
+            "Legacy wooden engine block entity identifier did not resolve"
+        );
+        helper.assertTrue(
+            net.minecraft.core.registries.BuiltInRegistries.BLOCK_ENTITY_TYPE.getValue(
+                Identifier.fromNamespaceAndPath("buildcraftenergy", "engine.iron")
+            ) == buildcraft.energy.BCEnergyBlockEntities.ENGINE_COMBUSTION.get(),
+            "Legacy combustion engine block entity identifier did not resolve"
+        );
         BlockPos relative = new BlockPos(1, 1, 1);
         helper.setBlock(relative, buildcraft.builders.BCBuildersBlocks.QUARRY.get());
         var quarry = helper.getBlockEntity(relative,

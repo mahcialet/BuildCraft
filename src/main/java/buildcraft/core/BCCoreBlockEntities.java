@@ -9,6 +9,7 @@ import buildcraft.core.block.entity.PowerTesterBlockEntity;
 import buildcraft.api.mj.MjAPI;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.resources.Identifier;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
@@ -44,8 +45,16 @@ public final class BCCoreBlockEntities {
     }
 
     public static void register(IEventBus modBus) {
+        BLOCK_ENTITIES.addAlias(id("marker.path"), id("marker_path"));
+        BLOCK_ENTITIES.addAlias(id("marker.volume"), id("marker_volume"));
+        BLOCK_ENTITIES.addAlias(id("engine.wood"), id("engine_redstone"));
+        BLOCK_ENTITIES.addAlias(id("engine.creative"), id("engine_creative"));
         BLOCK_ENTITIES.register(modBus);
         modBus.addListener(BCCoreBlockEntities::registerCapabilities);
+    }
+
+    private static Identifier id(String path) {
+        return Identifier.fromNamespaceAndPath(BuildCraft.MOD_ID, path);
     }
 
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
