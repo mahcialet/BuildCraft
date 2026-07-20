@@ -359,6 +359,10 @@ public final class QuarryBlockEntity extends buildcraft.core.block.entity.OwnedB
         return chunks;
     }
     private void ensureTickets(ServerLevel level) {
+        if (!buildcraft.core.BCCoreConfig.CHUNK_LOAD_LEVEL.get().allowsHardTileTickets()) {
+            releaseTickets();
+            return;
+        }
         for (long packed : desiredChunks()) {
             if (forcedChunks.add(packed)) {
                 ChunkPos chunk = ChunkPos.unpack(packed);

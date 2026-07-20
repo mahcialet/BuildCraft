@@ -7492,6 +7492,16 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     private static void mjEnergyConversion(GameTestHelper helper) {
         helper.assertFalse(BCCoreConfig.COLOR_BLIND_MODE.getDefault(),
             "color-blind display mode default");
+        helper.assertValueEqual(BCCoreConfig.CHUNK_LOAD_LEVEL.getDefault(),
+            BCCoreConfig.ChunkLoadLevel.SELF_TILES, "chunk loading default");
+        helper.assertFalse(BCCoreConfig.ChunkLoadLevel.NONE.allowsHardTileTickets(),
+            "NONE allowed Quarry chunk tickets");
+        helper.assertTrue(BCCoreConfig.ChunkLoadLevel.STRICT_TILES.allowsHardTileTickets(),
+            "STRICT_TILES rejected Quarry hard ticket");
+        helper.assertTrue(BCCoreConfig.ChunkLoadLevel.SELF_TILES.allowsHardTileTickets(),
+            "SELF_TILES rejected Quarry hard ticket");
+        helper.assertTrue(BCCoreConfig.ChunkLoadLevel.ALL_TILES.allowsHardTileTickets(),
+            "ALL_TILES rejected Quarry hard ticket");
         helper.assertValueEqual(BCCoreConfig.POWER_MODE.getDefault(), BCCoreConfig.PowerMode.MJ_ONLY,
             "configured power mode default");
         helper.assertFalse(MjAPI.isRfAutoConversionEnabled(), "MJ_ONLY unexpectedly enabled RF conversion");

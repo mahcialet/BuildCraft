@@ -14,6 +14,7 @@ public final class BCCoreConfig {
     public static final ModConfigSpec.IntValue NETWORK_UPDATE_RATE;
     public static final ModConfigSpec.DoubleValue MJ_PER_RF;
     public static final ModConfigSpec.EnumValue<PowerMode> POWER_MODE;
+    public static final ModConfigSpec.EnumValue<ChunkLoadLevel> CHUNK_LOAD_LEVEL;
     public static final ModConfigSpec.BooleanValue WORLDGEN_ENABLED;
     public static final ModConfigSpec.BooleanValue GENERATE_WATER_SPRINGS;
     public static final ModConfigSpec.BooleanValue COLOR_BLIND_MODE;
@@ -45,6 +46,9 @@ public final class BCCoreConfig {
         POWER_MODE = builder
             .comment("Controls RF/FE interoperability: MJ_ONLY disables conversion, MJ_AUTOCONVERT_RF enables conversion, and DISPLAY_RF also displays power as RF.")
             .defineEnum("powerMode", PowerMode.MJ_ONLY);
+        CHUNK_LOAD_LEVEL = builder
+            .comment("Controls automatic BuildCraft chunk loading. NONE disables it; the other legacy levels allow the Quarry's hard ticket.")
+            .defineEnum("chunkLoadLevel", ChunkLoadLevel.SELF_TILES);
         builder.pop();
         builder.push("worldgen");
         WORLDGEN_ENABLED = builder
@@ -85,6 +89,17 @@ public final class BCCoreConfig {
         MJ_ONLY,
         MJ_AUTOCONVERT_RF,
         DISPLAY_RF
+    }
+
+    public enum ChunkLoadLevel {
+        NONE,
+        STRICT_TILES,
+        SELF_TILES,
+        ALL_TILES;
+
+        public boolean allowsHardTileTickets() {
+            return this != NONE;
+        }
     }
 
     public static boolean networkUpdateDue(long gameTime, long previousUpdate, int interval, boolean force) {
