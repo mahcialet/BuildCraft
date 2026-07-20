@@ -42,6 +42,9 @@ public final class MiningWellBlockEntity extends BlockEntity implements buildcra
     private final OutputHandler output = new OutputHandler();
     private BlockPos target;
     private long progress;
+    private long lastNetworkSync = -100;
+    private long lastClientStored = Long.MIN_VALUE;
+    private BlockPos lastClientTarget;
 
     @Override public boolean hasWork() { return target != null; }
 
@@ -61,6 +64,27 @@ public final class MiningWellBlockEntity extends BlockEntity implements buildcra
         well.battery.tick(level, pos);
         well.pushDrops(serverLevel);
         well.mine(serverLevel);
+        well.syncClientState(serverLevel);
+    }
+
+    private void syncClientState(ServerLevel level) {
+        long stored = battery.getStored();
+        if (stored == lastClientStored && java.util.Objects.equals(target, lastClientTarget)) return;
+        if (!BCCoreConfig.networkUpdateDue(level.getGameTime(), lastNetworkSync,
+                BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        lastClientStored = stored;
+        lastClientTarget = target == null ? null : target.immutable();
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+    }
+
+    @Override public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
+    getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
     }
 
     private void mine(ServerLevel level) {

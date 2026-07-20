@@ -47,6 +47,11 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
     private BlockPos oilSpringSource;
     private int initialSpringSources;
     private int rebuildTicks;
+    private long lastNetworkSync = -100;
+    private long lastClientStored = Long.MIN_VALUE;
+    private int lastClientFluid = Integer.MIN_VALUE;
+    private BlockPos lastClientIntake;
+    private boolean networkDirty = true;
 
     @Override public boolean hasWork() { return intake != null || !sources.isEmpty(); }
 
@@ -64,12 +69,32 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
         if (level.isClientSide()) return;
         pump.battery.tick(level, pos);
         pump.pushFluid();
-        if (pump.tank.getAmountAsInt(0) > CAPACITY / 2) return;
+        if (pump.tank.getAmountAsInt(0) > CAPACITY / 2) {
+            pump.syncClientState();
+            return;
+        }
         if (pump.sources.isEmpty() && (++pump.rebuildTicks >= 30 || pump.intake == null)) {
             pump.rebuildTicks = 0;
             pump.rebuildQueue();
         }
         pump.pumpSource();
+        pump.syncClientState();
+    }
+
+    private void syncClientState() {
+        if (level == null) return;
+        long stored = battery.getStored();
+        int fluid = tank.getAmountAsInt(0);
+        if (!networkDirty && stored == lastClientStored && fluid == lastClientFluid
+                && java.util.Objects.equals(intake, lastClientIntake)) return;
+        if (!BCCoreConfig.networkUpdateDue(level.getGameTime(), lastNetworkSync,
+                BCCoreConfig.NETWORK_UPDATE_RATE.get(), false)) return;
+        networkDirty = false;
+        lastClientStored = stored;
+        lastClientFluid = fluid;
+        lastClientIntake = intake == null ? null : intake.immutable();
+        lastNetworkSync = level.getGameTime();
+        level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
     }
 
     private void rebuildQueue() {
@@ -200,9 +225,18 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
 
     private void changed() {
         setChanged();
-        if (level != null) level.sendBlockUpdated(
-            worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS
-        );
+        networkDirty = true;
+    }
+
+    @Override public net.minecraft.network.protocol.Packet<net.minecraft.network.protocol.game.ClientGamePacketListener>
+    getUpdatePacket() {
+        return net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    @Override public net.minecraft.nbt.CompoundTag getUpdateTag(net.minecraft.core.HolderLookup.Provider registries) {
+        net.minecraft.nbt.CompoundTag tag = saveWithoutMetadata(registries);
+        if (intake != null) tag.putLong("intake", intake.asLong());
+        return tag;
     }
 
     @Override protected void loadAdditional(ValueInput input) {
@@ -212,6 +246,7 @@ public final class PumpBlockEntity extends buildcraft.core.block.entity.OwnedBlo
         long stored = Math.max(0, input.getLongOr("stored_mj", 0));
         if (stored > 0) battery.addPower(stored, false);
         rebuildTicks = Math.clamp(input.getIntOr("rebuild_ticks", 0), 0, 29);
+        intake = input.getLong("intake").stream().map(BlockPos::of).findFirst().orElse(null);
         oilSpringSource = input.getLong("oil_spring_source").stream()
             .map(BlockPos::of).findFirst().orElse(null);
         initialSpringSources = Math.max(0, input.getIntOr("initial_spring_sources", 0));
