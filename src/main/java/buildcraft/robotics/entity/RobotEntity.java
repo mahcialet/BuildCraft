@@ -23,8 +23,9 @@ import buildcraft.robotics.FarmerPhase;
 import buildcraft.robotics.LeafCutterPhase;
 import buildcraft.robotics.ShovelmanPhase;
 import buildcraft.robotics.ButcherPhase;
-import buildcraft.robotics.AnimalWorkRegistry;
+import buildcraft.robotics.CombatTargetRegistry;
 import buildcraft.robotics.PumpPhase;
+import buildcraft.robotics.KnightPhase;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.core.BlockPos;
@@ -127,6 +128,11 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     private int pumpSearchX;
     private int pumpSearchY;
     private int pumpSearchZ;
+    private ItemStack knightTool = ItemStack.EMPTY;
+    private RobotStationRegistry.Address knightStationTarget;
+    private UUID knightEntityTarget;
+    private KnightPhase knightPhase = KnightPhase.NONE;
+    private int knightAttackDelay;
 
     public RobotEntity(EntityType<? extends RobotEntity> type, Level level) {
         super(type, level);
@@ -190,6 +196,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
     public ButcherPhase butcherPhase() { return butcherPhase; }
     public ItemStack butcherTool() { return butcherTool.copy(); }
     public PumpPhase pumpPhase() { return pumpPhase; }
+    public KnightPhase knightPhase() { return knightPhase; }
+    public ItemStack knightTool() { return knightTool.copy(); }
 
     public boolean dock(RobotStationRegistry.Station station) {
         if (!(level() instanceof ServerLevel) || !station.link(getUUID())) return false;
@@ -267,6 +275,9 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             } else if (board() == RobotBoardType.PUMP
                     && pumpPhase == PumpPhase.NONE && tickCount % 20 == 0) {
                 beginPump(serverLevel);
+            } else if (board() == RobotBoardType.KNIGHT
+                    && knightPhase == KnightPhase.NONE && tickCount % 20 == 0) {
+                beginKnight(serverLevel);
             }
         } else if (taskState() == RobotTaskState.RETURNING) {
             Vec3 difference = station.dockingPosition().subtract(position());
@@ -297,6 +308,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (shovelmanPhase != ShovelmanPhase.NONE) tickShovelman(serverLevel);
         if (butcherPhase != ButcherPhase.NONE) tickButcher(serverLevel);
         if (pumpPhase != PumpPhase.NONE) tickPump(serverLevel);
+        if (knightPhase != KnightPhase.NONE) tickKnight(serverLevel);
     }
 
     private boolean hasActiveWorkflow() {
@@ -312,7 +324,8 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
                 || leafCutterPhase != LeafCutterPhase.NONE
                 || shovelmanPhase != ShovelmanPhase.NONE
                 || butcherPhase != ButcherPhase.NONE
-                || pumpPhase != PumpPhase.NONE;
+                || pumpPhase != PumpPhase.NONE
+                || knightPhase != KnightPhase.NONE;
     }
 
     private void beginDelivery(ServerLevel level) {
@@ -2048,9 +2061,10 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             leaveStation();
             return;
         }
-        Optional<net.minecraft.world.entity.animal.Animal> target = AnimalWorkRegistry.reserveClosest(
+        Optional<net.minecraft.world.entity.LivingEntity> target = CombatTargetRegistry.reserveClosest(
                 level, position(), 250, getUUID(),
-                animal -> inside(workZone(level), animal.blockPosition()));
+                entity -> entity instanceof net.minecraft.world.entity.animal.Animal
+                        && inside(workZone(level), entity.blockPosition()));
         if (target.isEmpty()) return;
         butcherAnimalTarget = target.get().getUUID();
         butcherAttackDelay = 10;
@@ -2133,12 +2147,12 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             }
         } else if (butcherPhase == ButcherPhase.TO_TARGET || butcherPhase == ButcherPhase.ATTACKING) {
             if (butcherAnimalTarget == null
-                    || !AnimalWorkRegistry.reclaim(level, butcherAnimalTarget, getUUID())) {
+                    || !CombatTargetRegistry.reclaim(level, butcherAnimalTarget, getUUID())) {
                 releaseButcherTarget(level);
                 butcherPhase = ButcherPhase.RETURN_HOME;
                 return;
             }
-            var animal = AnimalWorkRegistry.animal(level, butcherAnimalTarget).orElse(null);
+            var animal = CombatTargetRegistry.target(level, butcherAnimalTarget).orElse(null);
             if (animal == null || !inside(workZone(level), animal.blockPosition())) {
                 releaseButcherTarget(level);
                 butcherPhase = ButcherPhase.RETURN_HOME;
@@ -2156,29 +2170,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             setEnergy(energy() - 133_334);
             if (++butcherAttackDelay > 20) {
                 butcherAttackDelay = 0;
-                var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
-                fakePlayer.setPos(position());
-                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, butcherTool.copy());
-                var attackEvent = new net.neoforged.neoforge.event.entity.player.AttackEntityEvent(fakePlayer, animal);
-                if (!net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(attackEvent).isCanceled()) {
-                    final double[] damage = {2.0};
-                    butcherTool.forEachModifier(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
-                            (attribute, modifier) -> {
-                                if (!attribute.equals(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) {
-                                    return;
-                                }
-                                switch (modifier.operation()) {
-                                    case ADD_VALUE -> damage[0] += modifier.amount();
-                                    case ADD_MULTIPLIED_BASE -> damage[0] += 2.0 * modifier.amount();
-                                    case ADD_MULTIPLIED_TOTAL -> damage[0] *= 1.0 + modifier.amount();
-                                }
-                            });
-                    if (animal.hurtServer(level, fakePlayer.damageSources().playerAttack(fakePlayer),
-                            (float) Math.max(0, damage[0]))) {
-                        butcherTool.hurtAndBreak(1, level, fakePlayer, item -> {});
-                    }
-                }
-                fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                butcherTool = attackWithSword(level, animal, butcherTool);
                 if (!animal.isAlive()) {
                     releaseButcherTarget(level);
                     butcherPhase = ButcherPhase.RETURN_HOME;
@@ -2195,10 +2187,35 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
 
     private void releaseButcherTarget(ServerLevel level) {
         if (butcherAnimalTarget != null) {
-            AnimalWorkRegistry.release(level, butcherAnimalTarget, getUUID());
+            CombatTargetRegistry.release(level, butcherAnimalTarget, getUUID());
             butcherAnimalTarget = null;
         }
         butcherAttackDelay = 0;
+    }
+
+    private ItemStack attackWithSword(ServerLevel level, net.minecraft.world.entity.LivingEntity target,
+            ItemStack sword) {
+        var fakePlayer = net.neoforged.neoforge.common.util.FakePlayerFactory.getMinecraft(level);
+        fakePlayer.setPos(position());
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, sword.copy());
+        var attackEvent = new net.neoforged.neoforge.event.entity.player.AttackEntityEvent(fakePlayer, target);
+        if (!net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(attackEvent).isCanceled()) {
+            final double[] damage = {2.0};
+            sword.forEachModifier(net.minecraft.world.entity.EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+                if (!attribute.equals(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE)) return;
+                switch (modifier.operation()) {
+                    case ADD_VALUE -> damage[0] += modifier.amount();
+                    case ADD_MULTIPLIED_BASE -> damage[0] += 2.0 * modifier.amount();
+                    case ADD_MULTIPLIED_TOTAL -> damage[0] *= 1.0 + modifier.amount();
+                }
+            });
+            if (target.hurtServer(level, fakePlayer.damageSources().playerAttack(fakePlayer),
+                    (float) Math.max(0, damage[0]))) {
+                sword.hurtAndBreak(1, level, fakePlayer, item -> {});
+            }
+        }
+        fakePlayer.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        return sword;
     }
 
     private void beginPump(ServerLevel level) {
@@ -2340,6 +2357,159 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             pumpBlockTarget = null;
         }
         pumpWaited = 0;
+    }
+
+    private void beginKnight(ServerLevel level) {
+        if (knightTool.isEmpty()) {
+            Optional<RobotStationRegistry.Address> source = findKnightToolStation(level, true);
+            if (source.isEmpty()) return;
+            knightStationTarget = source.get();
+            knightPhase = KnightPhase.TO_TOOL;
+            leaveStation();
+            return;
+        }
+        if (knightTool.isDamageableItem() && knightTool.getDamageValue() >= knightTool.getMaxDamage() - 1) {
+            Optional<RobotStationRegistry.Address> receiver = findKnightToolStation(level, false);
+            if (receiver.isEmpty()) return;
+            knightStationTarget = receiver.get();
+            knightPhase = KnightPhase.TO_UNLOAD_TOOL;
+            leaveStation();
+            return;
+        }
+        Optional<net.minecraft.world.entity.LivingEntity> target = CombatTargetRegistry.reserveClosest(
+                level, position(), 250, getUUID(), entity -> isKnightTarget(entity)
+                        && inside(workZone(level), entity.blockPosition()));
+        if (target.isEmpty()) return;
+        knightEntityTarget = target.get().getUUID();
+        knightAttackDelay = 10;
+        knightPhase = KnightPhase.TO_TARGET;
+        leaveStation();
+    }
+
+    private boolean isKnightTarget(net.minecraft.world.entity.LivingEntity entity) {
+        return entity instanceof net.minecraft.world.entity.monster.Enemy
+                || entity instanceof net.minecraft.world.entity.animal.wolf.Wolf wolf && wolf.isAngry();
+    }
+
+    private Optional<RobotStationRegistry.Address> findKnightToolStation(ServerLevel level, boolean provider) {
+        return RobotStationRegistry.loadedStations(level).stream()
+                .map(RobotStationRegistry.Station::address)
+                .filter(address -> !address.equals(stationAddress))
+                .filter(address -> inside(loadUnloadZone(level), address.pipePos()))
+                .filter(address -> {
+                    RobotStationConfig config = stationConfig(level, address);
+                    ResourceHandler<ItemResource> handler = sourceHandler(level, address);
+                    if (handler == null || (provider ? !config.mode().provides() : !config.mode().receives())) {
+                        return false;
+                    }
+                    if (!provider) {
+                        if (!config.matches(knightTool)) return false;
+                        try (Transaction transaction = Transaction.openRoot()) {
+                            return handler.insert(ItemResource.of(knightTool), 1, transaction) == 1;
+                        }
+                    }
+                    for (int slot = 0; slot < handler.size(); slot++) {
+                        ItemStack stack = handler.getResource(slot).toStack();
+                        if (stack.is(net.minecraft.tags.ItemTags.SWORDS)
+                                && handler.getAmountAsLong(slot) > 0 && config.matches(stack)) return true;
+                    }
+                    return false;
+                })
+                .min(java.util.Comparator.comparingDouble(address -> sourcePosition(address).distanceToSqr(position())));
+    }
+
+    private void loadKnightTool(ServerLevel level, RobotStationRegistry.Address source) {
+        ResourceHandler<ItemResource> handler = sourceHandler(level, source);
+        RobotStationConfig config = stationConfig(level, source);
+        if (handler == null || !config.mode().provides()) return;
+        for (int slot = 0; slot < handler.size(); slot++) {
+            ItemResource resource = handler.getResource(slot);
+            ItemStack stack = resource.toStack();
+            if (!stack.is(net.minecraft.tags.ItemTags.SWORDS) || !config.matches(stack)) continue;
+            try (Transaction transaction = Transaction.openRoot()) {
+                if (handler.extract(slot, resource, 1, transaction) == 1) {
+                    knightTool = resource.toStack(1);
+                    transaction.commit();
+                    return;
+                }
+            }
+        }
+    }
+
+    private void unloadKnightTool(ServerLevel level, RobotStationRegistry.Address destination) {
+        if (knightTool.isEmpty()) return;
+        ResourceHandler<ItemResource> handler = sourceHandler(level, destination);
+        RobotStationConfig config = stationConfig(level, destination);
+        if (handler == null || !config.mode().receives() || !config.matches(knightTool)) return;
+        try (Transaction transaction = Transaction.openRoot()) {
+            if (handler.insert(ItemResource.of(knightTool), 1, transaction) == 1) {
+                knightTool = ItemStack.EMPTY;
+                transaction.commit();
+            }
+        }
+    }
+
+    private void tickKnight(ServerLevel level) {
+        if (knightPhase == KnightPhase.TO_TOOL) {
+            if (knightStationTarget == null) { knightPhase = KnightPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(knightStationTarget))) {
+                loadKnightTool(level, knightStationTarget);
+                knightPhase = KnightPhase.RETURN_HOME;
+            }
+        } else if (knightPhase == KnightPhase.TO_UNLOAD_TOOL) {
+            if (knightStationTarget == null) { knightPhase = KnightPhase.RETURN_HOME; return; }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (flyToward(sourcePosition(knightStationTarget))) {
+                unloadKnightTool(level, knightStationTarget);
+                knightPhase = KnightPhase.RETURN_HOME;
+            }
+        } else if (knightPhase == KnightPhase.TO_TARGET || knightPhase == KnightPhase.ATTACKING) {
+            if (knightEntityTarget == null
+                    || !CombatTargetRegistry.reclaim(level, knightEntityTarget, getUUID())) {
+                releaseKnightTarget(level);
+                knightPhase = KnightPhase.RETURN_HOME;
+                return;
+            }
+            var target = CombatTargetRegistry.target(level, knightEntityTarget).orElse(null);
+            if (target == null || !isKnightTarget(target) || !inside(workZone(level), target.blockPosition())) {
+                releaseKnightTarget(level);
+                knightPhase = KnightPhase.RETURN_HOME;
+                return;
+            }
+            if (taskState() == RobotTaskState.LEAVING) return;
+            if (distanceToSqr(target) > 4.0) {
+                knightPhase = KnightPhase.TO_TARGET;
+                flyToward(target.position());
+                return;
+            }
+            setDeltaMovement(Vec3.ZERO);
+            knightPhase = KnightPhase.ATTACKING;
+            if (energy() < 133_334) return;
+            setEnergy(energy() - 133_334);
+            if (++knightAttackDelay > 20) {
+                knightAttackDelay = 0;
+                knightTool = attackWithSword(level, target, knightTool);
+                if (!target.isAlive()) {
+                    releaseKnightTarget(level);
+                    knightPhase = KnightPhase.RETURN_HOME;
+                }
+            }
+        } else if (knightPhase == KnightPhase.RETURN_HOME) {
+            if (taskState() != RobotTaskState.RETURNING && taskState() != RobotTaskState.DOCKED) returnToStation();
+            if (taskState() == RobotTaskState.DOCKED) {
+                knightStationTarget = null;
+                knightPhase = KnightPhase.NONE;
+            }
+        }
+    }
+
+    private void releaseKnightTarget(ServerLevel level) {
+        if (knightEntityTarget != null) {
+            CombatTargetRegistry.release(level, knightEntityTarget, getUUID());
+            knightEntityTarget = null;
+        }
+        knightAttackDelay = 0;
     }
 
     private void tickDelivery(ServerLevel level) {
@@ -2510,6 +2680,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         releaseShovelmanBlock(serverLevel);
         releaseButcherTarget(serverLevel);
         releasePumpSource(serverLevel);
+        releaseKnightTarget(serverLevel);
         ItemStack robotStack = RobotItem.create(board(), energy());
         if (!player.getInventory().add(robotStack)) spawnAtLocation(serverLevel, robotStack);
         for (ItemStack stack : inventory) {
@@ -2522,6 +2693,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (!leafCutterTool.isEmpty()) spawnAtLocation(serverLevel, leafCutterTool.copy());
         if (!shovelmanTool.isEmpty()) spawnAtLocation(serverLevel, shovelmanTool.copy());
         if (!butcherTool.isEmpty()) spawnAtLocation(serverLevel, butcherTool.copy());
+        if (!knightTool.isEmpty()) spawnAtLocation(serverLevel, knightTool.copy());
         discard();
         return InteractionResult.SUCCESS;
     }
@@ -2546,6 +2718,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             releaseShovelmanBlock(level);
             releaseButcherTarget(level);
             releasePumpSource(level);
+            releaseKnightTarget(level);
             spawnAtLocation(level, RobotItem.create(board(), energy()));
             for (ItemStack stack : inventory) {
                 if (!stack.isEmpty()) spawnAtLocation(level, stack.copy());
@@ -2557,6 +2730,7 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
             if (!leafCutterTool.isEmpty()) spawnAtLocation(level, leafCutterTool.copy());
             if (!shovelmanTool.isEmpty()) spawnAtLocation(level, shovelmanTool.copy());
             if (!butcherTool.isEmpty()) spawnAtLocation(level, butcherTool.copy());
+            if (!knightTool.isEmpty()) spawnAtLocation(level, knightTool.copy());
             discard();
         }
         return true;
@@ -2670,6 +2844,15 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         output.putInt("PumpSearchX", pumpSearchX);
         output.putInt("PumpSearchY", pumpSearchY);
         output.putInt("PumpSearchZ", pumpSearchZ);
+        if (!knightTool.isEmpty()) output.store("KnightTool", ItemStack.CODEC, knightTool);
+        output.putInt("KnightPhase", knightPhase.ordinal());
+        if (knightStationTarget != null) {
+            output.putLong("KnightStationPos", knightStationTarget.pipePos().asLong());
+            output.putInt("KnightStationSide", knightStationTarget.side().get3DDataValue());
+        }
+        if (knightEntityTarget != null) output.store("KnightTarget", net.minecraft.core.UUIDUtil.CODEC,
+                knightEntityTarget);
+        output.putInt("KnightAttackDelay", knightAttackDelay);
         ContainerHelper.saveAllItems(output, inventory);
     }
 
@@ -2917,6 +3100,23 @@ public final class RobotEntity extends Entity implements Container, ItemSupplier
         if (pumpPhase == PumpPhase.TO_UNLOAD && pumpStationTarget == null) pumpPhase = PumpPhase.RETURN_HOME;
         if ((pumpPhase == PumpPhase.TO_SOURCE || pumpPhase == PumpPhase.PUMPING)
                 && pumpBlockTarget == null) pumpPhase = PumpPhase.RETURN_HOME;
+        knightTool = input.read("KnightTool", ItemStack.CODEC).orElse(ItemStack.EMPTY);
+        int knightOrdinal = input.getIntOr("KnightPhase", KnightPhase.NONE.ordinal());
+        KnightPhase[] knightPhases = KnightPhase.values();
+        knightPhase = knightOrdinal >= 0 && knightOrdinal < knightPhases.length
+                ? knightPhases[knightOrdinal] : KnightPhase.NONE;
+        if (input.getLong("KnightStationPos").isPresent()) {
+            knightStationTarget = new RobotStationRegistry.Address(
+                    BlockPos.of(input.getLongOr("KnightStationPos", 0)),
+                    Direction.from3DDataValue(input.getIntOr(
+                            "KnightStationSide", Direction.UP.get3DDataValue())));
+        }
+        knightEntityTarget = input.read("KnightTarget", net.minecraft.core.UUIDUtil.CODEC).orElse(null);
+        knightAttackDelay = Math.clamp(input.getIntOr("KnightAttackDelay", 0), 0, 20);
+        if ((knightPhase == KnightPhase.TO_TOOL || knightPhase == KnightPhase.TO_UNLOAD_TOOL)
+                && knightStationTarget == null) knightPhase = KnightPhase.RETURN_HOME;
+        if ((knightPhase == KnightPhase.TO_TARGET || knightPhase == KnightPhase.ATTACKING)
+                && knightEntityTarget == null) knightPhase = KnightPhase.RETURN_HOME;
         ContainerHelper.loadAllItems(input, inventory);
     }
 

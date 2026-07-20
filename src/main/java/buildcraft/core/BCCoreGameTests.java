@@ -123,6 +123,8 @@ public final class BCCoreGameTests {
                 event.registerEnvironment(id("robotics_butcher"));
         Holder<TestEnvironmentDefinition<?>> pumpEnvironment =
                 event.registerEnvironment(id("robotics_pump"));
+        Holder<TestEnvironmentDefinition<?>> knightEnvironment =
+                event.registerEnvironment(id("robotics_knight"));
         registerTest(event, pickerEnvironment, "robotics_picker_robot", BCCoreGameTests::roboticsPickerRobot);
         registerTest(event, lumberjackEnvironment, "robotics_lumberjack_robot",
             BCCoreGameTests::roboticsLumberjackRobot);
@@ -142,6 +144,8 @@ public final class BCCoreGameTests {
                 BCCoreGameTests::roboticsButcherRobot);
         registerTest(event, pumpEnvironment, "robotics_pump_robot",
                 BCCoreGameTests::roboticsPumpRobot);
+        registerTest(event, knightEnvironment, "robotics_knight_robot",
+                BCCoreGameTests::roboticsKnightRobot);
         registerTest(event, environment, "decoration_states", BCCoreGameTests::decorationStates);
         registerTest(event, environment, "wrench_rotation", BCCoreGameTests::wrenchRotation);
         registerTest(event, environment, "path_graph", BCCoreGameTests::pathGraph);
@@ -7853,6 +7857,121 @@ registerTest(event, environment, "factory_tank", BCCoreGameTests::factoryTank);
                 "Pump scheduler did not finish");
         helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
                 "Pump work consumed no battery energy");
+        helper.succeed();
+    }
+
+    private static void roboticsKnightRobot(GameTestHelper helper) {
+        BlockPos homeRelative = new BlockPos(1, 132, 1);
+        BlockPos sourceRelative = new BlockPos(2, 132, 1);
+        BlockPos receiverRelative = new BlockPos(3, 132, 1);
+        BlockPos targetRelative = new BlockPos(5, 132, 1);
+        BlockPos passiveRelative = new BlockPos(5, 132, 2);
+        BlockPos excludedRelative = new BlockPos(5, 132, 3);
+        for (BlockPos relative : java.util.List.of(homeRelative, sourceRelative, receiverRelative)) {
+            helper.setBlock(relative, buildcraft.transport.BCTransportBlocks.PIPE_HOLDER.get());
+        }
+        helper.setBlock(sourceRelative.above(), Blocks.CHEST);
+        helper.setBlock(receiverRelative.above(), Blocks.CHEST);
+        var home = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(homeRelative));
+        var source = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative));
+        var receiver = (buildcraft.transport.block.entity.PipeHolderBlockEntity)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative));
+        BlockPos target = helper.absolutePos(targetRelative);
+        BlockPos passive = helper.absolutePos(passiveRelative);
+        BlockPos excluded = helper.absolutePos(excludedRelative);
+        var workZone = new buildcraft.robotics.zone.ZonePlan();
+        workZone.set(target.getX(), target.getZ(), true);
+        workZone.set(passive.getX(), passive.getZ(), true);
+        var loadZone = new buildcraft.robotics.zone.ZonePlan();
+        loadZone.set(source.getBlockPos().getX(), source.getBlockPos().getZ(), true);
+        loadZone.set(receiver.getBlockPos().getX(), receiver.getBlockPos().getZ(), true);
+        ItemStack homeStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        homeStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.DISABLED,
+                        java.util.List.of(), java.util.List.of(), workZone, loadZone));
+        home.installAttachment(Direction.UP, homeStation);
+        ItemStack sourceStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        sourceStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.PROVIDE,
+                        java.util.List.of()));
+        source.installAttachment(Direction.UP, sourceStation);
+        ItemStack receiverStation = new ItemStack(buildcraft.robotics.BCRoboticsItems.ROBOT_STATION.get());
+        receiverStation.set(buildcraft.robotics.BCRoboticsDataComponents.ROBOT_STATION_CONFIG.get(),
+                new buildcraft.robotics.RobotStationConfig(buildcraft.robotics.RobotStationMode.RECEIVE,
+                        java.util.List.of()));
+        receiver.installAttachment(Direction.UP, receiverStation);
+        var sourceChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(sourceRelative.above()));
+        var receiverChest = (net.minecraft.world.Container)
+                helper.getLevel().getBlockEntity(helper.absolutePos(receiverRelative.above()));
+        ItemStack nearlyBrokenSword = new ItemStack(Items.IRON_SWORD);
+        nearlyBrokenSword.setDamageValue(nearlyBrokenSword.getMaxDamage() - 2);
+        sourceChest.setItem(0, nearlyBrokenSword);
+        var targetZombie = net.minecraft.world.entity.EntityType.ZOMBIE.create(
+                helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        var excludedZombie = net.minecraft.world.entity.EntityType.ZOMBIE.create(
+                helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        var passiveWolf = net.minecraft.world.entity.EntityType.WOLF.create(
+                helper.getLevel(), net.minecraft.world.entity.EntitySpawnReason.COMMAND);
+        helper.assertTrue(targetZombie != null && excludedZombie != null && passiveWolf != null,
+                "Could not create Knight test entities");
+        targetZombie.setNoAi(true);
+        excludedZombie.setNoAi(true);
+        passiveWolf.setNoAi(true);
+        targetZombie.setHealth(1.0F);
+        targetZombie.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND,
+                new ItemStack(Items.GOLD_INGOT));
+        targetZombie.setDropChance(net.minecraft.world.entity.EquipmentSlot.MAINHAND, 2.0F);
+        targetZombie.setPos(net.minecraft.world.phys.Vec3.atCenterOf(target));
+        passiveWolf.setPos(net.minecraft.world.phys.Vec3.atCenterOf(passive));
+        excludedZombie.setPos(net.minecraft.world.phys.Vec3.atCenterOf(excluded));
+        helper.getLevel().addFreshEntity(targetZombie);
+        helper.getLevel().addFreshEntity(passiveWolf);
+        helper.getLevel().addFreshEntity(excludedZombie);
+        var homeRegistry = buildcraft.robotics.RobotStationRegistry.touch(
+                helper.getLevel(), home.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), source.getBlockPos(), Direction.UP);
+        buildcraft.robotics.RobotStationRegistry.touch(helper.getLevel(), receiver.getBlockPos(), Direction.UP);
+        var robot = new buildcraft.robotics.entity.RobotEntity(
+                buildcraft.robotics.BCRoboticsEntities.ROBOT.get(), helper.getLevel());
+        robot.setBoard(buildcraft.robotics.RobotBoardType.KNIGHT);
+        robot.setEnergy(buildcraft.robotics.RobotItemData.MAX_ENERGY);
+        helper.assertTrue(homeRegistry.reserve(robot.getUUID()) && robot.dock(homeRegistry),
+                "Knight failed to dock at home station");
+        helper.getLevel().addFreshEntity(robot);
+        for (int tick = 0; tick < 1600 && (targetZombie.isAlive()
+                || receiverChest.getItem(0).isEmpty()
+                || robot.knightPhase() != buildcraft.robotics.KnightPhase.NONE); tick++) {
+            for (var pipe : java.util.List.of(home, source, receiver)) {
+                buildcraft.robotics.RobotStationRegistry.touch(
+                        helper.getLevel(), pipe.getBlockPos(), Direction.UP);
+            }
+            robot.tick();
+        }
+        helper.assertTrue(!targetZombie.isAlive(),
+                "Knight did not kill zoned hostile: phase=" + robot.knightPhase()
+                        + ", state=" + robot.taskState() + ", tool=" + robot.knightTool());
+        helper.assertTrue(passiveWolf.isAlive(), "Knight attacked a non-angry Wolf");
+        helper.assertTrue(excludedZombie.isAlive(), "Knight attacked hostile outside its work zone");
+        helper.assertTrue(sourceChest.getItem(0).isEmpty(), "Knight did not extract one Sword");
+        helper.assertTrue(receiverChest.getItem(0).is(Items.IRON_SWORD)
+                        && receiverChest.getItem(0).getDamageValue()
+                        == receiverChest.getItem(0).getMaxDamage() - 1,
+                "Knight did not damage and unload its worn Sword");
+        helper.assertTrue(robot.knightTool().isEmpty(), "Knight retained unloaded Sword");
+        helper.assertValueEqual(buildcraft.robotics.RobotTaskState.DOCKED, robot.taskState(),
+                "Knight did not return home");
+        helper.assertValueEqual(buildcraft.robotics.KnightPhase.NONE, robot.knightPhase(),
+                "Knight scheduler did not finish");
+        helper.assertTrue(robot.energy() < buildcraft.robotics.RobotItemData.MAX_ENERGY,
+                "Knight work consumed no battery energy");
+        helper.assertTrue(!helper.getLevel().getEntitiesOfClass(
+                        net.minecraft.world.entity.item.ItemEntity.class,
+                        new net.minecraft.world.phys.AABB(target).inflate(3),
+                        item -> item.getItem().is(Items.GOLD_INGOT)).isEmpty(),
+                "Knight did not preserve hostile drops");
         helper.succeed();
     }
 
