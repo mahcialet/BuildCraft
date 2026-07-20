@@ -190,6 +190,10 @@ tasks.named('processResources', ProcessResources) {
         include 'filter.png'
         into 'assets/buildcrafttransport/textures/gui'
     }
+    from('buildcraft_resources/assets/buildcrafttransport/textures/blocks/filtered_buffer') {
+        include 'default.png'
+        into 'assets/buildcrafttransport/textures/block/filtered_buffer'
+    }
     from('buildcraft_resources/assets/buildcraftfactory/textures/blocks/tank') {
         include 'end.png', 'side.png', 'side_joined_below.png'
         into 'assets/buildcraftfactory/textures/block/tank'

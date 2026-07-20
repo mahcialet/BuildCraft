@@ -2,6 +2,7 @@ package buildcraft.transport;
 
 import buildcraft.api.mj.MjAPI;
 import buildcraft.transport.block.entity.PipeHolderBlockEntity;
+import buildcraft.transport.block.entity.FilteredBufferBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.neoforged.bus.api.IEventBus;
@@ -16,6 +17,9 @@ public final class BCTransportBlockEntities {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<PipeHolderBlockEntity>> PIPE_HOLDER =
         BLOCK_ENTITIES.register("pipe_holder", () -> new BlockEntityType<>(
             PipeHolderBlockEntity::new, false, BCTransportBlocks.PIPE_HOLDER.get()));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<FilteredBufferBlockEntity>> FILTERED_BUFFER =
+        BLOCK_ENTITIES.register("filtered_buffer", () -> new BlockEntityType<>(
+            FilteredBufferBlockEntity::new, false, BCTransportBlocks.FILTERED_BUFFER.get()));
 
     private BCTransportBlockEntities() {}
 
@@ -27,6 +31,8 @@ public final class BCTransportBlockEntities {
     private static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.Item.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side != null && holder.pipeType().carriesItems() ? holder.input(side) : null);
+        event.registerBlockEntity(Capabilities.Item.BLOCK, FILTERED_BUFFER.get(),
+            (buffer, side) -> buffer.inventory());
         event.registerBlockEntity(Capabilities.Fluid.BLOCK, PIPE_HOLDER.get(),
             (holder, side) -> side == null ? null : holder.fluidBuffer(side));
         event.registerBlockEntity(MjAPI.CAP_CONNECTOR, PIPE_HOLDER.get(), (holder, side) -> holder.mjConnector());

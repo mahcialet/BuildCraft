@@ -20,5 +20,6 @@
   "item.buildcrafttransport.pipe_void_fluid": "Void Fluid Pipe",
   "item.buildcrafttransport.pipe_stone_power": "Stone Power Pipe",
   "item.buildcrafttransport.pipe_diamond_power": "Diamond Power Pipe",
-  "item.buildcrafttransport.pipe_diamond_wood_power": "Diamond Wooden Power Pipe"
+  "item.buildcrafttransport.pipe_diamond_wood_power": "Diamond Wooden Power Pipe",
+  "block.buildcrafttransport.filtered_buffer": "Filtered Buffer"
 }

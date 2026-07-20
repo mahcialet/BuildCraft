@@ -1,0 +1,1 @@
+{"type":"minecraft:crafting_shaped","category":"misc","pattern":["PDP","PCP","PIP"],"key":{"P":"#minecraft:planks","D":"buildcrafttransport:pipe_diamond_item","C":"minecraft:chest","I":"minecraft:piston"},"result":{"id":"buildcrafttransport:filtered_buffer"}}

@@ -22,6 +22,7 @@ public final class BCTransport {
 
     private void addCreativeTabContents(BuildCreativeModeTabContentsEvent event) {
         if (!event.getTabKey().equals(BCCreativeTabs.MAIN.getKey())) return;
+        event.accept(BCTransportItems.FILTERED_BUFFER.get());
         event.accept(BCTransportItems.PIPE_STRUCTURE.get());
         event.accept(BCTransportItems.PIPE_COBBLE_ITEM.get());
         event.accept(BCTransportItems.PIPE_STONE_ITEM.get());

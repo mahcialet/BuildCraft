@@ -185,6 +185,7 @@ public final class BCCoreGameTests {
         registerTest(event, environment, "energy_refinery_fluids", BCCoreGameTests::energyRefineryFluids);
         registerTest(event, environment, "mj_dynamo", BCCoreGameTests::mjDynamo);
         registerTest(event, environment, "transport_pipe_foundation", BCCoreGameTests::transportPipeFoundation);
+        registerTest(event, environment, "transport_filtered_buffer", BCCoreGameTests::transportFilteredBuffer);
 registerTest(event, environment, "transport_fluid_pipe_foundation", BCCoreGameTests::transportFluidPipeFoundation);
 registerTest(event, environment, "transport_power_pipe_foundation", BCCoreGameTests::transportPowerPipeFoundation);
 registerTest(event, environment, "transport_wood_power_pipe", BCCoreGameTests::transportWoodPowerPipe);
@@ -4513,6 +4514,66 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
         helper.assertTrue(drops.size() == 1
                 && drops.getFirst().is(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_WOOD_FLUID.get()),
                 "diamond wooden fluid pipe returned wrong drop");
+        helper.succeed();
+    }
+
+    private static void transportFilteredBuffer(GameTestHelper helper) {
+        BlockPos pos = helper.absolutePos(new BlockPos(1, 2, 1));
+        helper.getLevel().setBlock(pos,
+                buildcraft.transport.BCTransportBlocks.FILTERED_BUFFER.get().defaultBlockState(), Block.UPDATE_ALL);
+        var buffer = (buildcraft.transport.block.entity.FilteredBufferBlockEntity)
+                helper.getLevel().getBlockEntity(pos);
+        helper.assertTrue(buffer != null, "Filtered Buffer has no block entity");
+        ItemStack namedStone = new ItemStack(Items.STONE);
+        namedStone.set(DataComponents.CUSTOM_NAME, net.minecraft.network.chat.Component.literal("Exact"));
+        buffer.setFilter(0, namedStone);
+        buffer.setFilter(1, new ItemStack(Items.DIRT));
+        var capability = helper.getLevel().getCapability(
+                net.neoforged.neoforge.capabilities.Capabilities.Item.BLOCK, pos, Direction.NORTH);
+        helper.assertTrue(capability != null && capability.size() == 9,
+                "Filtered Buffer did not expose its nine filtered slots");
+        try (var transaction = net.neoforged.neoforge.transfer.transaction.Transaction.openRoot()) {
+            helper.assertValueEqual(0, capability.insert(0,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(new ItemStack(Items.STONE)),
+                    8, transaction), "Filtered Buffer ignored exact filter components");
+            helper.assertValueEqual(8, capability.insert(0,
+                    net.neoforged.neoforge.transfer.item.ItemResource.of(namedStone), 8, transaction),
+                    "Filtered Buffer rejected matching item");
+            transaction.commit();
+        }
+        helper.assertValueEqual(8L, buffer.inventory().getAmountAsLong(0),
+                "Filtered Buffer did not retain inserted items");
+        var loaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(pos, buffer.getBlockState(),
+                buffer.saveWithFullMetadata(helper.getLevel().registryAccess()), helper.getLevel().registryAccess());
+        helper.assertTrue(loaded instanceof buildcraft.transport.block.entity.FilteredBufferBlockEntity,
+                "Filtered Buffer did not reload as its registered block entity");
+        var restored = (buildcraft.transport.block.entity.FilteredBufferBlockEntity) loaded;
+        helper.assertTrue(ItemStack.isSameItemSameComponents(namedStone, restored.filter(0))
+                        && restored.inventory().getAmountAsLong(0) == 8,
+                "Filtered Buffer lost filter or inventory data on reload");
+        helper.getLevel().setBlockEntity(restored);
+        var player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
+        var menu = new buildcraft.transport.menu.FilteredBufferMenu(91, player.getInventory(), pos);
+        menu.setCarried(new ItemStack(Items.GOLD_INGOT, 32));
+        menu.clicked(2, 0, net.minecraft.world.inventory.ContainerInput.PICKUP, player);
+        helper.assertTrue(restored.filter(2).is(Items.GOLD_INGOT) && restored.filter(2).getCount() == 1,
+                "Filtered Buffer menu did not store a phantom one-item filter");
+        var input = net.minecraft.world.item.crafting.CraftingInput.of(3, 3, java.util.List.of(
+                new ItemStack(Items.OAK_PLANKS),
+                new ItemStack(buildcraft.transport.BCTransportItems.PIPE_DIAMOND_ITEM.get()),
+                new ItemStack(Items.OAK_PLANKS),
+                new ItemStack(Items.OAK_PLANKS), new ItemStack(Items.CHEST), new ItemStack(Items.OAK_PLANKS),
+                new ItemStack(Items.OAK_PLANKS), new ItemStack(Items.PISTON), new ItemStack(Items.OAK_PLANKS)));
+        ItemStack crafted = helper.getLevel().getServer().getRecipeManager().getRecipeFor(
+                net.minecraft.world.item.crafting.RecipeType.CRAFTING, input, helper.getLevel())
+                .orElseThrow().value().assemble(input);
+        helper.assertTrue(crafted.is(buildcraft.transport.BCTransportItems.FILTERED_BUFFER.get()),
+                "Filtered Buffer recipe output");
+        var drops = Block.getDrops(helper.getLevel().getBlockState(pos), helper.getLevel(), pos,
+                restored, null, ItemStack.EMPTY);
+        helper.assertTrue(drops.size() == 1
+                        && drops.getFirst().is(buildcraft.transport.BCTransportItems.FILTERED_BUFFER.get()),
+                "Filtered Buffer loot output");
         helper.succeed();
     }
 
