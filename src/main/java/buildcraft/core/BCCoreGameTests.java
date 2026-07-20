@@ -6427,6 +6427,35 @@ registerTest(event, environment, "robotics_robot_station", BCCoreGameTests::robo
     }
 
     private static void siliconFacade(GameTestHelper helper) {
+        var facadeVariants = buildcraft.silicon.BCSiliconItems.facadeVariants();
+        int eligibleFacadeItems = 0;
+        java.util.Set<net.minecraft.world.level.block.Block> eligibleFacadeBlocks = new java.util.HashSet<>();
+        for (net.minecraft.world.item.Item item : net.minecraft.core.registries.BuiltInRegistries.ITEM) {
+            if (item instanceof net.minecraft.world.item.BlockItem blockItem && item != Items.AIR
+                    && !blockItem.getBlock().defaultBlockState().isAir()) {
+                eligibleFacadeItems++;
+                eligibleFacadeBlocks.add(blockItem.getBlock());
+            }
+        }
+        helper.assertValueEqual(eligibleFacadeItems * 2, facadeVariants.size(),
+                "creative facade catalog did not include solid and hollow form of every BlockItem");
+        java.util.Map<net.minecraft.world.level.block.Block, Integer> facadeForms = new java.util.HashMap<>();
+        for (ItemStack variant : facadeVariants) {
+            helper.assertTrue(variant.is(buildcraft.silicon.BCSiliconItems.PLUG_FACADE.get()),
+                    "facade catalog contained a non-facade item");
+            BlockState variantState = variant.get(buildcraft.silicon.BCSiliconDataComponents.FACADE_STATE.get());
+            helper.assertTrue(variantState != null, "facade catalog variant lacked appearance state");
+            int form = variant.getOrDefault(buildcraft.silicon.BCSiliconDataComponents.FACADE_HOLLOW.get(), false)
+                    ? 2 : 1;
+            facadeForms.merge(variantState.getBlock(), form, (left, right) -> left | right);
+        }
+        helper.assertValueEqual(eligibleFacadeBlocks.size(), facadeForms.size(),
+                "facade catalog covered wrong set of blocks");
+        for (var entry : facadeForms.entrySet()) {
+            helper.assertValueEqual(3, entry.getValue(),
+                    "facade catalog did not include both forms for " + entry.getKey());
+        }
+
         var input = new buildcraft.silicon.recipe.AssemblyRecipeInput(java.util.List.of(
                 new ItemStack(buildcraft.transport.BCTransportItems.PIPE_STRUCTURE.get(), 3),
                 new ItemStack(Blocks.OAK_PLANKS)), null);

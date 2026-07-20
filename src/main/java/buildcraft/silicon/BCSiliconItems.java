@@ -13,8 +13,11 @@ import buildcraft.silicon.item.FacadeItem;
 import buildcraft.silicon.item.RedstoneChipsetItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.BlockItem;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.DyeColor;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.resources.Identifier;
 import net.neoforged.bus.api.IEventBus;
@@ -78,10 +81,26 @@ public final class BCSiliconItems {
     }
 
     public static ItemStack facade(BlockState state) {
+        return facade(state, false);
+    }
+
+    public static ItemStack facade(BlockState state, boolean hollow) {
         ItemStack stack = new ItemStack(PLUG_FACADE.get());
         stack.set(BCSiliconDataComponents.FACADE_STATE.get(), state);
+        stack.set(BCSiliconDataComponents.FACADE_HOLLOW.get(), hollow);
         stack.set(DataComponents.ITEM_MODEL, state.getBlock().asItem().builtInRegistryHolder().key().identifier());
         return stack;
+    }
+
+    public static java.util.List<ItemStack> facadeVariants() {
+        java.util.List<ItemStack> variants = new java.util.ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            if (!(item instanceof BlockItem blockItem) || item == Items.AIR
+                    || blockItem.getBlock().defaultBlockState().isAir()) continue;
+            variants.add(facade(blockItem.getBlock().defaultBlockState(), false));
+            variants.add(facade(blockItem.getBlock().defaultBlockState(), true));
+        }
+        return java.util.List.copyOf(variants);
     }
 
     private BCSiliconItems() {}
